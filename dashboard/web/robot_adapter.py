@@ -3,6 +3,7 @@ import threading
 
 from host.robot_link import RobotLink
 from host.roles import RoleCoordinator
+from robot import config as settings
 
 
 class RobotAdapter:
@@ -55,7 +56,7 @@ class RobotAdapter:
             self.hub.close()
 
 
-def start_loop(adapter, core, lock, period_s=0.1):
+def start_loop(adapter, core, lock, period_s=settings.HOST_COMMAND_PERIOD_MS / 1000):
     stop = threading.Event()
 
     def run():

@@ -1,10 +1,11 @@
 """Optional explicit UDP transport; non-loopback requires caller opt-in."""
 import ipaddress
 import socket
+from robot import config as settings
 
 
 class UdpTransport:
-    def __init__(self, host="127.0.0.1", port=9100, receive_port=9101, *, allow_real=False):
+    def __init__(self, host="127.0.0.1", port=settings.CMD_PORT, receive_port=settings.TEL_PORT, *, allow_real=False):
         address = ipaddress.ip_address(host)
         if address.version != 4 or (not address.is_loopback and not allow_real):
             raise ValueError("non-loopback robot address requires explicit authorization")

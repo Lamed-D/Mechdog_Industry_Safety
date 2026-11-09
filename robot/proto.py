@@ -4,6 +4,13 @@
 MAX_CMD_LEN = 64
 MAX_SEQ = 2147483647
 PROTO_VERSION = 0
+MAX_TEL_LEN = 160
+MAX_ROLE_STATUS_LEN = 96
+ROLE_MIN_LEASE_MS = 100
+ROLE_MAX_LEASE_MS = 1000
+ROLE_PRIMARY, ROLE_SECONDARY, ROLE_NONE = "P", "S", "N"
+WARN_ORDER = ("clipped", "busy", "latched", "move_stale", "reset_denied", "garbage", "proto",
+              "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart")
 
 ACTION_ALLOW = ("stand_four_legs", "normal_attitude", "sit_dowm",
                 "go_prone", "nodding_motion", "scrape_a_bow")
@@ -117,7 +124,8 @@ def parse(data, robot_id):
         session, term, code, lease = args
         term, lease = parse_int(term), parse_int(lease)
         if (not _is_boot_id(session) or term is None or not 1 <= term <= MAX_SEQ
-                or code not in ("P", "S", "N") or lease is None or not 100 <= lease <= 1000):
+                or code not in (ROLE_PRIMARY, ROLE_SECONDARY, ROLE_NONE)
+                or lease is None or not ROLE_MIN_LEASE_MS <= lease <= ROLE_MAX_LEASE_MS):
             return BAD, None
         args = [session, term, code, lease]
     return OK, Command(name, seq, args, to_all)

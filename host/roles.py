@@ -2,8 +2,9 @@
 from dataclasses import dataclass
 import re
 import time
+from robot import config as settings, proto as wire
 
-CODES = {"primary": "P", "secondary": "S", "none": "N"}
+CODES = {"primary": wire.ROLE_PRIMARY, "secondary": wire.ROLE_SECONDARY, "none": wire.ROLE_NONE}
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class RoleStatus:
 
 
 def parse_role_status(data):
-    if len(data) > 96:
+    if len(data) > wire.MAX_ROLE_STATUS_LEN:
         raise ValueError("role status too long")
     fields = data.decode("ascii").split("|")
     if len(fields) != 8 or fields[0] != "ROLE" or fields[-1] != "$":
@@ -27,7 +28,7 @@ def parse_role_status(data):
             or code not in CODES.values() or not term.isascii() or not term.isdigit()
             or not remaining.isascii() or not remaining.isdigit()
             or not tseq.isascii() or not tseq.isdigit()
-            or not 1 <= int(term) <= 2147483647 or not 0 <= int(remaining) <= 1000):
+            or not 1 <= int(term) <= wire.MAX_SEQ or not 0 <= int(remaining) <= wire.ROLE_MAX_LEASE_MS):
         raise ValueError("invalid role fields")
     return RoleStatus(robot, session, int(term), code, int(remaining), int(tseq))
 
@@ -41,7 +42,7 @@ class RoleCoordinator:
 
     def step(self):
         eligible = sorted(r for r, link in self.links.items() if link.fresh() and not link.emergency
-                          and link.latest.battery_mv is not None and link.latest.battery_mv >= 7000)
+                          and link.latest.battery_mv is not None and link.latest.battery_mv >= settings.LOW_BATT_WARN_MV)
         # 회복한 A가 건강한 주 B를 빼앗지 않게 현재 주 역할을 유지합니다.
         primary = self.primary if self.primary in eligible else (eligible[0] if eligible else None)
         assignments = {r: ("primary" if r == primary else "secondary" if r in eligible else "none")

@@ -3,6 +3,7 @@
 import socket
 import threading
 import time
+from robot import config as settings
 
 from .rplidar_protocol import Command, SampleParser, parse_descriptor, request
 
@@ -12,7 +13,7 @@ class LidarHealthError(ValueError):
 
 
 class LidarClient:
-    def __init__(self, host, port=20108, timeout=2, retry_delay=0.5, on_health=None):
+    def __init__(self, host, port=settings.LIDAR_TCP_PORT, timeout=2, retry_delay=0.5, on_health=None):
         if timeout <= 0 or retry_delay < 0:
             raise ValueError("invalid timing")
         self.address = (host, port)

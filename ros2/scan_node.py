@@ -14,7 +14,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--robot", choices=("A", "B"), required=True)
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=20108)
+    from robot.config import LIDAR_TCP_PORT
+    parser.add_argument("--port", type=int, default=LIDAR_TCP_PORT)
     parser.add_argument("--direction", type=int, choices=(-1, 1), default=-1)
     parser.add_argument("--offset-deg", type=float, default=0)
     args = parser.parse_args()
