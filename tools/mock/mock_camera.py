@@ -76,7 +76,7 @@ def make_handler(state):
             if path == "/capture":
                 seq, jpeg = state.next_frame()
                 return self._send(200, jpeg, "image/jpeg",
-                                  (("X-Frame-Seq", str(seq)), ("X-Frame-Age-Ms", "5")))
+                                  (("X-Robot", state.robot), ("X-Frame-Seq", str(seq)), ("X-Frame-Age-Ms", "5")))
             if path == "/stream":
                 return self._stream()
             return self._send(404, b"not found\n")
@@ -84,6 +84,7 @@ def make_handler(state):
         def _stream(self):
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace;boundary=" + BOUNDARY)
+            self.send_header("X-Robot", state.robot)
             self.end_headers()
             state.clients += 1
             try:

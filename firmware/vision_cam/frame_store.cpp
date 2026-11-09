@@ -126,7 +126,8 @@ static bool store_frame(const camera_fb_t *fb, int64_t now_us) {
 }
 
 static bool jpeg_ok(const camera_fb_t *fb) {
-  return fb->format == PIXFORMAT_JPEG && fb->len > 4 && fb->buf[0] == 0xFF && fb->buf[1] == 0xD8;
+  return fb->format == PIXFORMAT_JPEG && fb->len > 4 && fb->buf[0] == 0xFF && fb->buf[1] == 0xD8 &&
+         fb->buf[fb->len - 2] == 0xFF && fb->buf[fb->len - 1] == 0xD9;
 }
 
 static void capture_task(void *) {
@@ -254,7 +255,8 @@ size_t frame_store_copy(uint8_t *dst, size_t cap, uint32_t after_seq, uint32_t t
   for (;;) {
     frame_store_demand();
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (s_len > 0 && s_seq != after_seq) {
+    if (s_stats.camera_ok && s_len > 0 && s_seq != after_seq &&
+        esp_timer_get_time() - s_ts_us <= (int64_t)CAM_FRAME_WAIT_MS * 1000) {
       if (s_len > cap) {
         if (need) *need = s_len;
         xSemaphoreGive(s_lock);

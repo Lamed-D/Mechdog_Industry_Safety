@@ -13,6 +13,8 @@
 #include "net.h"
 #include "settings.h"
 
+static bool s_http_ok = false;
+
 static void start_watchdog() {
   // 코어가 이미 켠 작업 워치독의 시간을 늘리고, loop 작업을 감시 대상에 넣습니다.
   esp_task_wdt_config_t cfg = {};
@@ -37,6 +39,7 @@ void setup() {
 
   net_begin();
   bool http = http_begin();
+  s_http_ok = http;
   Serial.printf("[cam] http :%d/:%d %s, host %s\n", CAM_HTTP_PORT, CAM_STREAM_PORT, http ? "ok" : "FAILED",
                 net_hostname());
 }
@@ -45,6 +48,11 @@ void loop() {
   esp_task_wdt_reset();
   settings_poll_serial();
   net_loop();
+  static uint32_t last_http_retry = 0;
+  if (!s_http_ok && millis() - last_http_retry >= 5000) {
+    last_http_retry = millis();
+    s_http_ok = http_begin();  // 이미 정상인 서버는 유지하고 실패한 서버만 재시도
+  }
 
   CamStats st = frame_store_stats();
   int clients = http_stream_clients();
