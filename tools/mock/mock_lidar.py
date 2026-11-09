@@ -9,18 +9,30 @@ import random
 import socket
 import socketserver
 import threading
+import time
+
+
+# A1M8-R6 standard-scan profile, not the device's 8 kHz measurement mode.
+MIN_DISTANCE_MM = 150
+MAX_DISTANCE_MM = 12000
+POINTS_PER_ROTATION = 360
+ROTATION_HZ = 5.5
+SAMPLES_PER_SECOND = POINTS_PER_ROTATION * ROTATION_HZ
+BATCH_SAMPLES = 20
 
 
 def descriptor(size, mode, kind):
     return b"\xa5\x5a" + (size | mode << 30).to_bytes(4, "little") + bytes([kind])
 
 
-def room_sample(index, points=360, noise_mm=0, rng=None):
+def room_sample(index, points=POINTS_PER_ROTATION, noise_mm=0, rng=None):
+    if points < 1 or not math.isfinite(noise_mm) or noise_mm < 0:
+        raise ValueError("invalid synthetic scan parameters")
     angle = index % points * 360 / points
     radians = math.radians(angle)
     distance = 2000 / max(abs(math.cos(radians)), abs(math.sin(radians)))
     distance += (rng or random).uniform(-noise_mm, noise_mm)
-    distance = max(0, min(16383.75, distance))
+    distance = max(MIN_DISTANCE_MM, min(MAX_DISTANCE_MM, distance))
     return (bytes([(40 << 2) | (1 if index % points == 0 else 2)])
             + ((round(angle * 64) << 1) | 1).to_bytes(2, "little")
             + round(distance * 4).to_bytes(2, "little"))
@@ -34,8 +46,11 @@ class _Handler(socketserver.BaseRequestHandler):
         scanning = False
         count = 0
         rng = random.Random(0)
+        next_batch = time.monotonic()
         try:
             while not server.stopping.is_set():
+                if scanning:
+                    self.request.settimeout(max(0.0001, min(0.01, next_batch - time.monotonic())))
                 try:
                     data = self.request.recv(1024)
                     if not data:
@@ -59,15 +74,18 @@ class _Handler(socketserver.BaseRequestHandler):
                     elif command == 0x20:
                         self.request.sendall(descriptor(5, 1, 0x81))
                         scanning = True
-                if scanning:
+                        next_batch = time.monotonic()
+                if scanning and time.monotonic() >= next_batch:
                     batch = bytearray()
-                    for _ in range(20):
+                    for _ in range(BATCH_SAMPLES):
                         packet = room_sample(count, noise_mm=server.noise_mm, rng=rng)
                         count += 1
                         if server.corrupt_every and count % server.corrupt_every == 0:
                             packet = b"\x00" * 5
                         batch.extend(packet)
                     self.request.sendall(batch)
+                    # Never burst to catch up after a delayed send or busy input.
+                    next_batch = time.monotonic() + BATCH_SAMPLES / SAMPLES_PER_SECOND
                     if server.disconnect_after and count >= server.disconnect_after:
                         return
         except OSError:
@@ -81,7 +99,7 @@ class MockLidar(socketserver.ThreadingTCPServer):
 
     def __init__(self, address=("127.0.0.1", 20108), *, noise_mm=0,
                  corrupt_every=0, disconnect_after=0, health=0):
-        if noise_mm < 0 or corrupt_every < 0 or disconnect_after < 0:
+        if not math.isfinite(noise_mm) or noise_mm < 0 or corrupt_every < 0 or disconnect_after < 0:
             raise ValueError("fault parameters must be nonnegative")
         self.noise_mm = noise_mm
         self.corrupt_every = corrupt_every

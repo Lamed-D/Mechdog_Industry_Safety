@@ -10,6 +10,17 @@ from tools.mock.mock_lidar import MockLidar, descriptor, room_sample
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_a1m8_synthetic_distance_limits(self):
+        import random
+        for index in range(360):
+            sample = parse_sample(room_sample(index, noise_mm=100000,
+                                              rng=random.Random(index)))
+            self.assertGreaterEqual(sample.distance_mm, 150)
+            self.assertLessEqual(sample.distance_mm, 12000)
+        for noise in (float('nan'), float('inf'), -1):
+            with self.assertRaises(ValueError):
+                room_sample(0, noise_mm=noise)
+
     def test_commands(self):
         for command, value in [(Command.STOP, 0x25), (Command.RESET, 0x40),
                                (Command.SCAN, 0x20), (Command.GET_INFO, 0x50),
