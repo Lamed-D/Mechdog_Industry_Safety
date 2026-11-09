@@ -15,6 +15,17 @@ def _has_result(result):
     return any(result)        # 이전 형식(중심 x, y): 0 이 아니면 결과
 
 
+def _valid_result(result):
+    if isinstance(result, bool):
+        return True
+    if isinstance(result, int):
+        return result >= 0
+    if not isinstance(result, (list, tuple)) or len(result) not in (2, 4):
+        return False
+    return all(isinstance(value, int) and not isinstance(value, bool) and value >= 0
+               for value in result)
+
+
 class Vision:
     def __init__(self, api, recognition_on_camera=False):
         self.camera = None
@@ -40,6 +51,8 @@ class Vision:
             return {"status": "unknown", "reason": "no_result"}
         if not isinstance(result, (bool, int, list, tuple)):
             return {"status": "unknown", "reason": "unexpected_result_type"}
+        if not _valid_result(result):
+            return {"status": "unknown", "reason": "invalid_result_shape"}
         return {"status": "observed", "camera_link": "ok", "recognition": self.recognition,
                 "result_type": type(result).__name__, "has_result": _has_result(result),
                 "fallen_person": "unknown"}

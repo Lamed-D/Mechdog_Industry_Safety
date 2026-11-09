@@ -33,7 +33,8 @@ class WebTests(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=3) as r:
                 return r.status, json.loads(r.read())
         except urllib.error.HTTPError as error:
-            return error.code, json.loads(error.read())
+            with error:
+                return error.code, json.loads(error.read())
 
     def tick(self, n=2):
         with self.lock:

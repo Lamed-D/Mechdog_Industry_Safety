@@ -79,3 +79,18 @@ class VisionResultShapeTests(unittest.TestCase):
         self.assertEqual(self.read([0, 0, 0, 0])["recognition"], "off_on_camera")
         self.assertEqual(self.read(True, recognition_on_camera=True)["recognition"], "on_camera")
         self.assertEqual(self.read([0, 0, 0, 0])["camera_link"], "ok")
+
+    def test_valid_legacy_and_current_shapes_keep_their_meaning(self):
+        for value in (True, 1, [40, 30], (40, 30, 25, 25)):
+            with self.subTest(value=value):
+                result = self.read(value)
+                self.assertEqual(result["status"], "observed")
+                self.assertTrue(result["has_result"])
+                self.assertEqual(result["fallen_person"], "unknown")
+
+    def test_malformed_result_never_escapes_or_claims_observation(self):
+        for value in ([], [1], [1, 2, 3], [1, 2, 3, 4, 5], [0, 0, "bad", 0],
+                      [None, 0], [True, 0], [-1, 0], -1, [float("nan"), 0],
+                      [float("inf"), 0], [[1], 0], [0, {}]):
+            with self.subTest(value=value):
+                self.assertEqual(self.read(value)["status"], "unknown")
