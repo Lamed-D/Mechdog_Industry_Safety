@@ -1,7 +1,9 @@
 # Mechdog Industry Safety — AI agent instructions
 
-Two AI agents work here: **claude1** (Claude Code) and **codex1** (OpenAI Codex CLI), each in its own git worktree.
-Prefix issue/PR titles, comments and reports with `[claude1]` / `[codex1]`; talk to each other through GitHub issues (labels from:/to:/agent:*).
+AI agents work here: **claude1** (Claude Code, robot side), **codex1** (Codex CLI, Pi 5 host side), **claude2** (another person's
+Claude Code, dashboard and scenario). **Your name is `git config --get agent.name`** (set once by `python tools/setup_agent.py <name>`);
+if it is empty, ask the user. Prefix issue/PR titles, comments and reports with `[<name>]`; talk through GitHub issues (labels from:/to:/agent:*),
+and treat `to:<name>` + `agent:request` issues as work assigned to you.
 Codex reads this file; Claude reads CLAUDE.md. Coordinate only through GitHub (branches, issues, PRs).
 
 Read these before changing code (Korean):

@@ -1,12 +1,13 @@
 # 에이전트 협업 규칙 (claude1 · codex1)
 
-이 저장소에서는 AI 에이전트 **두 개 — claude1(Claude Code)과 codex1(OpenAI Codex CLI)** 이 동시에 작업합니다.
+이 저장소에서는 AI 에이전트 **claude1(Claude Code), codex1(OpenAI Codex CLI), claude2(다른 사람이 쓰는 Claude Code)** 가 동시에 작업합니다.
 두 에이전트는 서로의 대화 내용을 모르므로, 협업은 **GitHub(브랜치·이슈·PR)와 이 문서**로만 합니다.
 
 ## 1. 내가 누구인지
 
-- Claude Code로 실행 중이면 **claude1**, Codex CLI로 실행 중이면 **codex1** 입니다. 같은 도구로 에이전트를 더 띄우면
-  사용자가 `claude2`, `codex2`처럼 이름을 정해 줍니다.
+- **내 이름은 `git config --get agent.name` 으로 확인합니다.** 클론·worktree를 만든 사람이 처음에
+  `python tools/setup_agent.py <이름>` 으로 정해 둡니다(이 작업 폴더에만 저장, 커밋되지 않음).
+- 값이 비어 있으면 작업 전에 사용자에게 묻고, 직접 정하지 않습니다.
 - 사용자가 다른 이름이나 역할을 지정하면 그 지시를 따릅니다. 애매하면 작업 전에 묻습니다.
 
 ## 2. 작업 공간은 따로
@@ -17,6 +18,7 @@
 | --- | --- |
 | claude1 | `C:\Users\Lamed\Documents\GitHub\mechdog-safety-claude` |
 | codex1 | `C:\Users\Lamed\Documents\GitHub\mechdog-safety-codex` |
+| claude2 | 다른 사람의 PC에 따로 클론한 폴더 ([claude2 안내](../agents/claude2.md)) |
 
 - 원본 폴더(`Mechdog_Industry_Safety`)는 사용자 전용입니다. 에이전트는 여기서 파일을 고치거나 브랜치를 바꾸지 않습니다.
 - 다른 에이전트의 작업 폴더에 들어가 파일을 읽거나 고치지 않습니다. 상대 작업은 GitHub의 브랜치·PR로만 봅니다.
@@ -27,7 +29,8 @@
 | --- | --- | --- |
 | 로봇(MechDog ESP32, MicroPython) 쪽 코드 — Hiwonder 공식 Python 기반 | **claude1** | `robot/`, `custom_sensors/`, `tests/fakes/`, `tools/bringup/` |
 | 로봇 ↔ Pi 5 통신 규약 문서 | **claude1** (codex1은 PR 리뷰·protocol 이슈로 의견) | `docs/protocol.md` |
-| Pi 5(호스트) 쪽 코드: 라이다 수신, ROS 2, 로봇 명령, 카메라, 대시보드 | **codex1** | `host/`, `ros2/`, `tools/mock/` |
+| Pi 5(호스트) 쪽 코드: 라이다 수신, ROS 2, 로봇 명령, 카메라 | **codex1** | `host/`, `ros2/`, `tools/mock/` |
+| 관리자 대시보드, 시연 시나리오 상태기계 | **claude2** | `dashboard/`, `scenario/`, `tests/dashboard/`, `tests/scenario/` |
 | 공용 규칙 문서 | 사용자 승인 후 한 에이전트만 | `docs/dev/*`, `AGENTS.md`, `CLAUDE.md`, `.github/*`, `.claude/`, `.codex/` |
 
 - 상대 담당 폴더의 파일은 고치지 않습니다. 필요하면 이슈나 PR 코멘트로 요청합니다.
@@ -35,10 +38,11 @@
 
 ## 4. 작업 표시와 소통
 
-- 이슈 제목, PR 제목, 이슈·PR 코멘트, 사용자에게 하는 보고의 **맨 앞**에 `[claude1]` 또는 `[codex1]`을 붙입니다.
-- PR 본문 첫 줄은 `작업자: claude1` / `작업자: codex1`, 커밋 본문 마지막 줄은 `Agent: claude1` / `Agent: codex1`.
+- 이슈 제목, PR 제목, 이슈·PR 코멘트, 사용자에게 하는 보고의 **맨 앞**에 `[내 이름]`(예: `[claude2]`)을 붙입니다.
+- 사용자가 에이전트에게 일을 맡길 때도 `to:<이름>` + `agent:request` 이슈로 맡깁니다. 에이전트는 이 이슈를 읽고 작업합니다.
+- PR 본문 첫 줄은 `작업자: <이름>`, 커밋 본문 마지막 줄은 `Agent: <이름>`.
 - 에이전트끼리는 **GitHub 이슈**로 소통합니다. 라벨:
-  - 보낸 쪽 `from:claude1`·`from:codex1`, 받는 쪽 `to:claude1`·`to:codex1`·`to:user`
+  - 보낸 쪽 `from:<이름>`, 받는 쪽 `to:<이름>`·`to:user` (claude1·codex1·claude2)
   - 종류 `agent:question`·`agent:request`·`agent:blocker`·`agent:info`, 주제 `protocol`
 - 작업 단위를 끝낼 때마다, 새 작업을 시작하기 전에 `gh issue list --label "to:<내 이름>" --state open`으로 받은 이슈를 확인하고
   `[내 이름] 확인, <계획>` 코멘트를 남깁니다. 이슈는 연 쪽이 답을 확인한 뒤 닫습니다.
@@ -55,11 +59,12 @@
 
 PR은 사용자를 기다리지 않고 에이전트끼리 리뷰해서 병합합니다.
 
-1. **리뷰:** claude1의 PR은 codex1이, codex1의 PR은 claude1이 [코드 리뷰 규칙](code-review.md)대로 리뷰합니다.
+1. **리뷰:** PR은 작성자가 아닌 **다른 에이전트 한 명**이 [코드 리뷰 규칙](code-review.md)대로 리뷰합니다
+   (기본: claude1 ↔ codex1, claude2의 PR은 담당 영역이 가까운 codex1, 바쁘면 claude1).
    리뷰는 PR 코멘트로 남기고 `[내 이름] 리뷰:`로 시작합니다. 두 에이전트가 같은 GitHub 계정을 쓰므로 GitHub의 "Approve" 기능은 쓰지 않고,
    승인은 코멘트 **`[내 이름] 리뷰: 승인`** 으로 표시합니다. 고칠 점이 있으면 `[차단]`/`[제안]`/`[사소]`/`[질문]`으로 적습니다.
 2. **병합 조건 (모두 충족):**
-   - 상대 에이전트의 `리뷰: 승인` 코멘트가 **마지막 커밋 이후에** 달려 있다(승인 뒤에 커밋을 더 올렸으면 다시 승인받는다)
+   - 다른 에이전트의 `리뷰: 승인` 코멘트가 **마지막 커밋 이후에** 달려 있다(승인 뒤에 커밋을 더 올렸으면 다시 승인받는다)
    - 해결되지 않은 `[차단]`·`[질문]`이 없다
    - `python -m unittest discover -s tests` 통과(테스트가 있는 경우), `python tools/check_confidential.py range origin/main..HEAD` 통과
    - PR 제목·본문·코멘트에 참고 자료 이름·경로가 없다(직접 확인)

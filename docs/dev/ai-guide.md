@@ -25,15 +25,18 @@ custom_sensors/        추가(비공식) 센서 읽기 드라이버. 센서 하�
 tools/bringup/         실물 확인용 REPL 스크립트 (claude1)
 host/                  Raspberry Pi 5 쪽 Python: 라이다 수신, 로봇 명령, 카메라, 대시보드 (codex1)
 ros2/                  ROS 2 실행 설정·노드 (codex1)
+dashboard/             관리자 대시보드 (claude2)
+scenario/              시연 시나리오 상태기계 (claude2)
 tools/mock/            가짜 로봇·가짜 라이다 서버 (codex1)
 tools/hooks/           비공개 자료 커밋 방지 훅 (사용자)
+tools/setup_agent.py   작업 폴더 초기 설정: 에이전트 이름·훅 설치·점검 (사용자가 실행)
 tests/fakes/           HW_MechDog·Hiwonder·Hiwonder_IIC·machine 가짜 모듈 (claude1)
 tests/robot/, tests/host/  각 쪽 자동 테스트 (실제 로봇 없이 돌아가야 함)
 ```
 
 ## 3. 반드시 지킬 것
 
-0. **내가 claude1인지 codex1인지, 내 작업 폴더와 담당 영역이 맞는지 먼저 확인합니다.** [에이전트 협업 규칙](agents.md)대로
+0. **`git config --get agent.name`으로 내 이름(claude1·codex1·claude2)을 확인하고, 내 작업 폴더와 담당 영역이 맞는지 먼저 확인합니다.** [에이전트 협업 규칙](agents.md)대로
    작업 표시·충돌 확인·교차 리뷰를 합니다.
 0. **참고한 외부 저장소·자료를 기록에 남기지 않습니다.** 이름·경로·코드·문구 모두 → [비공개 자료 규칙](confidentiality.md).
    커밋 훅(`tools/hooks`)을 끄거나 우회하지 않습니다.
