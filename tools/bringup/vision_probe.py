@@ -28,9 +28,17 @@ def run(api, clock):
         started = clock.ticks_ms()
         value = getattr(camera, method)()
         elapsed = clock.ticks_diff(clock.ticks_ms(), started)
-        result = {"status": "observed" if value is not None else "unknown",
+        has_result = None
+        if isinstance(value, bool):
+            has_result = value
+        elif isinstance(value, int) and value >= 0:
+            has_result = value != 0
+        elif (isinstance(value, (list, tuple)) and len(value) in (2, 4)
+              and all(type(v) is int and v >= 0 for v in value)):
+            has_result = value[2] > 0 if len(value) == 4 else any(value)
+        result = {"status": "observed" if has_result is not None else "unknown",
                   "result_type": type(value).__name__,
-                  "has_result": bool(value), "read_ms": elapsed,
+                  "has_result": has_result, "read_ms": elapsed,
                   "method": method, "fallen_person": "unknown"}
     except Exception as error:
         args = getattr(error, "args", ())

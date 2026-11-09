@@ -8,6 +8,29 @@ MechDog 사족보행 로봇을 활용한 산업 현장 안전 프로젝트입니
 그중 1대가 관리자 위치(사무실 등)로 가서 관리자를 사고 지점까지 안내해 조치하게 합니다.
 → [docs/demo-scenario.md](docs/demo-scenario.md)
 
+## 본체 테스트 담당자 시작 순서
+
+**본체 코드 백업은 사용자 보고로 완료됐습니다.** 담당자는 기존 백업과 대상 A/B의 대응 및 복구 위치를 확인합니다.
+현재 통합 main 적용 전 동작 시험 단계이며, 실제 A/B 결과는 아직 미실행입니다.
+
+1. PC에서 저장소 루트 기준으로 시험 전달 폴더를 만들고 검사합니다. 이 명령은 장치에 접속하지 않습니다.
+
+   ```powershell
+   python tools/package_robot_checks.py
+   python tools/package_robot_checks.py --verify
+   ```
+
+2. 생성된 `build/robot_checks/`를 업로드 담당자에게 전달합니다. 먼저 그 안의 README를 읽거나
+   [시험 업로드 인계서](docs/user-tests/robot-python-handoff.md)를 확인합니다.
+3. 담당자가 본체의 기존 main 자동 실행을 중단한 뒤, 인계서에 적힌 시험 `.py` 6개만 Hiwonder Python Editor로
+   **Download만** 선택해 원래 이름으로 올립니다. 시험 파일을 main.py로 바꾸거나 공식 라이브러리를 덮어쓰지 않습니다.
+4. 본체 REPL에서 **API·배터리/IMU 읽기 → 4개 루프 → 카메라 I2C → 정지 → 승인한 짧은 동작 1개씩** 실행합니다.
+   실제 움직임은 사용자가 지정한 담당자만 수행합니다. PC의 가짜 모듈을 보드에 올리지 않습니다.
+5. [A/B별 체크리스트](docs/user-tests/robot-python-checklist.md)와 [결과 양식](docs/user-tests/results-template.md)을 채워 전달합니다.
+   `calls_completed`는 실물 합격이 아닙니다. 실패·미실행·측정 불가는 그대로 기록하고, 결과 검토 후 통합 main 적용 여부를 판단합니다.
+
+PC 개발 검증은 `python -m unittest discover -s tests`입니다. 합성/가짜 모듈 테스트이며 실제 로봇 동작을 검증하지 않습니다.
+
 ## 지금 시작하는 순서
 
 **카메라 확인 완료(사용자 실측):** 구입 당시 영상 전송 펌웨어에서 휴대폰을 `HW_ESP32S3CAM`에 연결하고

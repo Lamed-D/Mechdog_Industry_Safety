@@ -9,6 +9,9 @@
 
 ## 먼저 하는 읽기 확인
 
+다른 작업자가 올릴 때는 [시험 업로드 인계서](robot-python-handoff.md)를 먼저 전달합니다.
+본체 백업은 사용자 보고로 완료됐으며, `python tools/package_robot_checks.py`로 전달 폴더를 생성합니다.
+
 상세 배선과 단계별 예상 결과는 [bringup.md](../bringup.md)를 따릅니다.
 
 | 순서 | 사용자가 할 일 | 실행 위치 | 결과 |
