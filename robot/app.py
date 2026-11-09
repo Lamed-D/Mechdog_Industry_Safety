@@ -97,8 +97,7 @@ class App:
                     on_error()
                 self.clock.sleep_ms(period_ms)  # 다른 루프에 차례를 넘김
         finally:
-            with self.lock:
-                self.motion.stop()  # 어떤 이유로든 루프가 끝나면 정지
+            self.robot.fail_safe()  # 동작 그룹도 정지하고 사람 RESET 전까지 래치
 
     def comm_loop(self):
         self._forever(self.comm_step, COMM_PERIOD_MS, self.robot.fail_safe)

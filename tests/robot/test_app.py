@@ -96,6 +96,22 @@ class StartTest(AppTestCase):
 
 
 class FlowTest(AppTestCase):
+    def test_loop_exit_stops_action_and_latches(self):
+        app = self.make_app()
+        self.ready(app)
+        self.cmd("ACTION", "nodding_motion")
+        self.step(app)
+
+        def exit_loop(ms):
+            raise KeyboardInterrupt
+
+        self.clock.sleep_ms = exit_loop
+        with self.assertRaises(KeyboardInterrupt):
+            app._forever(lambda: None, 5, app.robot.fail_safe)
+        self.assertIsNone(self.dog.action_running)
+        self.assertTrue(app.robot.latched)
+        self.assertEqual(self.dog.last_move, (0, 0))
+
     def test_normal_start_and_walk(self):
         app = self.make_app()
         self.ready(app)

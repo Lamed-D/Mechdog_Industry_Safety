@@ -204,11 +204,11 @@ class CommandTest(CoreTestCase):
         self.wait(200)
         self.assertFalse(self.robot.busy())
 
-    def test_latch_without_action_does_not_call_stop_action(self):
+    def test_latch_without_action_still_calls_stop_action(self):
         self.ready()
         self.send("MOVE", 40, 0)
         self.send("ESTOP")
-        self.assertEqual(self.dog.fake_calls("stop_action"), [])
+        self.assertEqual(self.dog.fake_calls("stop_action"), [()])
 
     def test_pose_default(self):
         self.ready()
@@ -218,6 +218,43 @@ class CommandTest(CoreTestCase):
 
 
 class LatchTest(CoreTestCase):
+    def test_estop_attempts_action_stop_without_tracking(self):
+        self.ready()
+        self.dog.action_running = "nodding_motion"
+        self.send("ESTOP")
+        self.assertIsNone(self.dog.action_running)
+        self.assertEqual(self.moves()[-1], (0, 0))
+
+    def test_action_start_exception_remains_tracked(self):
+        self.ready()
+        original = self.dog.action_run
+
+        def starts_then_fails(name):
+            original(name)
+            raise OSError("started before failure")
+
+        self.dog.action_run = starts_then_fails
+        with self.assertRaises(OSError):
+            self.send("ACTION", "nodding_motion")
+        self.robot.fail_safe()
+        self.assertIsNone(self.dog.action_running)
+        self.assertTrue(self.robot.latched)
+        self.assertEqual(self.moves()[-1], (0, 0))
+        self.send("RESET")
+        self.assertTrue(self.robot.latched)
+
+    def test_action_stop_failure_still_attempts_move_zero(self):
+        self.ready()
+        self.send("ACTION", "nodding_motion")
+
+        def broken():
+            raise OSError("stop unavailable")
+
+        self.dog.stop_action = broken
+        self.send("ESTOP")
+        self.assertEqual(self.moves()[-1], (0, 0))
+        self.assertEqual(self.robot.latch_reason, "estop")
+
     def test_estop_priority_and_not_overwritten(self):
         self.ready()
         self.send("MOVE", 40, 0)
