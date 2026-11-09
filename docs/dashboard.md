@@ -108,7 +108,12 @@ python -m dashboard.web.run --sim                  # 가짜 로봇 A·B, http://
 python -m dashboard.web.run --sim --host 0.0.0.0 --token <조작 토큰> --log D:\mechdog-logs\events.db
 ```
 
-- `--sim` 없이 실행하면 멈춥니다. 실물 링크(RobotLink + UDP, 두 로봇의 텔레메트리를 한 소켓에서 받아 로봇별로 나눔)는 다음 PR에서 붙입니다.
+- `--sim` 또는 `--allow-real`을 명시해야 실행합니다. 실물 점검 어댑터는 한 소켓으로 두 로봇을 받고
+  출처 주소·포트·로봇 ID를 대조합니다. 사용자가 대상 A/B를 승인한 뒤에만 아래 명령을 실행합니다.
+  `python -m dashboard.web.run --allow-real --robot-a <A_IP> --robot-b <B_IP> --token <사용자 토큰>`
+  실물 모드는 토큰이 필수입니다. HELLO/STOP/ESTOP과 사람이 확인한 RESET만 보냅니다.
+  **순찰·경로·안내·동작·자세는 stationary_mode로 차단하고 정지합니다.** 경로 계획·실물 검증 전 이동하지 않습니다.
+  시작·종료도 로봇으로 명령을 보내므로 에이전트는 이 명령을 실행하지 않습니다.
 - 화면 맨 위 **전체 정지** 버튼은 확인 창 없이 바로 보내고, 실패하면 한 번 더 보낸 뒤 결과를 빨갛게 표시합니다.
 - **전체 정지는 토큰 없이도** 받습니다(멈추는 쪽은 막지 않음). 순찰·안내 같은 조작과 래치 해제는 `--token`을 주면 토큰이 필요합니다.
 - 래치 해제는 화면의 확인 창("주변이 안전하고 로봇을 지켜보고 있습니까?")을 거쳐야 하고, 서버도 `confirmed: true`만 받습니다.

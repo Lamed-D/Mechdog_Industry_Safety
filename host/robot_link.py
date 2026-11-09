@@ -137,6 +137,11 @@ class RobotLink:
         self.pending_reset = False
         self.next_send = -math.inf
 
+    def stop(self):
+        self.intent = None
+        self.pending_reset = False
+        self.next_send = -math.inf
+
     def request_reset(self):
         if not self.fresh() or not self.latest.latched or self.latest.battery_mv is None or self.latest.battery_mv < 6800:
             raise ValueError("reset requires fresh latched telemetry and adequate battery")

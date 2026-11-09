@@ -38,6 +38,7 @@ class DashboardCore:
     # ---- 사람 조작 ---------------------------------------------------------
     def estop_all(self, source="operator"):
         """전체 정지. 반환값의 errors 가 비어 있지 않으면 화면에 크게 알려야 합니다."""
+        self.commands.clear()  # ESTOP 전에 쌓인 명령은 이후 어댑터에 전달하지 않음
         sent, errors = [], []
         for robot in ROBOTS:
             link = self.links.get(robot)
@@ -113,6 +114,12 @@ class DashboardCore:
         out = list(self.commands)
         self.commands.clear()
         return out
+
+    def command_blocked(self, robot, kind, reason):
+        """어댑터가 실행하지 못한 명령을 표시하고 시나리오의 준비 상태에서 뺍니다."""
+        self._ready[robot] = False
+        self._note("command_blocked", robot, {"command": kind, "reason": reason})
+        self._apply(self.scenario.link_lost(robot))
 
     def snapshot(self):
         return {"phase": self.scenario.phase, "scenario": self.scenario.snapshot(),
