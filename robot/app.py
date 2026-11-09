@@ -42,16 +42,29 @@ class App:
         self.lidar = LidarBridge(cfg, machine, socket, clock)
         self.vision = vision
         self.vision_status = {"status": "unknown", "reason": "not_read"}
+        self.ready = False
+        self.startup_failed = False
 
     def start(self, start_main):
-        self.motion.stop()
-        self.link.start()
-        self._update_conditions()
-        start_main(self.watchdog_loop)
-        start_main(self.comm_loop)
-        start_main(self.lidar_loop)
-        if self.vision is not None:
-            start_main(self.vision_loop)
+        if self.ready or self.startup_failed:
+            raise RuntimeError("startup already attempted; restart required")
+        try:
+            self.motion.stop()
+            self.link.start()
+            self._update_conditions()
+            start_main(self.watchdog_loop)
+            start_main(self.comm_loop)
+            start_main(self.lidar_loop)
+            if self.vision is not None:
+                start_main(self.vision_loop)
+            self.ready = True
+        except BaseException:
+            self.startup_failed = True
+            try:
+                self.robot.fail_safe()
+            except Exception:
+                pass
+            raise
 
     def _update_conditions(self):
         conditions = (("pm_on", self.link.pm_on), ("lidar_uart", not self.lidar.uart_ok()),
@@ -96,9 +109,10 @@ class App:
     # --- 반복 루프 ---
     def _forever(self, step, period_ms, on_error):
         try:
-            while True:
+            while not self.startup_failed:
                 try:
-                    step()
+                    if self.ready:  # 모든 루프 등록 전에 명령 처리를 시작하지 않음
+                        step()
                 except Exception:
                     on_error()
                 self.clock.sleep_ms(period_ms)  # 다른 루프에 차례를 넘김

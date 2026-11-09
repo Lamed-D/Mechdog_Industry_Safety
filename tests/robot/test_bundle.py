@@ -8,6 +8,31 @@ from tools.bundle_robot import render
 
 
 class BundleTests(unittest.TestCase):
+    def test_startup_error_is_preserved_when_action_stop_also_fails(self):
+        fakes.install()
+        try:
+            with patch.dict("sys.modules", {"socket": FakeNet(), "time": FakeClock(1000)}), \
+                    patch.object(fakes.Hiwonder, "startMain", side_effect=RuntimeError("registration failure")), \
+                    patch.object(fakes.HW_MechDog.MechDog, "stop_action", side_effect=OSError("stop failure")):
+                with self.assertRaisesRegex(RuntimeError, "registration"):
+                    exec(compile(render("B"), "bundle", "exec"), {})
+            self.assertEqual(fakes.HW_MechDog.instances[-1].last_move, (0, 0))
+        finally:
+            fakes.uninstall()
+
+    def test_startup_registration_failure_attempts_both_stops(self):
+        fakes.install()
+        try:
+            with patch.dict("sys.modules", {"socket": FakeNet(), "time": FakeClock(1000)}), \
+                    patch.object(fakes.Hiwonder, "startMain", side_effect=RuntimeError("synthetic registration failure")):
+                with self.assertRaisesRegex(RuntimeError, "registration"):
+                    exec(compile(render("A"), "bundle", "exec"), {})
+            dog = fakes.HW_MechDog.instances[-1]
+            self.assertTrue(dog.fake_calls("stop_action"))
+            self.assertEqual(dog.last_move, (0, 0))
+        finally:
+            fakes.uninstall()
+
     def test_both_ids_start_latched_with_fake_modules(self):
         for robot in ("A", "B"):
             with self.subTest(robot=robot):

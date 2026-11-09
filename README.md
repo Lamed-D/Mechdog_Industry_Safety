@@ -46,6 +46,7 @@ PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
 `python tools/build_vision_cam.py --verify-release`로 현재 소스와 일치하는지 읽기 검사합니다.
 현재 v0.1.4는 VGA 기본/SVGA 상세 프로필을 제공하며, 실제 화질·Pi 모델 성능은 아직 미검증입니다.
 본체는 [A/B별 단일 main 생성·업로드·복구](docs/robot-upload.md)를 따르고 장치에 맞는 묶음만 사용합니다.
+통합 main 실기 적용 전 [본체 Python 동작 체크리스트](docs/user-tests/robot-python-checklist.md)의 사용자 시험이 필요합니다.
 
 ## 파일과 실행 위치
 

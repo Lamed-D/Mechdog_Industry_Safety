@@ -65,6 +65,26 @@ class AppTestCase(unittest.TestCase):
 
 
 class StartTest(AppTestCase):
+    def test_partial_registration_failure_never_enables_loops(self):
+        app = App(self.cfg, self.dog, fakes.Hiwonder.Battery_power, self.imu.read_angle,
+                  fakes.network, self.net, fakes.machine, self.clock)
+        registered = []
+        def register(func):
+            self.assertFalse(app.ready)
+            if registered:
+                raise RuntimeError("synthetic registration failure")
+            registered.append(func)
+        with self.assertRaises(RuntimeError):
+            app.start(register)
+        self.assertTrue(app.startup_failed)
+        self.assertFalse(app.ready)
+        registered[0]()  # 남은 callback은 명령을 처리하지 않고 종료
+        self.assertTrue(app.robot.latched)
+        self.assertEqual(self.dog.last_move, (0, 0))
+
+        with self.assertRaisesRegex(RuntimeError, "restart required"):
+            app.start(register)
+
     def test_lock_failure_prevents_startup(self):
         from unittest.mock import patch
         with patch("_thread.allocate_lock", side_effect=RuntimeError("unavailable")):
