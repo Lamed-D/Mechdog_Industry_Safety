@@ -1,7 +1,8 @@
 <!-- 제목: feat: ... / fix: ... (squash merge 커밋 메시지가 됩니다) -->
 <!-- 브랜치: feat/<설명> 또는 issue/<번호>-<설명>  — docs/dev/branch-rules.md -->
 
-작업자: <!-- Claude / Codex / 사람 이름 -->  리뷰어: <!-- 다른 에이전트 -->
+작업자: <!-- claude1 / codex1 / 사람 이름 -->  리뷰어: <!-- 다른 에이전트 -->
+<!-- 제목 앞에 [claude1] 또는 [codex1]. 병합 조건: docs/dev/agents.md 6절 -->
 
 ## 무엇을 / 왜
 
