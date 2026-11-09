@@ -46,6 +46,35 @@ class FakeLidarUart:
 
 
 class BringupTest(unittest.TestCase):
+    def test_standalone_vision_probe_success_and_failure_without_motion(self):
+        module = load("vision_probe")
+        clock = FakeClock()
+        fakes.Hiwonder_IIC.fake_set_face(True)
+        result = module.run(fakes.Hiwonder_IIC, clock)
+        self.assertEqual(result["status"], "observed")
+        self.assertEqual(result["fallen_person"], "unknown")
+        fakes.Hiwonder_IIC.fake_set_face(OSError(5))
+        failure = module.run(fakes.Hiwonder_IIC, clock)
+        self.assertEqual(failure["status"], "unknown")
+        self.assertEqual((failure["stage"], failure["errno"]), ("face_read", 5))
+        self.assertEqual(fakes.HW_MechDog.instances, [])
+        self.assertEqual(fakes.machine.uarts, [])
+
+    def test_vision_probe_distinguishes_bus_and_camera_init_failures(self):
+        module = load("vision_probe")
+        class Broken:
+            @staticmethod
+            def IIC(bus):
+                raise OSError(19)
+            @staticmethod
+            def ESP32S3Cam(bus):
+                raise OSError(5)
+        result = module.run(Broken, FakeClock())
+        self.assertEqual((result["stage"], result["errno"]), ("iic_init", 19))
+        Broken.IIC = staticmethod(lambda bus: object())
+        result = module.run(Broken, FakeClock())
+        self.assertEqual((result["stage"], result["errno"]), ("camera_init", 5))
+
     def test_mechdog_only_does_not_construct_robot_or_open_uart(self):
         result = load("mechdog_only").main()
         self.assertEqual(result["battery_mv"], 7800)
