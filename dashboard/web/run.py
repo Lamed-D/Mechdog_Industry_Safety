@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from dashboard.core import DashboardCore, EventLog
+from dashboard.core import DashboardCore, EventLog, BufferedEventLog
 from dashboard.web.server import DashboardServer
 from dashboard.web.sim import SimLink, start_loop
 from scenario.machine import Scenario
@@ -46,7 +46,11 @@ def main(argv=None):
         from host.robot_hub import RobotHub
         from dashboard.web.robot_adapter import RobotAdapter
         adapter = RobotAdapter(RobotHub({"A": args.robot_a, "B": args.robot_b}, allow_real=True))
-        core = DashboardCore(Scenario(), adapter.links, EventLog(args.log))
+        try:
+            core = DashboardCore(Scenario(), adapter.links, BufferedEventLog(EventLog(args.log)))
+        except Exception:
+            adapter.close()
+            raise
     server = None
     stop_event = thread = None
     try:

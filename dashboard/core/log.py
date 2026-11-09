@@ -33,13 +33,13 @@ class EventLog:
                          " robot TEXT, detail TEXT NOT NULL)")
         self._db.commit()
 
-    def record(self, kind, robot=None, detail=None):
+    def record(self, kind, robot=None, detail=None, *, event_wall=None):
         """기록 성공 여부를 돌려줍니다. 실패해도 예외를 올리지 않습니다."""
         try:
             text = json.dumps(_clean(detail or {}), ensure_ascii=False, sort_keys=True)
             with self._lock:
                 self._db.execute("INSERT INTO events (wall, kind, robot, detail) VALUES (?, ?, ?, ?)",
-                                 (self.wall(), str(kind), robot, text))
+                                 (self.wall() if event_wall is None else event_wall, str(kind), robot, text))
                 self._db.commit()
             return True
         except (sqlite3.Error, ValueError, TypeError):
