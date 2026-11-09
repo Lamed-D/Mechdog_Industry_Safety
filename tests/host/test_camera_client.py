@@ -128,6 +128,30 @@ class FreshnessTests(unittest.TestCase):
 
 
 class MockServerTests(unittest.TestCase):
+    def test_valid_synthetic_jpeg_decoding_probe(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("optional Pillow decoder unavailable")
+        from unittest.mock import patch
+        from tools.vision_performance import decode_jpeg, measure
+        output = io.BytesIO()
+        Image.new("RGB", (640, 480), (128, 64, 32)).save(output, format="JPEG")
+        with patch.object(mock_camera, "synthetic_jpeg", return_value=output.getvalue()):
+            receiver = LatestFrameReceiver(self.endpoint).start()
+            try:
+                deadline = time.monotonic() + 2
+                while receiver.latest() is None and time.monotonic() < deadline:
+                    time.sleep(.01)
+                result = measure({"A": receiver}, .2, processor=decode_jpeg)
+                values = result["robots"]["A"]
+                self.assertEqual(values["dimensions"], (640, 480))
+                self.assertEqual(values["processing_errors"], 0)
+                self.assertGreater(values["processed_fps"], 0)
+                self.assertFalse(result["model_accuracy_verified"])
+            finally:
+                receiver.stop()
+
     def test_other_robot_capture_is_rejected(self):
         self.state.robot = "B"
         self.assertIsNone(CameraClient(self.endpoint).capture())
