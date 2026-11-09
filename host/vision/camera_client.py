@@ -225,6 +225,7 @@ class LatestFrameReceiver:
         self._stop = threading.Event()
         self._thread = None
         self.frames = 0
+        self.bytes_received = 0
         self.errors = 0
         self.last_error = None
 
@@ -267,6 +268,7 @@ class LatestFrameReceiver:
             with self._lock:
                 self._frame = frame
             self.frames += 1
+            self.bytes_received += len(frame.jpeg)
             self.last_error = None
             if self._stop.is_set():
                 return

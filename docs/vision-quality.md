@@ -37,6 +37,21 @@ python tools/build_vision_cam.py --release --profile detail   # detail로 최신
 
 ## Pi 처리 방식과 실물 합격 기준
 
+사용자가 직접 실행할 측정 명령(영상 저장·로봇 명령 없음):
+
+```bash
+python -m tools.vision_performance --a-host <A_카메라_IP> --b-host <B_카메라_IP> --allow-camera --seconds 30
+python -m tools.vision_performance --a-host <A_카메라_IP> --b-host <B_카메라_IP> --allow-camera --seconds 30 --decode
+```
+
+`--decode`는 선택 의존성 Pillow로 JPEG→RGB 디코딩 시간을 잽니다. 모델 추론 시간이 아닙니다.
+사용자가 설치·검토한 모델 어댑터는 `--processor package:function`으로 별도 측정하며 JPEG bytes를 받습니다.
+모델·가중치는 자동 설치하거나 다운로드하지 않습니다. Ubuntu ARM64 지원과 라이선스를 먼저 확인합니다.
+접근 키는 사용자 환경 변수 CAMERA_A_KEY/CAMERA_B_KEY에서 읽고 출력하지 않습니다.
+숫자 JSON만 표준 출력으로 내며 영상 파일을 만들지 않습니다. 수신 FPS·JPEG 대역·선택 프레임·처리 FPS·오류·차원을 보고합니다.
+p95는 최근 최대 2000개 표본의 결과 나이·처리 시간입니다. 저장 큐는 쌓지 않습니다.
+이 측정의 `model_accuracy_verified`는 항상 false이며 화질·낙상 정확도 합격을 대신하지 않습니다.
+
 영상 수신 스레드는 계속 최신 JPEG 한 장만 보관합니다. 모델은 처리할 때 최신 프레임을 가져오고,
 느리면 중간 프레임을 건너뜁니다. 디코딩·추론 때문에 네트워크 수신을 멈추거나 모든 프레임을 큐에 쌓지 않습니다.
 카메라의 실제 드라이버 취득 시각으로 나이를 계산하므로 보관 버퍼·전송 지연도 오래된 영상 판정에 포함됩니다.
