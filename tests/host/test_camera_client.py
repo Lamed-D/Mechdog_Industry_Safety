@@ -66,6 +66,26 @@ class StatusTests(unittest.TestCase):
 
 
 class FreshnessTests(unittest.TestCase):
+    def test_capture_rejects_missing_old_or_slow_age(self):
+        for age, delay in ((None, 0), ("1500", 0), ("5", 2)):
+            clock = FakeClock()
+
+            class Response(io.BytesIO):
+                headers = {"X-Robot": "A", "X-Frame-Age-Ms": age, "X-Frame-Seq": "1"}
+
+                def read(self, n=-1):
+                    clock.now += delay
+                    return super().read(n)
+
+            client = CameraClient(CameraEndpoint("A", "x"), clock=clock,
+                                  opener=lambda *a, **kw: Response(mock_camera.synthetic_jpeg(1)))
+            self.assertIsNone(client.capture())
+
+    def test_duplicate_sequence_cannot_refresh_frame(self):
+        receiver = LatestFrameReceiver(CameraEndpoint("A", "x"), clock=FakeClock())
+        with self.assertRaises(ValueError):
+            receiver.feed(io.BytesIO(part(1) + part(1)))
+
     def test_latest_goes_unknown_when_stale(self):
         clock = FakeClock()
         receiver = LatestFrameReceiver(CameraEndpoint("A", "x"), max_age_s=1.0, clock=clock)
@@ -108,6 +128,20 @@ class FreshnessTests(unittest.TestCase):
 
 
 class MockServerTests(unittest.TestCase):
+    def test_other_robot_capture_is_rejected(self):
+        self.state.robot = "B"
+        self.assertIsNone(CameraClient(self.endpoint).capture())
+
+    def test_other_robot_stream_is_unknown(self):
+        self.state.robot = "B"
+        receiver = LatestFrameReceiver(self.endpoint, retry_s=0.05).start()
+        self.addCleanup(receiver.stop)
+        deadline = time.monotonic() + 2
+        while receiver.errors == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertIsNone(receiver.latest())
+        self.assertGreater(receiver.errors, 0)
+
     def setUp(self):
         self.state = mock_camera.CameraState("A", key="secret-key", fps=50)
         self.http = mock_camera.serve(self.state)

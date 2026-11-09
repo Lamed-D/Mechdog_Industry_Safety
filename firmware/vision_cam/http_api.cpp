@@ -161,7 +161,7 @@ static void stream_task(void *arg) {
     httpd_resp_set_type(req, "multipart/x-mixed-replace;boundary=" STREAM_BOUNDARY);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "X-Robot", settings_robot());
-    uint32_t seq = 0;
+    uint32_t seq = frame_store_seq();  // 재접속 시 쉬던 카메라의 옛 프레임을 보내지 않음
     for (;;) {
       int64_t ts = 0;
       uint32_t next = 0;
@@ -210,6 +210,7 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 }
 
 static bool start(httpd_handle_t *h, uint16_t port, uint16_t ctrl, int sockets, const httpd_uri_t *uris, int n) {
+  if (*h != nullptr) return true;
   httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
   cfg.server_port = port;
   cfg.ctrl_port = ctrl;
@@ -220,7 +221,13 @@ static bool start(httpd_handle_t *h, uint16_t port, uint16_t ctrl, int sockets, 
   cfg.stack_size = 6144;
   cfg.core_id = 0;
   if (httpd_start(h, &cfg) != ESP_OK) return false;
-  for (int i = 0; i < n; i++) httpd_register_uri_handler(*h, &uris[i]);
+  for (int i = 0; i < n; i++) {
+    if (httpd_register_uri_handler(*h, &uris[i]) != ESP_OK) {
+      httpd_stop(*h);
+      *h = nullptr;
+      return false;
+    }
+  }
   return true;
 }
 

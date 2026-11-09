@@ -125,6 +125,7 @@ class CameraClient:
                 body = response.read(8192)
             status = parse_status(json.loads(body), self.endpoint.robot)
         except urllib.error.HTTPError as error:
+            error.close()
             return {"robot": self.endpoint.robot, "status": "unknown", "reason": "http_%d" % error.code}
         except (OSError, ValueError) as error:
             return {"robot": self.endpoint.robot, "status": "unknown", "reason": type(error).__name__}
@@ -140,13 +141,23 @@ class CameraClient:
         try:
             with self._open(self.endpoint.url("/capture"), timeout=self.timeout_s) as response:
                 header_time = self._clock()
+                if response.headers.get("X-Robot") != self.endpoint.robot:
+                    return None
                 data = response.read(MAX_FRAME_BYTES + 1)
                 headers = response.headers
             if len(data) > MAX_FRAME_BYTES or not is_jpeg(data):
                 return None
             age = _optional_int(headers.get("X-Frame-Age-Ms"))
-            return Frame(self.endpoint.robot, data, _optional_int(headers.get("X-Frame-Seq")), age,
+            seq = _optional_int(headers.get("X-Frame-Seq"))
+            if seq is None:
+                return None
+            if age is None or not 0 <= self._clock() - _captured_at(header_time, age) <= self.max_frame_age_ms / 1000:
+                return None
+            return Frame(self.endpoint.robot, data, seq, age,
                          _captured_at(header_time, age))
+        except urllib.error.HTTPError as error:
+            error.close()
+            return None
         except (OSError, ValueError):
             return None
 
@@ -232,9 +243,9 @@ class LatestFrameReceiver:
         with self._lock:
             frame = self._frame
         # Without the camera's age header the frame's real age is unknown: not fresh.
-        if frame is None or frame.camera_age_ms is None or frame.camera_age_ms > self.max_camera_age_ms:
+        if frame is None or frame.seq is None or frame.camera_age_ms is None or frame.camera_age_ms > self.max_camera_age_ms:
             return None
-        if self._clock() - frame.captured_at > self.max_age_s:
+        if not 0 <= self._clock() - frame.captured_at <= self.max_age_s:
             return None
         return frame
 
@@ -246,7 +257,13 @@ class LatestFrameReceiver:
 
     def feed(self, stream):
         """Read one connection until it ends. Separated from the thread for tests."""
+        previous = None
         for frame in read_mjpeg(stream, self.endpoint.robot, self._clock):
+            if frame.seq is not None and previous is not None and frame.seq <= previous:
+                with self._lock:
+                    self._frame = None
+                raise ValueError("frame sequence did not advance")
+            previous = frame.seq
             with self._lock:
                 self._frame = frame
             self.frames += 1
@@ -258,11 +275,16 @@ class LatestFrameReceiver:
         while not self._stop.is_set():
             try:
                 with self._open(self.endpoint.url("/stream"), timeout=self.timeout_s) as response:
+                    if response.headers.get("X-Robot") != self.endpoint.robot:
+                        raise ValueError("camera reports another robot")
                     self.feed(response)
                 self.last_error = "stream_ended"
             except urllib.error.HTTPError as error:
+                error.close()
                 self.last_error = "http_%d" % error.code
             except (OSError, ValueError) as error:
                 self.last_error = type(error).__name__
+            with self._lock:
+                self._frame = None
             self.errors += 1
             self._stop.wait(self.retry_s)

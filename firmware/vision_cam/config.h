@@ -10,7 +10,7 @@
 #define CAM_HAS_SECRETS 0
 #endif
 
-#define CAM_FW_VERSION "0.1.1"
+#define CAM_FW_VERSION "0.1.2"
 
 // ── 로봇 ID: "A" 또는 "B". mDNS 이름은 mechdog-<소문자 ID>-cam ──
 #ifndef CAM_ROBOT_ID
