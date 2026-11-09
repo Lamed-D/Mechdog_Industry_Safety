@@ -103,6 +103,7 @@ function render(s) {
     return `<div style="margin-bottom:10px"><b>로봇 ${r}</b>
       <div class="row"><span>통신</span><span class="${linkCls(v.link)}">${esc(v.link)}${v.last_seen_age_s != null ? " (" + v.last_seen_age_s + "초 전)" : ""}</span></div>
       <div class="row"><span>상태</span><span>${esc(v.state)}</span></div>
+      <div class="row"><span>통신 역할</span><span>${esc(({primary:"주 로봇",secondary:"보조 로봇",none:"미지정"})[v.role] || "확인 중")}</span></div>
       <div class="row"><span>래치</span><span class="${v.latched ? "bad" : "ok"}">${v.latched == null ? "?" : v.latched ? "잠김(" + esc(v.reason) + ")" : "풀림"}</span></div>
       <div class="row"><span>배터리</span><span>${v.battery_mv == null ? "모름" : (v.battery_mv / 1000).toFixed(2) + " V"}</span></div>
       <div class="row"><span>카메라</span><span class="${v.camera === "streaming" ? "ok" : "warn"}">${esc(v.camera)}</span></div>
