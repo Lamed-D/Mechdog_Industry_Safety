@@ -61,3 +61,5 @@ reset은 confirmed=true와 공개 reset_context가 필요합니다. confirmed JS
 형식 검사·권한·처리 ID 저널·실행 직전 상태/신선도 검사는 SQL만으로 대체하지 않습니다.
 
 실물 미검증. 실제 PostgreSQL/Supabase 실행·RLS·Storage 권한·API 성능은 모두 미검증입니다.
+
+동일 UUID와 동일 내용의 재전송은 변경 없는 재시도로 허용한다. 확정 지도 내용 변경은 계속 거부한다.

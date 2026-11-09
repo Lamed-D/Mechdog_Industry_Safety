@@ -157,6 +157,9 @@ begin
   if (new.id,new.hub_id,new.created_at) is distinct from (old.id,old.hub_id,old.created_at) then
     raise exception 'immutable row identity';
   end if;
+  if to_jsonb(new)=to_jsonb(old) then
+    return new; -- 같은 UUID의 완전히 같은 재전송만 허용
+  end if;
   if tg_table_name='maps' then
     if old.state in ('confirmed','archived') then
       if not (old.state='confirmed' and new.state='archived'
