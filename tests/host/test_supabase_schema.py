@@ -54,3 +54,4 @@ class SchemaTests(unittest.TestCase):
         self.assertNotRegex(self.sql, r'grant (?:insert|update|delete).*on public.devices')
         self.assertNotIn('for all', self.sql.lower())
         self.assertIn('foreign key(hub_id,map_id)', self.sql)
+        self.assertIn('if to_jsonb(new)=to_jsonb(old) then', self.sql)

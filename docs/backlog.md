@@ -4,7 +4,7 @@
 
 ## 현재 검증 결과와 진행 경계
 
-- 전체 unittest 341개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
+- 전체 unittest 347개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
 - 카메라 v0.1.4 balanced/detail 컴파일 성공. 앱 1,019,888바이트, 합본 1,085,424바이트.
   최신 배포는 balanced이며 `python tools/build_vision_cam.py --verify-release`로 현재 소스·설정·바이너리 일치를 확인함.
 - 본체 A/B 단일 main은 각각 48,976바이트로 생성됨. 실제 MicroPython 실행은 미검증이며 필수 동작 체크 전 적용 보류.
@@ -32,6 +32,9 @@
 - 명세·예비 골격·안내: [#63](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/63), [#64](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/64), [#77](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/77), [#80](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/80)
 
 ## 완료
+
+- HUB-2: 허브별 SQLite 확정 설정 사본/활성 버전·순서 있는 sync_outbox·상태 사본·기존 CommandJournal 재사용.
+  오류/포화 시 False와 실패 수로 보고하며 이전 사본을 보존. 실제 장치·클라우드/디스크 내구성 미검증.
 
 - 허브/노트북 순환 HUB-1: Supabase 13개 표·UUID·허브별 RLS·명령 결과 열 권한 초안과 문서/열 정적 계약 검사.
   SQL은 실행하지 않음. 이후 로컬 저장소 → 게이트웨이 → 명령 처리 → 단절 정책 → 설정 → 루틴 → 노트북 앱 → 모의 통합 → 설치 안내 순서.
