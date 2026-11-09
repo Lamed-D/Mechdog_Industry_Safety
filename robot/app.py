@@ -3,7 +3,7 @@
 # 감시가 수신과 다른 루프라 수신이 멈춰도 600 ms 뒤 정지합니다(docs/protocol.md 5.1절).
 
 from comm import Link
-from core import NoLock, Robot
+from core import Robot
 from lidar_bridge import LidarBridge
 from motion import Motion
 
@@ -12,12 +12,12 @@ LIDAR_PERIOD_MS = 2
 
 
 def make_lock():
-    """수신·감시 루프가 같은 상태를 바꾸지 않게 하는 잠금. _thread 가 없으면 빈 잠금(루프가 번갈아 도는 경우)."""
+    """동시 상태 변경을 직렬화합니다. 잠금을 만들 수 없으면 시작하지 않습니다."""
     try:
         import _thread
         return _thread.allocate_lock()
-    except Exception:
-        return NoLock()
+    except Exception as error:
+        raise RuntimeError("safety lock unavailable") from error
 
 
 def safe_reader(func):

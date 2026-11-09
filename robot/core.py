@@ -84,7 +84,7 @@ class Robot:
         return deadline is not None and self._diff(deadline, self._now()) > 0
 
     def busy(self):
-        return self._before(self.action_until)
+        return self.action_name is not None or self._before(self.action_until)
 
     def state(self):
         if self.latched:
@@ -295,7 +295,7 @@ class Robot:
         if self.action_name is not None and self._diff(now, self.action_started) >= self.cfg.ACTION_MIN_MS:
             try:
                 result = self.motion.action_over()  # 제조사 예제의 끝남 확인
-                over = isinstance(result, (bool, int)) and bool(result)
+                over = isinstance(result, (bool, int)) and result == 1
             except Exception:
                 over = False  # 모르면 끝난 것으로 보지 않음
             if over:

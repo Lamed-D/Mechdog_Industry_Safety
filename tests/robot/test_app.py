@@ -65,6 +65,13 @@ class AppTestCase(unittest.TestCase):
 
 
 class StartTest(AppTestCase):
+    def test_lock_failure_prevents_startup(self):
+        from unittest.mock import patch
+        with patch("_thread.allocate_lock", side_effect=RuntimeError("unavailable")):
+            with self.assertRaises(RuntimeError):
+                self.make_app()
+        self.assertEqual(fakes.Hiwonder.main_funcs, [])
+
     def test_start_registers_three_loops_and_stops(self):
         self.make_app()
         self.assertEqual(len(fakes.Hiwonder.main_funcs), 3)

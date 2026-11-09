@@ -172,7 +172,7 @@ class CommandTest(CoreTestCase):
         self.send("POSE", "sit")
         self.assertIn("busy", self.robot.events)
         self.assertEqual(len(self.dog.fake_calls("action_run")), 1)
-        self.wait(self.cfg.ACTION_DURATION_MS["nodding_motion"])
+        self.wait(self.cfg.ACTION_DURATION_MS["nodding_motion"] + 100)
         self.send("MOVE", 40, 0)  # 기본 자세 먼저
         self.assertEqual(self.dog.fake_calls("set_default_pose"), [()])
         self.assertEqual(self.moves()[-1], (0, 0))
@@ -404,12 +404,25 @@ class ActionSafetyTest(CoreTestCase):
         self.wait(self.cfg.ACTION_DURATION_MS["go_prone"] + 200)
         self.assertEqual(self.moves()[-1], (0, 0))
         self.assertEqual(self.robot.action_name, "go_prone")  # 시간이 지났다고 끝난 것으로 보지 않음
-        self.assertFalse(self.robot.busy())
+        self.assertTrue(self.robot.busy())
         calls = []
         self.dog.stop_action = lambda: calls.append(1)
         self.send("ESTOP")
         self.assertEqual(calls, [1])  # ESTOP 은 여전히 동작 중단을 시도
         self.assertEqual(self.moves()[-1], (0, 0))
+
+    def test_unconfirmed_action_blocks_reset_and_new_motion_after_deadline(self):
+        self.ready()
+        self.dog.stop_action = lambda: None
+        self.dog.action_is_over = lambda: 2
+        self.send("ACTION", "go_prone")
+        self.wait(self.cfg.ACTION_DURATION_MS["go_prone"] + 200)
+        self.send("MOVE", 40, 0)
+        self.assertEqual(self.moves()[-1], (0, 0))
+        self.send("ESTOP")
+        self.send("RESET")
+        self.assertTrue(self.robot.latched)
+        self.assertTrue(self.robot.busy())
 
     def test_action_is_over_failure_means_not_over(self):
         self.ready()
