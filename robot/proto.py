@@ -13,6 +13,7 @@ POSE_ACTION = {"default": None, "sit": "sit_dowm", "prone": "go_prone"}
 _ARG_COUNT = {
     "MOVE": 2, "STOP": 0, "ACTION": 1, "POSE": 1,
     "ESTOP": 0, "RESET": 0, "PING": 0, "HELLO": 1,
+    "ROLE": 4,
 }
 _ALL_ROBOTS_OK = ("STOP", "ESTOP")
 
@@ -112,6 +113,13 @@ def parse(data, robot_id):
         return BAD, None
     elif name == "POSE" and args[0] not in POSE_ACTION:
         return BAD, None
+    elif name == "ROLE":
+        session, term, code, lease = args
+        term, lease = parse_int(term), parse_int(lease)
+        if (not _is_boot_id(session) or term is None or not 1 <= term <= MAX_SEQ
+                or code not in ("P", "S", "N") or lease is None or not 100 <= lease <= 1000):
+            return BAD, None
+        args = [session, term, code, lease]
     return OK, Command(name, seq, args, to_all)
 
 

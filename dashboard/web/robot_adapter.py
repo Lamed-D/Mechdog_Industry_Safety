@@ -2,6 +2,7 @@
 import threading
 
 from host.robot_link import RobotLink
+from host.roles import RoleCoordinator
 
 
 class RobotAdapter:
@@ -9,6 +10,7 @@ class RobotAdapter:
         self.hub = hub
         options = {} if clock is None else {"clock": clock}
         self.links = {r: RobotLink(r, hub.sender(r), **options) for r in ("A", "B")}
+        self.roles = RoleCoordinator(self.links, **options)
         self.failures = 0
 
     def step(self, core):
@@ -19,6 +21,7 @@ class RobotAdapter:
             self.failures += 1
             for link in self.links.values():
                 link.estop()
+        self.roles.step()
         core.update()
         for command in core.drain_commands():
             link = self.links[command.robot]

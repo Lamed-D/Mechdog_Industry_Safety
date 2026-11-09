@@ -141,6 +141,8 @@ class DashboardCore:
                 fresh, latest, status = False, None, "unknown"
         view.update(link="ok" if fresh else ("stale" if status != "unknown" else "unknown"),
                     fresh=fresh, state=status)
+        role_reader = getattr(link, "confirmed_role", None)
+        view["role"] = role_reader() if callable(role_reader) else "unknown"
         if latest is not None:
             view.update(latched=latest.latched, reason=latest.reason, battery_mv=latest.battery_mv,
                         warnings=sorted(latest.warnings))

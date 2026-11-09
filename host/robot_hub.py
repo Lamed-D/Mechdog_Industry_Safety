@@ -3,6 +3,7 @@ import ipaddress
 import socket
 
 from host.robot_link import parse_telemetry
+from host.roles import parse_role_status
 
 
 class RobotHub:
@@ -44,7 +45,7 @@ class RobotHub:
             except BlockingIOError:
                 return
             try:
-                tel = parse_telemetry(data)
+                tel = parse_role_status(data) if data.startswith(b"ROLE|") else parse_telemetry(data)
             except (ValueError, UnicodeError):
                 self.rejected += 1
                 continue

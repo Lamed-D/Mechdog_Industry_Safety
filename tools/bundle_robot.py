@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = ("config", "proto", "netutil", "motion", "vision", "lidar_bridge", "core", "comm", "app", "main")
+MODULES = ("config", "proto", "roles", "netutil", "motion", "vision", "lidar_bridge", "core", "comm", "app", "main")
 
 
 def render(robot):

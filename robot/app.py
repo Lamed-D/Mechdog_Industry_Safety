@@ -70,6 +70,9 @@ class App:
             dest = self.robot.telemetry_dest()
             line = self.robot.telemetry()
             self.link.send(line, dest)
+            role = self.robot.role_status()
+            if role is not None:
+                self.link.send(role, dest)
 
     def watchdog_step(self):
         self.robot.tick(self.link.connected())

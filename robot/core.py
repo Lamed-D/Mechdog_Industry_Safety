@@ -5,6 +5,7 @@
 # 시간이 걸릴 수 있는 센서 읽기(배터리·기울기)와 네트워크 입출력은 잠금 밖에서 합니다.
 
 import proto
+from roles import RoleLease
 
 IDLE = "idle"
 MOVING = "moving"
@@ -38,6 +39,7 @@ def finite_number(value):
 class Robot:
     def __init__(self, cfg, motion, clock, read_battery, read_tilt, lock=None):
         self.cfg = cfg
+        self.roles = RoleLease(clock)
         self.motion = motion
         self.clock = clock
         self._read_battery = read_battery
@@ -158,6 +160,16 @@ class Robot:
             return  # boot_id 를 모르면 STOP·ESTOP 만 (2.2절)
         if cmd.seq <= self.last_cmd_seq:
             return  # 늦게 온 옛 명령. 감시 타이머도 갱신하지 않음
+        if name == "ROLE":
+            session, term, code, lease = cmd.args
+            previous = self.roles.code
+            if session != self.boot_id or not self.roles.grant(term, code, lease):
+                return
+            self._accept(cmd.seq)
+            if previous != "N" and previous != code:
+                self._latch("link_lost")  # 역할 변경으로 기존 동작을 이어가지 않음
+            self.urgent = True
+            return
         self._accept(cmd.seq)
         if self.latched:
             if name == "RESET":
@@ -194,6 +206,9 @@ class Robot:
         if addr is not None:
             self.tel_addr = addr[0]
         if cmd.seq != self.boot_id:
+            if self.roles.armed:
+                self._latch("link_lost")
+                self.roles = RoleLease(self.clock)
             self._stop()
             self.last_cmd_seq = 0
             self.boot_id = cmd.seq  # 래치는 그대로 둠
@@ -276,6 +291,8 @@ class Robot:
         now = self._now()
         self.uptime_ms += max(self._diff(now, self._last_tick), 0)
         self._last_tick = now
+        if self.roles.expire():
+            self._latch("link_lost")
         self._check_action(now)
         if not wifi_connected and self.wifi_ok:
             self._latch("link_lost")
@@ -332,6 +349,13 @@ class Robot:
     # ---------- 텔레메트리 (6절) ----------
     def telemetry_due(self):
         return self.urgent or self._diff(self._now(), self._last_tel) >= self.cfg.TEL_PERIOD_MS
+
+    def role_status(self):
+        with self._lock:
+            if not self.roles.armed:
+                return None
+            return "ROLE|%s|%s|%d|%s|%d|%d|$" % (self.cfg.ROBOT_ID, self.boot_id,
+                self.roles.term, self.roles.code, self.roles.remaining(), self.tseq)
 
     def telemetry_dest(self):
         host = self.cfg.PI_HOST or self.tel_addr

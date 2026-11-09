@@ -4,6 +4,7 @@ import math
 import re
 import secrets
 import time
+from host.roles import CODES, parse_role_status
 
 MAX_SEQ = 2147483647
 WARN = {"clipped", "busy", "latched", "move_stale", "reset_denied", "garbage", "proto",
@@ -89,13 +90,26 @@ class RobotLink:
         self.last_acked = 0
         self.ack_wait_since = None
         self.fault = None
+        self.role_request = None
+        self.role_ack = None
+        self.role_seen = self.next_role = -math.inf
 
     def observe(self, data):
+        if data.startswith(b"ROLE|"):
+            value = parse_role_status(data)
+            if (value.robot != self.robot or value.boot_id != self.boot_id or self.role_request is None
+                    or (value.term, value.code) != self.role_request[:2]):
+                return False
+            if self.role_ack is not None and value.tseq <= self.role_ack.tseq:
+                return False
+            self.role_ack, self.role_seen = value, self.clock()
+            return True
         value = parse_telemetry(data)
         if value.robot != self.robot:
             return False
         if value.boot_id != self.boot_id:
             self.latest = None
+            self.role_ack = None
             self.intent = None
             self.pending_reset = False
             return False
@@ -113,6 +127,20 @@ class RobotLink:
         self.latest, self.last_seen = value, self.clock()
         self.seq = max(self.seq, value.last_seq)
         return True
+
+    def assign_role(self, term, role):
+        if role not in CODES or isinstance(term, bool) or not isinstance(term, int) or not 1 <= term <= MAX_SEQ:
+            raise ValueError("invalid role assignment")
+        self.role_request = (term, CODES[role])
+        self.role_ack = None
+        self.next_role = -math.inf
+
+    def confirmed_role(self):
+        ack = self.role_ack
+        age = self.clock() - self.role_seen
+        if self.emergency or not self.fresh() or ack is None or not 0 <= age < min(0.4, ack.remaining_ms / 1000):
+            return "unknown"
+        return next(name for name, code in CODES.items() if code == ack.code)
 
     def _link_fault(self, reason):
         if not self.emergency:
@@ -191,6 +219,10 @@ class RobotLink:
         elif self.pending_reset:
             self.pending_reset = False
             payload = self._command("RESET")
+        elif self.role_request is not None and now >= self.next_role:
+            term, code = self.role_request
+            payload = self._command("ROLE", self.boot_id, term, code, 1000)
+            self.next_role = now + 0.3
         elif self.latest.latched:
             self.intent = None
             payload = self._command("PING")

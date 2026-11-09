@@ -1,5 +1,8 @@
 # 로봇 ↔ Pi 5 통신 규약 v0
 
+동일 장비 A/B의 주·보조 역할 확장 `CMD|ROLE|...`와 별도 `ROLE|...` ACK는
+[역할 통신 규약](robot-redundancy.md)을 따릅니다. A/B ID는 역할과 별개이며 임대·세션·세대로 확인합니다.
+
 로봇(MechDog 메인 ESP32, MicroPython)과 Raspberry Pi 5(고정 위치) 사이의 메시지 규약입니다.
 로봇 쪽 구현은 Claude(`robot/`, `custom_sensors/`), Pi 5 쪽 구현은 Codex(`host/`, `tools/mock/`)가 이 문서를 기준으로 합니다.
 규약을 바꿀 때는 이 문서를 먼저 고치고 PR로 상대 에이전트의 리뷰를 받습니다.
