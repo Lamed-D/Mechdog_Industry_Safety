@@ -39,7 +39,7 @@ class App:
         self.lock = lock if lock is not None else make_lock()
         self.robot = Robot(cfg, self.motion, clock, read_battery, safe_reader(read_tilt), self.lock)
         self.link = Link(cfg, network, socket, clock, ssid, password)
-        self.lidar = LidarBridge(cfg, machine, socket)
+        self.lidar = LidarBridge(cfg, machine, socket, clock)
         self.vision = vision
         self.vision_status = {"status": "unknown", "reason": "not_read"}
 
@@ -54,16 +54,19 @@ class App:
             start_main(self.vision_loop)
 
     def _update_conditions(self):
-        words = self.robot.conditions
-        for word, active in (("pm_on", self.link.pm_on), ("lidar_uart", not self.lidar.uart_ok())):
-            if active:
-                words.add(word)
-            else:
-                words.discard(word)
+        conditions = (("pm_on", self.link.pm_on), ("lidar_uart", not self.lidar.uart_ok()),
+                      ("lidar_backlog", self.lidar.backlogged()))
+        with self.lock:
+            for word, active in conditions:
+                if active:
+                    self.robot.conditions.add(word)
+                else:
+                    self.robot.conditions.discard(word)
 
     # --- 한 단계 (테스트가 직접 부름) ---
     def comm_step(self):
         self.link.service()
+        self._update_conditions()
         for data, addr in self.link.poll():
             self.robot.handle(data, addr)
         if self.robot.telemetry_due():

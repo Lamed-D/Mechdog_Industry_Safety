@@ -7,6 +7,13 @@ def tel(seq=1, *, state="idle", latch=0, reason="none", boot="b1", battery="7800
 
 
 class LinkTests(unittest.TestCase):
+    def test_lidar_backlog_blocks_move_even_with_fresh_scan(self):
+        self.assertTrue(self.link.observe(tel().replace(b"|none|$", b"|lidar_backlog|$")))
+        self.link.mark_scan(True)
+        self.link.move(40, 0)
+        self.link.step()
+        self.assertIn(b"|STOP|", self.sent[-1])
+
     def test_estop_before_handshake_still_sends_hello_for_telemetry(self):
         self.link.estop()
         self.link.step()

@@ -30,9 +30,15 @@ def _close(sock):
 
 
 class LidarBridge:
-    def __init__(self, cfg, machine, socket):
+    def __init__(self, cfg, machine, socket, clock=None):
         self.cfg = cfg
         self.socket = socket
+        self.clock = clock
+        self.waiting = self.high_water = self.drained = self.stalls = 0
+        self._pending_since = None
+        self._rate_at = clock.ticks_ms() if clock is not None else None
+        self._rate_sent = self._rate_received = 0
+        self.send_bps = self.receive_bps = None
         self.uart = None
         self.server = None
         self.conn = None
@@ -60,9 +66,41 @@ class LidarBridge:
         if self.conn is None:
             self._drain()
             return
+        self.waiting = self.uart.any()
+        self.high_water = max(self.high_water, self.waiting)
         self._to_pi()
         if self.conn is not None:
             self._to_lidar()
+        if self.conn is not None:
+            self._sample_rate()
+
+    def _sample_rate(self):
+        if self.clock is None:
+            return
+        now = self.clock.ticks_ms()
+        elapsed = self.clock.ticks_diff(now, self._rate_at)
+        if elapsed >= 1000:
+            self.send_bps = (self.sent - self._rate_sent) * 1000 // elapsed
+            self.receive_bps = (self.received - self._rate_received) * 1000 // elapsed
+            self._rate_at = now
+            self._rate_sent, self._rate_received = self.sent, self.received
+
+    def _pending_age(self):
+        if self.clock is not None and self._pending_since is not None:
+            return max(0, self.clock.ticks_diff(self.clock.ticks_ms(), self._pending_since))
+        return None
+
+    def metrics(self):
+        return {"connected": self.conn is not None, "uart_waiting": self.waiting,
+                "uart_high_water": self.high_water, "pending_bytes": len(self.pending),
+                "pending_age_ms": self._pending_age(), "sent": self.sent, "received": self.received,
+                "drained": self.drained, "stalls": self.stalls,
+                "send_bps": self.send_bps, "receive_bps": self.receive_bps}
+
+    def backlogged(self):
+        age = self._pending_age()
+        return self.conn is not None and (self.waiting * 4 >= self.cfg.LIDAR_RXBUF * 3
+                or (age is not None and age >= self.cfg.LIDAR_PENDING_WARN_MS))
 
     def stop(self):
         self._drop()
@@ -101,30 +139,47 @@ class LidarBridge:
         self.conn = None
         self.pending = b""
         self.tx_pending = b""
+        self.waiting = 0
+        self._pending_since = None
+        self.send_bps = self.receive_bps = None
+        if self.clock is not None:
+            self._rate_at = self.clock.ticks_ms()
+            self._rate_sent, self._rate_received = self.sent, self.received
 
     def _drain(self):
         if self.uart is None:
             return
         for _ in range(DRAIN_MAX):
-            if not self.uart.any() or not self.uart.read(CHUNK):
+            if not self.uart.any():
                 break
+            data = self.uart.read(CHUNK)
+            if not data:
+                break
+            self.drained += len(data)
 
     def _to_pi(self):
         if not self.pending:
-            waiting = self.uart.any()
+            waiting = self.waiting
             if waiting:
                 self.pending = self.uart.read(min(waiting, CHUNK)) or b""
+                if self.pending and self.clock is not None:
+                    self._pending_since = self.clock.ticks_ms()
         if not self.pending:
             return
         try:
             count = self.conn.send(self.pending)
         except OSError as error:
+            self.stalls += 1
             if not _no_data(error):
                 self._drop()
             return
         count = count or 0
+        if not count:
+            self.stalls += 1
         self.sent += count
         self.pending = self.pending[count:]  # 못 보낸 바이트는 다음에 (UART 는 그동안 버퍼에 쌓임)
+        if not self.pending:
+            self._pending_since = None
 
     def _to_lidar(self):
         # 못 쓴 바이트를 먼저 순서대로 다 쓴 뒤에만 다음 TCP 데이터를 읽음(명령 경계 유지)

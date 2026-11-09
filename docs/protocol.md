@@ -325,6 +325,7 @@ TEL|A|5131|3390|stopped|1|link_lost|7610|0.8|-0.2|513141|6f3a91|none|$
 | `imu_unknown` | 기울기 읽기 실패 |
 | `pm_on` | Wi-Fi 절전 끄기(`PM_NONE`)가 지원되지 않아 절전이 켜져 있음 — 지연이 클 수 있음 |
 | `lidar_uart` | 라이다 UART를 열지 못함(7절) |
+| `lidar_backlog` | UART 관측 수위 75% 이상 또는 미송신 묶음 100ms 이상. 호스트 MOVE 차단, 임계는 가정 |
 
 ### 6.2 Pi 5가 텔레메트리를 다루는 규칙
 

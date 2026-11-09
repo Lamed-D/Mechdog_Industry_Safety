@@ -214,6 +214,62 @@ class LidarBridgeTest(AppTestCase):
         _bridge, uart = self.bridge()
         self.assertEqual((uart.uart_id, uart.baudrate, uart.rx, uart.tx, uart.rxbuf), (1, 115200, 32, 33, 4096))
 
+    def test_backlog_warn_refreshes_and_clears_in_telemetry(self):
+        app = self.make_app()
+        self.ready(app)
+        self.net.connect_tcp(self.cfg.LIDAR_TCP_PORT)
+        app.lidar_step()
+        uart = fakes.machine.uarts[-1]
+        uart.fake_feed(b"x" * 3072)
+        app.lidar_step()
+        self.clock.advance(100)
+        app.comm_step()
+        self.assertIn("lidar_backlog", self.tel_lines()[-1].split("|")[12])
+        self.assertEqual(app.lidar.metrics()["uart_high_water"], 3072)
+        for _ in range(10):
+            app.lidar_step()
+        self.clock.advance(100)
+        app.comm_step()
+        self.assertNotIn("lidar_backlog", self.tel_lines()[-1].split("|")[12])
+
+    def test_pending_age_wrap_and_partial_bytes_keep_order(self):
+        self.clock.now_ms = (1 << 30) - 30
+        bridge = LidarBridge(self.cfg, fakes.machine, self.net, self.clock)
+        uart = fakes.machine.uarts[-1]
+        bridge.service(True)
+        client = self.net.connect_tcp(self.cfg.LIDAR_TCP_PORT)
+        bridge.service(True)
+        send = bridge.conn.send
+        bridge.conn.send = lambda data: 0
+        uart.fake_feed(b"abcdef")
+        bridge.service(True)
+        self.clock.advance(100)
+        self.assertEqual(bridge.metrics()["pending_age_ms"], 100)
+        self.assertTrue(bridge.backlogged())
+        self.assertEqual(bridge.metrics()["stalls"], 1)
+        bridge.conn.send = send
+        bridge.service(True)
+        self.assertEqual(client.recv(64), b"abcdef")
+        self.assertFalse(bridge.backlogged())
+        self.assertIsNone(bridge.metrics()["pending_age_ms"])
+
+    def test_rate_and_discard_counters_do_not_invent_uart_loss(self):
+        bridge = LidarBridge(self.cfg, fakes.machine, self.net, self.clock)
+        uart = fakes.machine.uarts[-1]
+        uart.fake_feed(b"old")
+        bridge.service(True)
+        client = self.net.connect_tcp(self.cfg.LIDAR_TCP_PORT)
+        bridge.service(True)
+        uart.fake_feed(b"x" * 512)
+        client.send(b"\xa5\x20")
+        self.clock.advance(1000)
+        bridge.service(True)
+        stats = bridge.metrics()
+        self.assertEqual((stats["send_bps"], stats["receive_bps"], stats["drained"]), (512, 2, 3))
+        bridge.service(False)
+        self.assertFalse(bridge.backlogged())
+        self.assertIsNone(bridge.metrics()["send_bps"])
+
     def test_two_way_relay_without_changes(self):
         bridge, uart = self.bridge()
         bridge.service(True)

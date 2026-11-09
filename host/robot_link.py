@@ -241,7 +241,7 @@ class RobotLink:
             payload = self._command("PING")
         elif (self.intent and now < self.intent[2] and self.latest.state != "action"
               and self.latest.battery_mv is not None and self.latest.battery_mv >= settings.LOW_BATT_WARN_MV
-              and not self.latest.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "proto"})
+              and not self.latest.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "lidar_backlog", "proto"})
               and (not self.require_scan or 0 <= now - self.last_scan < settings.HOST_SCAN_FRESH_MS / 1000)):
             payload = self._command("MOVE", *self.intent[:2])
         else:
