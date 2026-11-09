@@ -20,7 +20,9 @@ OPERATOR_EVENTS = ("start_patrol", "operator_ack", "start_guide", "retry", "reso
 
 
 class DashboardCore:
-    def __init__(self, scenario, links, log, clock=time.monotonic, wall=time.time, notice_limit=100):
+    def __init__(self, scenario, links, log, clock=time.monotonic, wall=time.time, notice_limit=100, alert_limit=100):
+        if alert_limit <= 0:
+            raise ValueError("positive alert limit required")
         self.scenario = scenario
         self.links = dict(links)
         self.log = log
@@ -29,7 +31,7 @@ class DashboardCore:
         self.robots = {r: {"link": "unknown", "fresh": False, "state": "unknown", "latched": None,
                            "reason": None, "battery_mv": None, "warnings": [], "last_seen_age_s": None,
                            "camera": "unknown"} for r in ROBOTS}
-        self.alerts = []
+        self.alerts = deque(maxlen=alert_limit)
         self.notices = deque(maxlen=notice_limit)
         self.commands = deque()
         self._was_fresh = {r: False for r in ROBOTS}
@@ -92,7 +94,17 @@ class DashboardCore:
     # ---- 외부 입력 ---------------------------------------------------------
     def detection(self, result, zone=None):
         """host.vision.EvidenceMonitor 결과."""
-        self._apply(self.scenario.detection(result, zone))
+        out = self.scenario.detection(result, zone)
+        self._apply(out)
+        if any(getattr(item, "kind", None) in ("alert", "alert_update") for item in out):
+            fields = ("status", "source", "confidence", "threshold", "hold_s", "duration_s", "reason")
+            evidence = {k: result[k] for k in fields if k in result}
+            frame = result.get("frame")
+            if isinstance(frame, dict):
+                evidence["frame"] = {k: frame[k] for k in ("seq", "width", "height", "sha256", "captured_at") if k in frame}
+            self._log("incident_context", result.get("robot"), {"v": 1, "incident": self.scenario.incident["id"],
+                "phase": self.scenario.phase, "detection": evidence,
+                "robots": {r: dict(view) for r, view in self.robots.items()}})
 
     def arrived(self, robot, target):
         self._apply(self.scenario.arrived(robot, target))

@@ -88,3 +88,18 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(jpeg_size(metadata_jpeg(800, 600)), (800, 600))
         for data in (b"not jpeg", metadata_jpeg()[:9], metadata_jpeg(0, 480)):
             self.assertIsNone(jpeg_size(data))
+
+    def test_frame_context_refers_to_processed_frame_and_is_not_mutable(self):
+        self.feed(seq=1)
+
+        def infer(jpeg):
+            self.feed(seq=99, size=(800, 600))
+            return {"candidate": True, "confidence": .9}
+
+        pump = self.make(infer)
+        pump.step()
+        context = pump.snapshot()["A"]["event"]["frame"]
+        self.assertEqual((context["seq"], context["width"], context["height"]), (1, 640, 480))
+        self.assertEqual(len(context["sha256"]), 64)
+        context["seq"] = 0
+        self.assertEqual(pump.snapshot()["A"]["event"]["frame"]["seq"], 1)

@@ -1,5 +1,7 @@
 """최신 JPEG 한 장만 추론하는 작업자. 모델은 주입하며 영상·얼굴을 저장하지 않습니다."""
 from collections import deque
+from copy import deepcopy
+import hashlib
 import math
 import threading
 import time
@@ -89,6 +91,9 @@ class VisionPump:
                 metrics["errors"] += 1
                 event = self.monitor.missing(robot)
                 event["reason"] = "inference_failed"
+            if event.get("status") in ("needs_check", "suspected_fall"):
+                event["frame"] = {"seq": frame.seq, "width": dimensions[0], "height": dimensions[1],
+                                  "captured_at": frame.captured_at, "sha256": hashlib.sha256(frame.jpeg).hexdigest()}
             self._publish(robot, event, frame.captured_at)
 
     def _publish(self, robot, event, captured, reason=None):
@@ -105,7 +110,7 @@ class VisionPump:
 
     def snapshot(self):
         with self._lock:
-            return {r: {**v, "event": dict(v["event"])} for r, v in self._results.items()}
+            return deepcopy(self._results)
 
     def apply(self, core):
         """로봇 제어 루프에서 호출. 수신 상태·완료 결과만 읽으며 모델을 부르지 않습니다."""
