@@ -95,8 +95,8 @@ ROS를 쓰지 않는 PC에서는 일반 venv로 충분하다. ROS 노드는 ROS 
 [lidar-integration.md](lidar-integration.md)를 참조한다.
 WP-X2에서 `/robot_a/scan`과 `/robot_b/scan` 어댑터와 실행 절차를 추가한다.
 현재 해당 노드의 구현과 ROS 검증은 완료되지 않았다.
-WP-X3 robot_link는 규약의 세션 경계 리뷰를 해결한 뒤 구현한다.
-WP-X4 vision은 그다음 진행한다.
+WP-X3 링크의 사용법과 v0 세션 경계 한계는 [host-link.md](host-link.md)에 명시한다.
+WP-X4 영상은 장착 모듈의 공식 Python 결과와 원본 스트림을 구분해 적용한다.
 
 실물 연결·명령 송신·로봇 업로드는 이 절차에 포함하지 않는다.
 Pi 5에서는 아직 실행하지 않았다. 두 대 동시 스캔과 영상 추론의
