@@ -1,0 +1,51 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+outputs/
+.pytest_cache/
+
+# 편집기·OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 비밀 정보: Wi-Fi 비밀번호, API 키, 토큰은 저장소에 올리지 않는다
+.env
+.env.*
+!.env.example
+secrets.py
+config_local.py
+*.pem
+*.key
+
+# 실제 현장에서 찍은 영상·사진·센서 기록은 저장소 밖에 둔다
+/recordings/
+/captures/
+/logs/
+*.mp4
+*.avi
+*.mov
+*.h264
+*.bag
+# 다시 만들 수 있는 합성 테스트 데이터는 올린다
+!tests/fixtures/**
+
+# 참고 자료·비공개 메모는 저장소에 올리지 않는다
+# (구체적인 참고 자료 이름은 각자 .git/info/exclude 에 적는다 — 이름 자체도 공개하지 않기 위해)
+/.private/
+/refs/
+/references/
+*.hwp
+*.hwpx
+*.zip
+# 커밋 금지 낱말 목록 (tools/check_confidential.py 가 읽음)
+.confidential-terms
+
+# 에이전트 개인 설정
+.claude/settings.local.json
+.codex/*.local.toml
