@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from robot import config as settings
 
 ROBOTS = ("A", "B")
 MAX_FRAME_BYTES = 512 * 1024      # VGA JPEG is ~20-40 KB; anything this big is a broken stream
@@ -22,8 +23,8 @@ MAX_HEADER_LINES = 16
 class CameraEndpoint:
     robot: str
     host: str
-    http_port: int = 80
-    stream_port: int = 81
+    http_port: int = settings.VISION_HTTP_PORT
+    stream_port: int = settings.VISION_STREAM_PORT
     key: str | None = None
 
     def __post_init__(self):

@@ -5,10 +5,10 @@ import re
 import secrets
 import time
 from host.roles import CODES, parse_role_status
+from robot import config as settings, proto as wire
 
-MAX_SEQ = 2147483647
-WARN = {"clipped", "busy", "latched", "move_stale", "reset_denied", "garbage", "proto",
-        "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart"}
+MAX_SEQ = wire.MAX_SEQ
+WARN = set(wire.WARN_ORDER)
 
 
 def integer(value):
@@ -35,7 +35,7 @@ class Telemetry:
 def parse_telemetry(data):
     start = data.find(b"TEL|")
     end = data.find(b"$", start)
-    if start < 0 or end < 0 or end - start + 1 > 160:
+    if start < 0 or end < 0 or end - start + 1 > wire.MAX_TEL_LEN:
         raise ValueError("invalid telemetry framing")
     text = data[start:end + 1].decode("ascii")
     if any(ord(c) <= 32 for c in text):
@@ -119,7 +119,7 @@ class RobotLink:
             self.intent = None
             return False
         now = self.clock()
-        if self.latest is not None and now - self.last_seen >= 0.4:
+        if self.latest is not None and now - self.last_seen >= settings.HOST_TEL_FRESH_MS / 1000:
             self._link_fault("telemetry_stale")
         if value.last_seq > self.last_acked:
             self.last_acked = value.last_seq
@@ -138,7 +138,7 @@ class RobotLink:
     def confirmed_role(self):
         ack = self.role_ack
         age = self.clock() - self.role_seen
-        if self.emergency or not self.fresh() or ack is None or not 0 <= age < min(0.4, ack.remaining_ms / 1000):
+        if self.emergency or not self.fresh() or ack is None or not 0 <= age < min(settings.HOST_TEL_FRESH_MS / 1000, ack.remaining_ms / 1000):
             return "unknown"
         return next(name for name, code in CODES.items() if code == ack.code)
 
@@ -157,7 +157,7 @@ class RobotLink:
             raise ValueError("integer motion only")
         if not (-100 <= step <= 100 and -30 <= angle <= 30):
             raise ValueError("motion out of range")
-        self.intent = (step, angle, self.clock() + 0.3)
+        self.intent = (step, angle, self.clock() + settings.HOST_INTENT_MS / 1000)
 
     def estop(self):
         self.emergency = True
@@ -171,7 +171,7 @@ class RobotLink:
         self.next_send = -math.inf
 
     def request_reset(self):
-        if not self.fresh() or not self.latest.latched or self.latest.battery_mv is None or self.latest.battery_mv < 6800:
+        if not self.fresh() or not self.latest.latched or self.latest.battery_mv is None or self.latest.battery_mv < settings.LOW_BATT_RESET_MV:
             raise ValueError("reset requires fresh latched telemetry and adequate battery")
         self.emergency = False
         self.intent = None
@@ -181,10 +181,10 @@ class RobotLink:
         self.fault = None
 
     def fresh(self):
-        return self.latest is not None and 0 <= self.clock() - self.last_seen < 0.4
+        return self.latest is not None and 0 <= self.clock() - self.last_seen < settings.HOST_TEL_FRESH_MS / 1000
 
     def status(self):
-        if self.latest is None or self.clock() - self.last_seen >= 1:
+        if self.latest is None or self.clock() - self.last_seen >= settings.HOST_TEL_UNKNOWN_MS / 1000:
             return "unknown"
         return self.latest.state
 
@@ -201,10 +201,10 @@ class RobotLink:
         now = self.clock()
         if now < self.next_send:
             return
-        self.next_send = now + 0.1  # No catch-up bursts.
+        self.next_send = now + settings.HOST_COMMAND_PERIOD_MS / 1000  # No catch-up bursts.
         if self.latest is not None and not self.fresh():
             self._link_fault("telemetry_stale")
-        if self.ack_wait_since is not None and now - self.ack_wait_since >= 0.6:
+        if self.ack_wait_since is not None and now - self.ack_wait_since >= settings.LINK_TIMEOUT_MS / 1000:
             self._link_fault("ack_stalled")
         if self.emergency:
             payload = self._command("ESTOP")
@@ -212,8 +212,8 @@ class RobotLink:
             self.intent = None
             self.pending_reset = False
             if now >= self.next_hello:
-                payload = ("CMD|HELLO|%s|%s|0|$" % (self.robot, self.boot_id)).encode()
-                self.next_hello = now + 0.5
+                payload = ("CMD|HELLO|%s|%s|%d|$" % (self.robot, self.boot_id, wire.PROTO_VERSION)).encode()
+                self.next_hello = now + settings.HOST_HELLO_RETRY_MS / 1000
             else:
                 payload = self._command("STOP")
         elif self.pending_reset:
@@ -221,15 +221,15 @@ class RobotLink:
             payload = self._command("RESET")
         elif self.role_request is not None and now >= self.next_role:
             term, code = self.role_request
-            payload = self._command("ROLE", self.boot_id, term, code, 1000)
-            self.next_role = now + 0.3
+            payload = self._command("ROLE", self.boot_id, term, code, settings.ROLE_LEASE_MS)
+            self.next_role = now + settings.ROLE_RENEW_MS / 1000
         elif self.latest.latched:
             self.intent = None
             payload = self._command("PING")
         elif (self.intent and now < self.intent[2] and self.latest.state != "action"
-              and self.latest.battery_mv is not None and self.latest.battery_mv >= 7000
+              and self.latest.battery_mv is not None and self.latest.battery_mv >= settings.LOW_BATT_WARN_MV
               and not self.latest.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "proto"})
-              and (not self.require_scan or 0 <= now - self.last_scan < 0.3)):
+              and (not self.require_scan or 0 <= now - self.last_scan < settings.HOST_SCAN_FRESH_MS / 1000)):
             payload = self._command("MOVE", *self.intent[:2])
         else:
             self.intent = None
@@ -254,7 +254,7 @@ def main():
     parser = argparse.ArgumentParser(description="Status-only v0 link: HELLO/STOP, never RESET/MOVE")
     parser.add_argument("--robot", choices=("A", "B"), required=True)
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--receive-port", type=int, default=9101)
+    parser.add_argument("--receive-port", type=int, default=settings.TEL_PORT)
     parser.add_argument("--allow-real", action="store_true")
     args = parser.parse_args()
     transport = UdpTransport(args.host, receive_port=args.receive_port, allow_real=args.allow_real)

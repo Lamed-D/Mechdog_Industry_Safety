@@ -13,9 +13,8 @@ ACTION = "action"
 STOPPED = "stopped"
 
 # 텔레메트리 warn 순서 (6.1절 표 순서)
-WARN_ORDER = ("clipped", "busy", "latched", "move_stale", "reset_denied", "garbage", "proto",
-              "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart")
-MAX_TEL_LEN = 160
+WARN_ORDER = proto.WARN_ORDER
+MAX_TEL_LEN = proto.MAX_TEL_LEN
 
 _NOT_READ = object()
 
@@ -166,7 +165,7 @@ class Robot:
             if session != self.boot_id or not self.roles.grant(term, code, lease):
                 return
             self._accept(cmd.seq)
-            if previous != "N" and previous != code:
+            if previous != proto.ROLE_NONE and previous != code:
                 self._latch("link_lost")  # 역할 변경으로 기존 동작을 이어가지 않음
             self.urgent = True
             return

@@ -7,6 +7,7 @@ import math
 import threading
 import time
 from types import SimpleNamespace
+from robot import config as settings
 
 
 class SimLink:
@@ -39,15 +40,15 @@ class SimLink:
         self.sent.append("RESET")
 
     def fresh(self):
-        return self.latest is not None and 0 <= self.clock() - self.last_seen < 0.4
+        return self.latest is not None and 0 <= self.clock() - self.last_seen < settings.HOST_TEL_FRESH_MS / 1000
 
     def status(self):
-        if self.latest is None or self.clock() - self.last_seen >= 1:
+        if self.latest is None or self.clock() - self.last_seen >= settings.HOST_TEL_UNKNOWN_MS / 1000:
             return "unknown"
         return self.latest.state
 
 
-def run_loop(core, links, lock, stop_event, period_s=0.1, on_commands=None):
+def run_loop(core, links, lock, stop_event, period_s=settings.HOST_COMMAND_PERIOD_MS / 1000, on_commands=None):
     """10Hz: 링크 송신 → core.update → 이동 명령 넘기기. 예외가 나도 루프는 계속하되 기록합니다."""
     while not stop_event.is_set():
         with lock:
@@ -63,7 +64,7 @@ def run_loop(core, links, lock, stop_event, period_s=0.1, on_commands=None):
         stop_event.wait(period_s)
 
 
-def start_loop(core, links, lock, period_s=0.1, on_commands=None):
+def start_loop(core, links, lock, period_s=settings.HOST_COMMAND_PERIOD_MS / 1000, on_commands=None):
     stop_event = threading.Event()
     thread = threading.Thread(target=run_loop, args=(core, links, lock, stop_event, period_s, on_commands),
                               name="dashboard-loop", daemon=True)

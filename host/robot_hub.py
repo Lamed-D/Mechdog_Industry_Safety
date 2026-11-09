@@ -4,10 +4,11 @@ import socket
 
 from host.robot_link import parse_telemetry
 from host.roles import parse_role_status
+from robot import config as settings
 
 
 class RobotHub:
-    def __init__(self, hosts, *, allow_real=False, receive_port=9101, command_port=9100,
+    def __init__(self, hosts, *, allow_real=False, receive_port=settings.TEL_PORT, command_port=settings.CMD_PORT,
                  socket_factory=socket.socket):
         if set(hosts) != {"A", "B"}:
             raise ValueError("both robot addresses required")
