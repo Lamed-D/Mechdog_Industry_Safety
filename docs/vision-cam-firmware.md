@@ -1,7 +1,7 @@
 # 비전 모듈(ESP32-S3 카메라) 맞춤 펌웨어
 
 로봇 A·B 앞쪽 비전 모듈에 올리는 우리 펌웨어의 설치·설정·확인·복구·빌드 안내입니다.
-소스는 v0.1.3입니다. 최신 합본은 `python tools/build_vision_cam.py --release`로 생성합니다. 이전 바이너리는 보관하지 않습니다.
+소스는 v0.1.4입니다. 최신 합본은 `python tools/build_vision_cam.py --release`로 생성합니다. 이전 바이너리는 보관하지 않습니다.
 기본은 640×480·JPEG 품질 10·최대 약 15fps이며, [Pi 모델용 화질·측정 기준](vision-quality.md)을 따릅니다.
 **목표는 카메라 영상을 Wi-Fi로 Pi 5에 보내는 것**입니다. 쓰러진 사람 인식은 Pi 5가 영상으로 합니다.
 
@@ -181,6 +181,10 @@ HTTPS가 아니므로 공유기 안에서 엿볼 수 있는 사람에게는 보�
 
 ## 5. 복구
 
+0x0 합본은 NVS 영역의 빈 바이트도 포함하므로 새 합본을 구우면 저장한 ID·Wi-Fi·키 설정이 초기화될 수 있습니다.
+ERASE를 누르지 않았다는 사실이 설정 보존을 뜻하지 않습니다. 사용자 백업을 먼저 확인하고,
+갱신 후 시리얼에서 ID·Wi-Fi 설정을 다시 입력합니다. 비밀번호나 백업 원본을 저장소에 올리지 않습니다.
+
 문제가 있으면 둘 중 하나로 되돌립니다(사용자).
 
 - **백업으로 되돌리기(가장 확실):**
@@ -275,3 +279,11 @@ python tools/build_vision_cam.py --release  # + build/vision_cam/latest/ 최신 
 - 근거: [esp32-camera 버퍼 모드 정의](https://github.com/espressif/esp32-camera/blob/master/driver/include/esp_camera.h),
   [ESP-IDF HTTP 서버 API](https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32s3/api-reference/protocols/esp_http_server.html).
   실제 Wire 타이밍·재접속·워치독·전원은 실물 미검증입니다.
+
+## 12. v0.1.4 실제 영상 차원 표시
+
+`/status.camera.dimensions_measured`가 true이면 width/height는 실제 취득·보관한 프레임에서 읽은 값입니다.
+초기화·재초기화 직후에는 false이며 요청한 프로필 해상도와 실제 센서 결과를 구분합니다.
+Pi의 상태 클라이언트는 아직 실측 프레임이 없으면 unknown/no_measured_frame으로 표시합니다.
+quality·profile·target_fps·jpeg_kbps·PSRAM과 차원/카운터의 형식도 검증합니다.
+모델 사용 가능 여부는 실제 JPEG 디코딩·차원·속도·정확도로 확인하며 status만으로 확정하지 않습니다.

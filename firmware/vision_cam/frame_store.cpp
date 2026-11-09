@@ -89,6 +89,7 @@ static bool camera_init() {
   s_stats.quality = (uint8_t)c.jpeg_quality;
   s_stats.sensor = info ? info->name : "unknown";
   s_stats.camera_ok = true;
+  s_stats.dimensions_measured = false;
   xSemaphoreGive(s_lock);
   return true;
 }
@@ -97,6 +98,7 @@ static void camera_lost() {
   esp_camera_deinit();
   xSemaphoreTake(s_lock, portMAX_DELAY);
   s_stats.camera_ok = false;
+  s_stats.dimensions_measured = false;
   s_stats.reinits++;
   xSemaphoreGive(s_lock);
 }
@@ -121,12 +123,15 @@ static bool store_frame(const camera_fb_t *fb, int64_t now_us) {
   s_stats.frames++;
   s_stats.last_frame_us = now_us;
   s_stats.last_len = fb->len;
+  s_stats.width = (uint16_t)fb->width;
+  s_stats.height = (uint16_t)fb->height;
+  s_stats.dimensions_measured = true;
   xSemaphoreGive(s_lock);
   return true;
 }
 
 static bool jpeg_ok(const camera_fb_t *fb) {
-  return fb->format == PIXFORMAT_JPEG && fb->len > 4 && fb->buf[0] == 0xFF && fb->buf[1] == 0xD8 &&
+  return fb->width > 0 && fb->height > 0 && fb->format == PIXFORMAT_JPEG && fb->len > 4 && fb->buf[0] == 0xFF && fb->buf[1] == 0xD8 &&
          fb->buf[fb->len - 2] == 0xFF && fb->buf[fb->len - 1] == 0xD9;
 }
 

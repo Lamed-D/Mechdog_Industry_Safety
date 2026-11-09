@@ -45,6 +45,17 @@ class StatusTests(unittest.TestCase):
         self.assertTrue(status["camera_ok"])
         self.assertFalse(status["recognition"])
 
+    def test_optional_profile_and_measured_dimensions_are_validated(self):
+        obj = mock_camera.CameraState("A").status()
+        obj["camera"].update(dimensions_measured=True, profile="balanced", target_fps=15, jpeg_kbps=1200)
+        self.assertTrue(parse_status(obj, "A")["dimensions_measured"])
+        for field, value in (("fps", True), ("dimensions_measured", "yes"), ("width", -1),
+                             ("jpeg_kbps", float("nan")), ("quality", 64), ("target_fps", 0)):
+            broken = mock_camera.CameraState("A").status()
+            broken["camera"][field] = value
+            with self.assertRaises(ValueError):
+                parse_status(broken, "A")
+
     def test_wrong_robot_and_bad_fields_rejected(self):
         good = mock_camera.CameraState("A").status()
         with self.assertRaises(ValueError):
@@ -196,6 +207,8 @@ class MockServerTests(unittest.TestCase):
         self.assertEqual(client.status()["reason"], "camera_not_ok")
         self.state.status = lambda: {**original(), "camera": {**original()["camera"], "frame_age_ms": 5000}}
         self.assertEqual(client.status()["reason"], "stale_frames")
+        self.state.status = lambda: {**original(), "camera": {**original()["camera"], "dimensions_measured": False}}
+        self.assertEqual(client.status()["reason"], "no_measured_frame")
         self.state.status = original
 
     def test_unreachable_camera_is_unknown(self):

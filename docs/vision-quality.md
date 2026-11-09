@@ -65,6 +65,7 @@ Raspberry Pi 전용 AI Camera/NPU 벤치마크를 우리 ESP32-S3 카메라·CPU
 사용자가 카메라 A 다음 B를 백업·굽기·확인한 뒤 두 대를 동시에 측정합니다.
 
 1. `/status`: `camera.psram=true`, 실제 센서·width·height·quality·profile·target_fps 확인.
+   v0.1.4 이상은 dimensions_measured=true인지 확인합니다. false이면 표시된 프로필 크기를 실측으로 보지 않습니다.
 2. 10분 동시 수신: 실효 FPS·`camera.jpeg_kbps`·프레임 나이·RSSI·실패/재초기화 횟수·Pi CPU/온도 기록.
 3. **초기 목표 [가정]**: 각 카메라 수신 10fps 이상, 수신 나이 p95 300ms 이하, 추론 선택 처리 5fps/대 이상,
    결과 나이 p95 500ms 이하. 목표 미달이면 프로필·모델·동시 작업을 조정하고 합격 처리하지 않습니다.
