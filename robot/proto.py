@@ -10,7 +10,7 @@ ROLE_MIN_LEASE_MS = 100
 ROLE_MAX_LEASE_MS = 1000
 ROLE_PRIMARY, ROLE_SECONDARY, ROLE_NONE = "P", "S", "N"
 WARN_ORDER = ("clipped", "busy", "latched", "move_stale", "reset_denied", "garbage", "proto",
-              "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart")
+              "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart", "lidar_backlog")
 
 ACTION_ALLOW = ("stand_four_legs", "normal_attitude", "sit_dowm",
                 "go_prone", "nodding_motion", "scrape_a_bow")
