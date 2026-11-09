@@ -55,7 +55,9 @@
 
 ## 4. 설치 (미리 빌드한 bin, 사용자)
 
-로봇 한 대씩 합니다. 아래는 로봇 A 기준이며 B도 같고 `set robot B`만 다릅니다.
+로봇 한 대씩 합니다. 아래 예시는 로봇 A 기준입니다. 로봇 B 카메라는 `set robot B`로 설정하고,
+주소·AP 이름의 `a`/`A`를 `b`/`B`로 바꿔 씁니다(`mechdog-b-cam.local`, `MECHDOG-B-CAM`).
+카메라 ID는 그 카메라가 달린 로봇의 ID를 쓰며, 두 로봇의 카메라가 같은 ID를 쓰지 않게 합니다.
 
 ### 4.1 준비
 
@@ -147,7 +149,9 @@ SPI SPEED **80MHz**, SPI MODE **DIO**, BAUD **460800**, 나머지 기본값, `ST
 | 영상 | `http://mechdog-a-cam.local:81/stream` | 브라우저에 실시간 영상 |
 | 수신 지연 | 영상 보면서 `/status` 새로 고침 | `camera.fps`, `frame_age_ms`(작을수록 좋음) |
 
-- `.local` 이름이 안 열리면 시리얼 로그의 IP로 엽니다(Windows는 mDNS가 안 될 수 있음).
+- 로봇 B 카메라는 `mechdog-b-cam.local`이고 `/status`의 `"robot"`이 `"B"`입니다.
+- `.local` 이름이 안 열리면 시리얼 상태 줄의 `sta <IP>`로 `http://<IP>/status`, `http://<IP>:81/stream`을 엽니다
+  (Windows·휴대폰은 mDNS가 안 될 수 있음).
 - Pi 5(또는 PC)에서 파이썬으로:
 
   ```python
