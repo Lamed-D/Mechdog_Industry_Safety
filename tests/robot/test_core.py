@@ -1,5 +1,6 @@
 """명령 처리·감시·래치·저전압·텔레메트리 (docs/protocol.md 4·5·6절)."""
 
+import threading
 import unittest
 
 from tests import fakes
@@ -378,6 +379,125 @@ class TelemetryTest(CoreTestCase):
         line = self.robot.telemetry()
         self.assertLessEqual(len(line), core.MAX_TEL_LEN)
         self.assertIn("clipped", line)
+
+
+class ActionSafetyTest(CoreTestCase):
+    """리뷰 [차단] 재현: 동작 그룹 끝 판단과 래치 뒤 RESET 기한."""
+
+    def test_reset_blocked_until_max_time_even_if_stop_reports_over(self):
+        self.ready()
+        self.send("POSE", "prone")
+        self.send("ESTOP")  # fake stop_action 은 바로 '끝남'으로 바뀜
+        self.wait(self.cfg.ACTION_MIN_MS)
+        self.assertTrue(self.dog.action_is_over())
+        self.send("RESET")
+        self.assertTrue(self.robot.latched)
+        self.assertIn("reset_denied", self.robot.events)
+        self.wait(self.cfg.ACTION_DURATION_MS["go_prone"])
+        self.send("RESET")
+        self.assertFalse(self.robot.latched)
+
+    def test_action_not_confirmed_is_stopped_at_max_time_and_still_tracked(self):
+        self.ready()
+        self.dog.stop_action = lambda: None  # 멈춰도 끝났다고 보고되지 않는 경우
+        self.send("ACTION", "go_prone")
+        self.wait(self.cfg.ACTION_DURATION_MS["go_prone"] + 200)
+        self.assertEqual(self.moves()[-1], (0, 0))
+        self.assertEqual(self.robot.action_name, "go_prone")  # 시간이 지났다고 끝난 것으로 보지 않음
+        self.assertFalse(self.robot.busy())
+        calls = []
+        self.dog.stop_action = lambda: calls.append(1)
+        self.send("ESTOP")
+        self.assertEqual(calls, [1])  # ESTOP 은 여전히 동작 중단을 시도
+        self.assertEqual(self.moves()[-1], (0, 0))
+
+    def test_action_is_over_failure_means_not_over(self):
+        self.ready()
+
+        def broken():
+            raise AttributeError("no action_is_over")
+        self.dog.action_is_over = broken
+        self.send("ACTION", "nodding_motion")
+        self.wait(self.cfg.ACTION_DURATION_MS["nodding_motion"] + 100)
+        self.assertEqual(self.robot.action_name, "nodding_motion")
+        self.assertEqual(self.dog.fake_calls("stop_action"), [()])  # 최대 시간에 멈춤 시도
+        self.send("ESTOP")
+        self.assertEqual(self.dog.fake_calls("stop_action"), [(), ()])
+
+    def test_stop_action_error_still_moves_zero(self):
+        self.ready()
+
+        def broken():
+            raise AttributeError("no stop_action")
+        self.dog.stop_action = broken
+        self.send("ACTION", "go_prone")
+        self.send("ESTOP")
+        self.assertEqual(self.moves()[-1], (0, 0))
+        self.assertEqual(self.robot.latch_reason, "estop")
+
+
+class TiltValidationTest(CoreTestCase):
+    def test_non_finite_or_bad_tilt_is_na(self):
+        self.tick()
+        for value in ([float("nan"), 0.0], [0.0, float("inf")], [True, 0.0], [1.0], "ab", [None, 1.0]):
+            fakes.Hiwonder_IIC.fake_set_angle(value)
+            fields = self.tel()
+            self.assertEqual(fields[8:10], ["NA", "NA"], value)
+            self.assertIn("imu_unknown", fields[12], value)
+        fakes.Hiwonder_IIC.fake_set_angle([1, -2.25])
+        self.assertEqual(self.tel()[8:10], ["1.0", "-2.2"])
+
+
+class ConcurrencyTest(CoreTestCase):
+    """리뷰 [차단] 재현: 수신이 move 를 부르는 도중 감시가 래치하는 경합."""
+
+    def setUp(self):
+        super().setUp()
+        self.lock = threading.Lock()
+        self.robot = core.Robot(self.cfg, Motion(self.dog), self.clock,
+                                fakes.Hiwonder.Battery_power, self.imu.read_angle, lock=self.lock)
+
+    def test_motion_calls_happen_under_lock(self):
+        self.ready()
+        seen = []
+        real_move = self.dog.move
+
+        def move(step, angle):
+            seen.append(self.lock.locked())
+            real_move(step, angle)
+        self.dog.move = move
+        self.send("MOVE", 40, 0)
+        self.tick(self.cfg.LINK_TIMEOUT_MS + 1)
+        self.assertEqual(seen, [True, True])
+
+    def test_watchdog_latch_during_move_ends_stopped(self):
+        self.ready()
+        real_move = self.dog.move
+        watchdog = []
+
+        def move(step, angle):
+            if (step, angle) != (0, 0) and not watchdog:
+                # move 직전에 통신 끊김 시간이 지나고 감시 루프가 돌기 시작함
+                self.clock.advance(self.cfg.LINK_TIMEOUT_MS + 1)
+                thread = threading.Thread(target=self.robot.tick, args=(True,))
+                watchdog.append(thread)
+                thread.start()
+                thread.join(0.05)
+                self.assertTrue(thread.is_alive())  # 잠금 때문에 기다림
+            real_move(step, angle)
+        self.dog.move = move
+        self.send("MOVE", 40, 0)
+        watchdog[0].join(1)
+        self.assertEqual(self.robot.latch_reason, "link_lost")
+        self.assertEqual(self.dog.last_move, (0, 0))
+        self.assertFalse(self.robot.moving)
+
+    def test_latched_but_moving_is_stopped_by_tick(self):
+        self.ready()
+        self.send("MOVE", 40, 0)
+        self.robot.latched = True  # 어떤 경로로든 래치 중에 moving 이 남은 경우
+        self.tick(10)
+        self.assertEqual(self.dog.last_move, (0, 0))
 
 
 class FailSafeTest(CoreTestCase):
