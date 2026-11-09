@@ -179,6 +179,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | HUB-2 | `host/hub/store.py` | [로컬 저장소](hub-store.md): 설정 사본·대기열·상태·기존 명령 저널 | PC SQLite 합성 검사. 실제 디스크/정전/클라우드 미검증 |
 | HUB-3 | `host/hub/sync.py` | [외부 동기화](hub-sync.md): FIFO 재시도·1초 명령 조회·REST 어댑터·메모리 모의 서버 | 실제 계정/HTTP/RLS 미검증. 실행 서비스 연결은 후속 단위 |
 | HUB-4 | `host/hub/commands.py` | [명령 처리](hub-commands.md): 기존 봉투·저널·Core 연결, 확인 ID와 해제 텔레메트리 대조 | 실제 권한 갱신·실행 서비스·장비 미검증 |
+| HUB-5 | `host/hub/connectivity.py` | [연결 정책](hub-connectivity.md): 10초·약한 링크·복귀 실패 정지·사람만 재개 | 순수 상태기계 검사. 약한 링크 기준 실측·Navigator·실행 서비스 미구현 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 
