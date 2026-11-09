@@ -151,6 +151,13 @@ class FlowTest(AppTestCase):
         self.assertTrue(app.robot.latched)
 
 
+class LockTest(AppTestCase):
+    def test_app_uses_real_lock_for_robot(self):
+        app = self.make_app()
+        self.assertIs(app.robot._lock, app.lock)
+        self.assertTrue(hasattr(app.lock, "acquire"))  # CPython 의 _thread 잠금
+
+
 class LinkTest(AppTestCase):
     def test_socket_error_reopens(self):
         link = Link(self.cfg, fakes.network, self.net, self.clock, "s", "p")
@@ -258,6 +265,65 @@ class LidarBridgeTest(AppTestCase):
         self.cmd("MOVE", 40, 0)
         self.step(app)
         self.assertEqual(self.dog.last_move, (40, 0))  # 라이다 문제로 로봇을 멈추지 않음
+
+    def connected_bridge(self):
+        bridge, uart = self.bridge()
+        bridge.service(True)
+        client = self.net.connect_tcp(self.cfg.LIDAR_TCP_PORT)
+        bridge.service(True)
+        return bridge, uart, client
+
+    def test_partial_uart_write_keeps_command_bytes(self):
+        bridge, uart, client = self.connected_bridge()
+        real_write = uart.write
+        uart.write = lambda data: real_write(bytes(data)[:1])  # 한 번에 1바이트만 써짐
+        client.send(b"\xa5\x20")
+        bridge.service(True)
+        self.assertEqual(uart.fake_take_tx(), b"\xa5")
+        self.assertEqual(bridge.received, 1)
+        client.send(b"\xa5\x25")
+        bridge.service(True)
+        bridge.service(True)
+        bridge.service(True)
+        self.assertEqual(uart.fake_take_tx(), b"\x20\xa5\x25")
+        self.assertEqual(bridge.received, 4)
+
+    def test_uart_write_none_or_zero_retries(self):
+        bridge, uart, client = self.connected_bridge()
+        real_write = uart.write
+        answers = [None, 0]
+
+        def flaky(data):
+            if answers:
+                answers.pop(0)
+                return None if not answers else 0
+            return real_write(data)
+        uart.write = flaky
+        client.send(b"\xa5\x52")
+        for _ in range(3):
+            bridge.service(True)
+        self.assertEqual(uart.fake_take_tx(), b"\xa5\x52")
+
+    def test_uart_write_error_drops_connection_and_buffers(self):
+        bridge, uart, client = self.connected_bridge()
+
+        def broken(data):
+            raise OSError("uart")
+        uart.write = broken
+        client.send(b"\xa5\x20")
+        bridge.service(True)
+        self.assertIsNone(bridge.conn)
+        self.assertEqual((bridge.pending, bridge.tx_pending), (b"", b""))
+
+    def test_new_client_clears_unsent_bytes(self):
+        bridge, uart, client = self.connected_bridge()
+        uart.write = lambda data: 0
+        client.send(b"\xa5\x20")
+        bridge.service(True)
+        self.assertEqual(bridge.tx_pending, b"\xa5\x20")
+        self.net.connect_tcp(self.cfg.LIDAR_TCP_PORT)
+        bridge.service(True)
+        self.assertEqual(bridge.tx_pending, b"")
 
     def test_network_down_closes_server(self):
         bridge, _uart = self.bridge()

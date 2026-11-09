@@ -3,12 +3,21 @@
 # 감시가 수신과 다른 루프라 수신이 멈춰도 600 ms 뒤 정지합니다(docs/protocol.md 5.1절).
 
 from comm import Link
-from core import Robot
+from core import NoLock, Robot
 from lidar_bridge import LidarBridge
 from motion import Motion
 
 COMM_PERIOD_MS = 5
 LIDAR_PERIOD_MS = 2
+
+
+def make_lock():
+    """수신·감시 루프가 같은 상태를 바꾸지 않게 하는 잠금. _thread 가 없으면 빈 잠금(루프가 번갈아 도는 경우)."""
+    try:
+        import _thread
+        return _thread.allocate_lock()
+    except Exception:
+        return NoLock()
 
 
 def safe_reader(func):
@@ -23,11 +32,12 @@ def safe_reader(func):
 
 class App:
     def __init__(self, cfg, dog, read_battery, read_tilt, network, socket, machine, clock,
-                 ssid=None, password=None):
+                 ssid=None, password=None, lock=None):
         self.cfg = cfg
         self.clock = clock
         self.motion = Motion(dog)
-        self.robot = Robot(cfg, self.motion, clock, read_battery, safe_reader(read_tilt))
+        self.lock = lock if lock is not None else make_lock()
+        self.robot = Robot(cfg, self.motion, clock, read_battery, safe_reader(read_tilt), self.lock)
         self.link = Link(cfg, network, socket, clock, ssid, password)
         self.lidar = LidarBridge(cfg, machine, socket)
 
@@ -73,7 +83,8 @@ class App:
                     on_error()
                 self.clock.sleep_ms(period_ms)  # 다른 루프에 차례를 넘김
         finally:
-            self.motion.stop()  # 어떤 이유로든 루프가 끝나면 정지
+            with self.lock:
+                self.motion.stop()  # 어떤 이유로든 루프가 끝나면 정지
 
     def comm_loop(self):
         self._forever(self.comm_step, COMM_PERIOD_MS, self.robot.fail_safe)

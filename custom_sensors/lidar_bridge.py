@@ -36,7 +36,8 @@ class LidarBridge:
         self.uart = None
         self.server = None
         self.conn = None
-        self.pending = b""
+        self.pending = b""     # 라이다 -> Pi 5 로 아직 못 보낸 바이트
+        self.tx_pending = b""  # Pi 5 -> 라이다 로 아직 못 쓴 바이트
         self.sent = 0       # 라이다 -> Pi 5 바이트 수
         self.received = 0   # Pi 5 -> 라이다 바이트 수
         try:
@@ -99,6 +100,7 @@ class LidarBridge:
         _close(self.conn)
         self.conn = None
         self.pending = b""
+        self.tx_pending = b""
 
     def _drain(self):
         if self.uart is None:
@@ -125,14 +127,23 @@ class LidarBridge:
         self.pending = self.pending[count:]  # 못 보낸 바이트는 다음에 (UART 는 그동안 버퍼에 쌓임)
 
     def _to_lidar(self):
+        # 못 쓴 바이트를 먼저 순서대로 다 쓴 뒤에만 다음 TCP 데이터를 읽음(명령 경계 유지)
+        if not self.tx_pending:
+            try:
+                data = self.conn.recv(RECV_SIZE)
+            except OSError as error:
+                if not _no_data(error):
+                    self._drop()
+                return
+            if not data:
+                self._drop()  # 상대가 닫음. 라이다에는 아무것도 보내지 않음
+                return
+            self.tx_pending = data
         try:
-            data = self.conn.recv(RECV_SIZE)
-        except OSError as error:
-            if not _no_data(error):
-                self._drop()
+            count = self.uart.write(self.tx_pending)
+        except Exception:
+            self._drop()
             return
-        if not data:
-            self._drop()  # 상대가 닫음. 라이다에는 아무것도 보내지 않음
-            return
-        self.uart.write(data)
-        self.received += len(data)
+        count = count or 0  # None(시간 초과)·0 이면 다음에 다시
+        self.received += count
+        self.tx_pending = self.tx_pending[count:]
