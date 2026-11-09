@@ -44,7 +44,7 @@ void net_begin() {
   WiFi.setHostname(s_host);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);  // 절전 끄기: 스트림 지연·끊김 방지
-  WiFi.setAutoReconnect(true);
+  WiFi.setAutoReconnect(false);  // 재접속은 net_loop 가 맡음(두 곳에서 다시 붙지 않게)
   apply_static_ip();
   start_sta();
   uint32_t now = millis();
@@ -73,7 +73,9 @@ void net_loop() {
       s_sta_was_up = false;
       s_sta_down_since = now;
     }
-    if (ssid_set() && now - s_last_try >= CAM_STA_RETRY_MS) {
+    // 점검용 AP에 누가 붙어 있으면 STA 재시도(채널 탐색)를 드물게 해 AP 연결이 끊기지 않게 합니다.
+    uint32_t retry_ms = (s_ap_on && WiFi.softAPgetStationNum() > 0) ? CAM_STA_RETRY_AP_BUSY_MS : CAM_STA_RETRY_MS;
+    if (ssid_set() && now - s_last_try >= retry_ms) {
       s_last_try = now;
       s_reconnects++;
       WiFi.disconnect(false, false);
@@ -81,6 +83,8 @@ void net_loop() {
     }
     if (!s_ap_on && ap_allowed() && (!ssid_set() || now - s_sta_down_since >= CAM_STA_FALLBACK_MS)) {
       WiFi.mode(WIFI_AP_STA);
+      // 제조사 기본 펌웨어와 같은 주소(192.168.5.1)를 써서 점검 때 헷갈리지 않게 합니다.
+      WiFi.softAPConfig(IPAddress(192, 168, 5, 1), IPAddress(192, 168, 5, 1), IPAddress(255, 255, 255, 0));
       WiFi.softAP(s_ap_ssid, settings_ap_password());
       WiFi.setSleep(false);
       s_ap_on = true;

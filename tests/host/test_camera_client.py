@@ -77,6 +77,30 @@ class FreshnessTests(unittest.TestCase):
         self.assertIsNone(receiver.latest())
         self.assertEqual(receiver.state()["status"], "unknown")
 
+    def test_slow_body_transfer_counts_as_age(self):
+        clock = FakeClock()
+
+        class SlowBody(io.BytesIO):
+            def read(self, n=-1):          # body arrives 2 s after its headers
+                clock.now += 2.0
+                return super().read(n)
+
+        receiver = LatestFrameReceiver(CameraEndpoint("A", "x"), max_age_s=1.0, clock=clock)
+        receiver.feed(SlowBody(part(1, lead=b"")))
+        self.assertIsNone(receiver.latest())
+
+    def test_missing_age_header_is_not_fresh(self):
+        jpeg = mock_camera.synthetic_jpeg(1)
+        data = b"--b\r\nContent-Length: %d\r\n\r\n" % len(jpeg) + jpeg
+        receiver = LatestFrameReceiver(CameraEndpoint("A", "x"), clock=FakeClock())
+        receiver.feed(io.BytesIO(data))
+        self.assertEqual(receiver.frames, 1)
+        self.assertIsNone(receiver.latest())
+
+    def test_non_ascii_digits_do_not_crash(self):
+        frames = list(read_mjpeg(io.BytesIO(part(1).replace(b"X-Frame-Seq: 1", b"X-Frame-Seq: \xb2")), "A"))
+        self.assertIsNone(frames[0].seq)
+
     def test_camera_reported_old_frame_is_not_fresh(self):
         receiver = LatestFrameReceiver(CameraEndpoint("A", "x"), max_camera_age_ms=500, clock=FakeClock())
         receiver.feed(io.BytesIO(part(1, age=900)))
@@ -106,6 +130,15 @@ class MockServerTests(unittest.TestCase):
         client = CameraClient(endpoint, timeout_s=2)
         self.assertEqual(client.status(), {"robot": "A", "status": "unknown", "reason": "http_401"})
         self.assertIsNone(client.capture())
+
+    def test_reachable_but_broken_camera_is_unknown(self):
+        client = CameraClient(self.endpoint, timeout_s=2)
+        original = self.state.status
+        self.state.status = lambda: {**original(), "camera": {**original()["camera"], "ok": False}}
+        self.assertEqual(client.status()["reason"], "camera_not_ok")
+        self.state.status = lambda: {**original(), "camera": {**original()["camera"], "frame_age_ms": 5000}}
+        self.assertEqual(client.status()["reason"], "stale_frames")
+        self.state.status = original
 
     def test_unreachable_camera_is_unknown(self):
         endpoint = CameraEndpoint("A", "127.0.0.1", 9, 9)

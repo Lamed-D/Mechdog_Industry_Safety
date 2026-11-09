@@ -10,7 +10,6 @@
 #include "frame_store.h"
 #include "http_api.h"
 #include "i2c_compat.h"
-#include "i2c_table.h"
 #include "net.h"
 #include "settings.h"
 
@@ -18,7 +17,7 @@ static void start_watchdog() {
   // 코어가 이미 켠 작업 워치독의 시간을 늘리고, loop 작업을 감시 대상에 넣습니다.
   esp_task_wdt_config_t cfg = {};
   cfg.timeout_ms = CAM_WDT_TIMEOUT_MS;
-  cfg.idle_core_mask = 0;
+  cfg.idle_core_mask = 1 << 0;  // 코어 0(Wi-Fi·HTTP·스트림)이 막히면 감지
   cfg.trigger_panic = true;  // 멈추면 재부팅
   if (esp_task_wdt_reconfigure(&cfg) != ESP_OK) esp_task_wdt_init(&cfg);
   esp_task_wdt_add(nullptr);
@@ -49,12 +48,6 @@ void loop() {
 
   CamStats st = frame_store_stats();
   int clients = http_stream_clients();
-  uint8_t flags = 0;
-  if (st.camera_ok) flags |= CAM_FLAG_CAMERA_OK;
-  if (net_sta_connected()) flags |= CAM_FLAG_STA;
-  if (net_ap_on()) flags |= CAM_FLAG_AP;
-  if (clients > 0) flags |= CAM_FLAG_STREAMING;
-  i2c_compat_set_status(flags, (uint8_t)clients);
 
   static uint32_t last_log = 0;
   if (millis() - last_log >= 10000) {

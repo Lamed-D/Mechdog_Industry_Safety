@@ -52,7 +52,8 @@ class Frame:
     jpeg: bytes
     seq: int | None
     camera_age_ms: int | None   # age reported by the camera when the frame was sent
-    received_at: float          # receiver clock (monotonic seconds)
+    captured_at: float          # estimated capture time on the receiver clock (monotonic seconds):
+                                # part-header arrival minus camera_age_ms, so slow transfer counts as age
 
 
 def is_jpeg(data):
@@ -63,7 +64,11 @@ def _optional_int(value):
     if value is None:
         return None
     value = value.strip()
-    return int(value) if value.isdigit() else None
+    return int(value) if value.isascii() and value.isdigit() else None
+
+
+def _captured_at(header_time, camera_age_ms):
+    return header_time - (camera_age_ms or 0) / 1000.0
 
 
 def parse_status(obj, robot):
@@ -106,9 +111,11 @@ def parse_status(obj, robot):
 class CameraClient:
     """One-shot requests (status, capture). Failures are reported, never treated as 'no person'."""
 
-    def __init__(self, endpoint, timeout_s=3.0, opener=None, clock=time.monotonic):
+    # timeout is longer than the camera's own /capture wait (1.5 s) so its "503 no frame" arrives.
+    def __init__(self, endpoint, timeout_s=5.0, max_frame_age_ms=1000, opener=None, clock=time.monotonic):
         self.endpoint = endpoint
         self.timeout_s = timeout_s
+        self.max_frame_age_ms = max_frame_age_ms
         self._open = opener or urllib.request.urlopen
         self._clock = clock
 
@@ -116,24 +123,32 @@ class CameraClient:
         try:
             with self._open(self.endpoint.url("/status"), timeout=self.timeout_s) as response:
                 body = response.read(8192)
-            return {"status": "ok", **parse_status(json.loads(body), self.endpoint.robot)}
+            status = parse_status(json.loads(body), self.endpoint.robot)
         except urllib.error.HTTPError as error:
             return {"robot": self.endpoint.robot, "status": "unknown", "reason": "http_%d" % error.code}
         except (OSError, ValueError) as error:
             return {"robot": self.endpoint.robot, "status": "unknown", "reason": type(error).__name__}
+        # Reachable is not healthy: a lost camera or stale frames are reported as unknown.
+        if not status["camera_ok"]:
+            return {**status, "status": "unknown", "reason": "camera_not_ok"}
+        if not status["idle"] and not 0 <= status["frame_age_ms"] <= self.max_frame_age_ms:
+            return {**status, "status": "unknown", "reason": "stale_frames"}
+        return {**status, "status": "ok"}
 
     def capture(self):
         """Returns a Frame or None. A camera error is 'unknown', not an empty scene."""
         try:
             with self._open(self.endpoint.url("/capture"), timeout=self.timeout_s) as response:
+                header_time = self._clock()
                 data = response.read(MAX_FRAME_BYTES + 1)
                 headers = response.headers
+            if len(data) > MAX_FRAME_BYTES or not is_jpeg(data):
+                return None
+            age = _optional_int(headers.get("X-Frame-Age-Ms"))
+            return Frame(self.endpoint.robot, data, _optional_int(headers.get("X-Frame-Seq")), age,
+                         _captured_at(header_time, age))
         except (OSError, ValueError):
             return None
-        if len(data) > MAX_FRAME_BYTES or not is_jpeg(data):
-            return None
-        return Frame(self.endpoint.robot, data, _optional_int(headers.get("X-Frame-Seq")),
-                     _optional_int(headers.get("X-Frame-Age-Ms")), self._clock())
 
 
 def read_mjpeg(stream, robot, clock=time.monotonic):
@@ -161,6 +176,7 @@ def read_mjpeg(stream, robot, clock=time.monotonic):
             headers[name.strip().lower()] = value.strip()
         else:
             raise ValueError("too many part headers")
+        header_time = clock()          # body transfer time below counts toward the frame's age
         length = _optional_int(headers.get("content-length"))
         if length is None or length > MAX_FRAME_BYTES:
             raise ValueError("invalid content length")
@@ -169,15 +185,16 @@ def read_mjpeg(stream, robot, clock=time.monotonic):
             return
         if not is_jpeg(data):
             raise ValueError("part is not a JPEG")
-        yield Frame(robot, data, _optional_int(headers.get("x-frame-seq")),
-                    _optional_int(headers.get("x-frame-age-ms")), clock())
+        age = _optional_int(headers.get("x-frame-age-ms"))
+        yield Frame(robot, data, _optional_int(headers.get("x-frame-seq")), age, _captured_at(header_time, age))
 
 
 class LatestFrameReceiver:
     """Background MJPEG reader that keeps only the newest frame per camera.
 
-    latest() returns None when the newest frame is older than max_age_s (receiver clock) or
-    the camera reported it as older than max_camera_age_ms. Callers must treat None as
+    latest() returns None when the newest frame's estimated capture time (header arrival minus the
+    camera-reported age, so transfer delay counts) is older than max_age_s, when the camera reported
+    it as older than max_camera_age_ms, or when the age header is missing. Callers must treat None as
     'unknown', never as 'nothing detected'.
     """
 
@@ -214,9 +231,10 @@ class LatestFrameReceiver:
     def latest(self):
         with self._lock:
             frame = self._frame
-        if frame is None or self._clock() - frame.received_at > self.max_age_s:
+        # Without the camera's age header the frame's real age is unknown: not fresh.
+        if frame is None or frame.camera_age_ms is None or frame.camera_age_ms > self.max_camera_age_ms:
             return None
-        if frame.camera_age_ms is not None and frame.camera_age_ms > self.max_camera_age_ms:
+        if self._clock() - frame.captured_at > self.max_age_s:
             return None
         return frame
 

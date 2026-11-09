@@ -1,6 +1,6 @@
 # 비전 모듈(ESP32-S3 카메라) 맞춤 펌웨어
 
-로봇 A·B 앞쪽 비전 모듈에 올리는 우리 펌웨어(`firmware/vision_cam`, v0.1.0)의 설치·설정·확인·복구·빌드 안내입니다.
+로봇 A·B 앞쪽 비전 모듈에 올리는 우리 펌웨어(`firmware/vision_cam`, v0.1.1)의 설치·설정·확인·복구·빌드 안내입니다.
 **목표는 카메라 영상을 Wi-Fi로 Pi 5에 보내는 것**입니다. 쓰러진 사람 인식은 Pi 5가 영상으로 합니다.
 
 > **이 문서의 굽기·백업 명령은 사용자가 직접 실행합니다.** 에이전트는 카메라·로봇에 펌웨어를 올리지 않습니다.
@@ -15,7 +15,7 @@
 | 이름 | 고정 IP 하나 | mDNS `mechdog-a-cam.local` / `mechdog-b-cam.local` + 로봇 ID 확인 |
 | Wi-Fi 절전 | 미확인 | **끔**(지연·끊김 방지) |
 | 접속 실패 시 | — | 30초 뒤 점검용 AP `MECHDOG-A-CAM`(비밀번호 설정한 경우만), STA 재시도 계속 |
-| 메인 보드 I2C | 응답 없음(오류 19로 보임) | 공식 `ESP32S3Cam` 읽기에 규격대로 **"결과 없음"** 응답 + 상태 레지스터 `0xE0` |
+| 메인 보드 I2C | 응답 없음(오류 19로 보임) | 공식 `ESP32S3Cam` 읽기에 규격대로 **"결과 없음"** 응답(명령과 무관한 고정 응답) |
 | 카메라 안 인식(얼굴·색·라인) | 기능별 별도 펌웨어 | **넣지 않음**(9절) |
 | 감시 | 미확인 | 작업 워치독 10초, 카메라 재초기화, Wi-Fi 재접속, 10분 고립 시 재부팅 |
 | 설정 저장 | — | USB 시리얼 명령으로 카메라 안(NVS)에 저장. **저장소에는 비밀번호 없음** |
@@ -26,7 +26,7 @@
 
 | 경로 | 내용 |
 | --- | --- |
-| `firmware/vision_cam/release/mechdog_vision_cam_v0.1.0_0x0.bin` | **바로 굽는 합본 이미지**(주소 `0x0`). 부트로더·파티션 표·앱 포함, 약 1.06 MB |
+| `firmware/vision_cam/release/mechdog_vision_cam_v0.1.1_0x0.bin` | **바로 굽는 합본 이미지**(주소 `0x0`). 부트로더·파티션 표·앱 포함, 약 1.06 MB |
 | `firmware/vision_cam/release/*.sha256` | 위 파일의 SHA-256 |
 | `firmware/vision_cam/*.ino, *.cpp, *.h` | 소스(한국어 주석) |
 | `firmware/vision_cam/config.h` | 기본값(해상도·품질·포트·I2C 주소·시간) |
@@ -68,7 +68,7 @@
 - [ ] esptool 준비. Arduino IDE ESP32 패키지에 들어 있습니다:
       `%LOCALAPPDATA%\Arduino15\packages\esp32\tools\esptool_py\<버전>\esptool.exe`
       (또는 `pip install esptool` 뒤 `python -m esptool`). 아래 예시는 `esptool`로 줄여 씁니다.
-- [ ] 이미지 확인(PowerShell): `Get-FileHash firmware\vision_cam\release\mechdog_vision_cam_v0.1.0_0x0.bin -Algorithm SHA256`
+- [ ] 이미지 확인(PowerShell): `Get-FileHash firmware\vision_cam\release\mechdog_vision_cam_v0.1.1_0x0.bin -Algorithm SHA256`
       값이 같은 폴더 `.sha256` 파일과 같아야 합니다.
 
 ### 4.2 (1) 현재 플래시 전체 백업 — 반드시 먼저
@@ -86,7 +86,7 @@ esptool --chip esp32s3 --port COM10 --baud 460800 read-flash 0 ALL C:\camera-bac
 ### 4.3 (2) 맞춤 펌웨어 굽기
 
 ```powershell
-esptool --chip esp32s3 --port COM10 --baud 460800 write-flash 0x0 firmware\vision_cam\release\mechdog_vision_cam_v0.1.0_0x0.bin
+esptool --chip esp32s3 --port COM10 --baud 460800 write-flash 0x0 firmware\vision_cam\release\mechdog_vision_cam_v0.1.1_0x0.bin
 ```
 
 제조사 플래시 다운로드 도구를 쓸 때도 제조사 안내와 같은 설정입니다: ChipType **ESP32-S3**, 파일 하나 체크, 주소 **0x0000**,
@@ -125,11 +125,13 @@ SPI SPEED **80MHz**, SPI MODE **DIO**, BAUD **460800**, 나머지 기본값, `ST
 
    - `show`는 비밀번호·키를 가리고 "설정됨"만 표시합니다.
    - 설정은 카메라 안(NVS)에만 저장되고 **다시 구워도 지워지지 않을 수 있습니다.** 지우려면 `clear pass` 처럼 씁니다.
+   - `set key` 처럼 값 없이 쓰면 "빈 값"이 저장되어 키·AP가 꺼집니다. `clear key`는 빌드 때 값으로 돌아갑니다.
+   - 접근 키는 영문·숫자와 `. _ ~ -`만 됩니다(주소창에 그대로 넣을 수 있게).
    - 공백이 있는 SSID도 그대로 쓰면 됩니다(`set ssid My Router`).
 4. 재시작 뒤 10초마다 상태 줄이 나옵니다. `sta 192.168.x.y rssi -55 | cam 1 fps 0.0 clients 0` 처럼 **`sta`와 IP**가 보이면 접속 성공입니다.
    (받는 사람이 없으면 촬영을 쉬므로 fps 0.0이 정상입니다.)
 5. 30초 넘게 접속이 안 되고 `ap_pass`를 넣었으면 AP `MECHDOG-A-CAM`이 켜집니다. 그 AP에 노트북을 붙여
-   `http://192.168.4.1/status`로 상태를 볼 수 있습니다. 공유기 SSID·비밀번호를 다시 확인합니다.
+   `http://192.168.5.1/status`로 상태를 볼 수 있습니다(제조사 기본 펌웨어 AP와 같은 주소). 공유기 SSID·비밀번호를 다시 확인합니다.
 
 공유기에서 두 카메라에 **DHCP 예약(고정 IP)** 을 해 두기를 권장합니다. mDNS가 안 되는 네트워크에서도 주소가 바뀌지 않습니다.
 빌드 때 넣고 싶으면 `secrets.example.h`를 `secrets.h`로 복사해 같은 값을 넣고 직접 빌드합니다(6절). 시리얼로 저장한 값이 우선합니다.
@@ -230,19 +232,20 @@ python tools/build_vision_cam.py --release  # + firmware/vision_cam/release/ 합
 | 프레임 버퍼 | PSRAM 2개, 최신 프레임 모드 | 지연 최소화. PSRAM 없으면 QVGA·1개로 자동 낮춤 |
 | 동시 스트림 | 2 | Pi 5 + 점검용 브라우저. `CAM_MAX_STREAM_CLIENTS` |
 | 촬영 쉬기 | 10초 무요청 | 발열 감소. `CAM_IDLE_MS` |
-| 새 프레임 대기 | 3초 | 넘으면 스트림 종료·캡처 503. `CAM_FRAME_WAIT_MS` |
+| 새 프레임 대기 | 스트림 3초, 캡처 1.5초 | 넘으면 스트림 종료(연결 닫음)·캡처 503. `CAM_FRAME_WAIT_MS`, `CAM_CAPTURE_WAIT_MS` |
 | 재초기화 | 연속 실패 10회 | `CAM_FAILS_BEFORE_REINIT`. 재초기화 3회 실패 시 재부팅(전원 켠 뒤 최대 3번, 그 뒤 30초마다 재시도) |
 | 워치독 | 10초 | `CAM_WDT_TIMEOUT_MS` |
-| STA 재시도 / AP 전환 | 10초 / 30초 | `CAM_STA_RETRY_MS`, `CAM_STA_FALLBACK_MS` |
+| STA 재시도 / AP 전환 | 15초(AP 접속자 있으면 60초) / 30초 | `CAM_STA_RETRY_MS`, `CAM_STA_RETRY_AP_BUSY_MS`, `CAM_STA_FALLBACK_MS` |
 | 고립 재부팅 | 10분 | `CAM_NET_RESTART_MS`(SSID를 설정한 경우만) |
 | 영상 방향 | 센서별 기본(OV2640 등 상하 반전) | 실물이 거꾸로면 `CAM_VFLIP`/`CAM_HMIRROR` |
 
-## 9. 카메라 안 인식을 넣지 않은 이유
+## 9. 카메라 안 인식을 넣지 않은 이유 (필요한 것만 구현)
 
 - 목표 기능(쓰러진 사람)은 카메라 안의 얼굴·색·라인 인식으로 할 수 없습니다. 얼굴 검출은 자세 정보가 아닙니다.
 - 인식을 같이 돌리면 같은 칩에서 영상 압축·전송 속도가 떨어지고 메모리를 나눠 씁니다. 영상 전송이 우선입니다.
 - `robot/vision.py`는 카메라 인식 결과로 로봇을 움직이지 않고 상태만 기록합니다(`fallen_person: unknown`).
-- 그래서 I2C는 규격대로 "결과 없음"만 돌려줍니다. 메인 보드의 공식 읽기가 성공하는지는 **카메라 연결 확인** 용도로 씁니다.
+- 그래서 I2C는 제조사 공식 자료에서 **주소·핀·속도·"결과 없음" 형식만** 가져와 고정 응답으로 답합니다.
+  메인 보드의 공식 읽기가 성공하는지는 **카메라 연결 확인** 용도로 씁니다. 얼굴·색·라인 인식이 필요해지면 Pi 5에서 영상으로 합니다.
 
 ## 10. 확인하지 못한 것
 

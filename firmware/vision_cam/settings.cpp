@@ -38,8 +38,10 @@ static void load() {
   bool opened = p.begin(NS, true);
   for (int i = 0; i < F_COUNT; i++) {
     Field &f = s_fields[i];
-    String stored = opened && p.isKey(f.name) ? p.getString(f.name, "") : String();
-    const char *src = stored.length() ? stored.c_str() : f.fallback;
+    // 저장된 값이 있으면(빈 문자열 포함) 그것을 씁니다. clear 로 지워야 secrets.h 값으로 돌아갑니다.
+    bool has = opened && p.isKey(f.name);
+    String stored = has ? p.getString(f.name, "") : String();
+    const char *src = has ? stored.c_str() : f.fallback;
     strncpy(f.value, src, sizeof(f.value) - 1);
     f.value[sizeof(f.value) - 1] = '\0';
   }
@@ -68,9 +70,9 @@ static void help() {
   Serial.println("  set robot A|B           로봇 ID");
   Serial.println("  set ssid <이름>         공유기 SSID(공백 포함 가능)");
   Serial.println("  set pass <비밀번호>     공유기 비밀번호");
-  Serial.println("  set ap_pass <8자 이상>  점검용 AP 비밀번호(비우면 AP 안 켬)");
-  Serial.println("  set key <값>            HTTP 접근 키(비우면 키 없음)");
-  Serial.println("  clear <이름>            저장값 지우기(secrets.h 값으로 돌아감)");
+  Serial.println("  set ap_pass <8자 이상>  점검용 AP 비밀번호(set ap_pass 만 쓰면 AP 끔)");
+  Serial.println("  set key <값>            HTTP 접근 키, 영문·숫자 . _ ~ - (set key 만 쓰면 키 없음)");
+  Serial.println("  clear <이름>            저장값 지우기(빌드 때 secrets.h 값으로 돌아감)");
   Serial.println("  reboot                  다시 시작(설정은 재시작 뒤 적용)");
 }
 
@@ -109,6 +111,11 @@ static void handle(char *line) {
       return (void)Serial.println("[cfg] robot 은 A 또는 B 만 됩니다");
     if (f == &s_fields[F_AP_PASS] && value[0] && strlen(value) < 8)
       return (void)Serial.println("[cfg] ap_pass 는 8자 이상이어야 합니다");
+    if (f == &s_fields[F_KEY]) {  // 주소창에 그대로 쓸 수 있는 문자만(인코딩 차이로 늘 거부되는 일 방지)
+      for (const char *c = value; *c; c++)
+        if (!isalnum((unsigned char)*c) && !strchr("._~-", *c))
+          return (void)Serial.println("[cfg] key 는 영문·숫자와 . _ ~ - 만 됩니다");
+    }
   }
   Preferences p;
   if (!p.begin(NS, false)) return (void)Serial.println("[cfg] 저장 공간을 열 수 없습니다");
