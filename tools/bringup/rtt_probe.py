@@ -35,6 +35,8 @@ def summarize(rtts_ms, sent, gaps_ms, timeout_ms=600):
 
 
 def probe(host, port, count, period_s=0.1, wait_s=1.0):
+    if count <= 0 or period_s <= 0 or wait_s <= 0:
+        raise ValueError("probe timing and count must be positive")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(0.01)
     sent_at = {}

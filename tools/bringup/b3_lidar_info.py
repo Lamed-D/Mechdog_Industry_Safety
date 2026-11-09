@@ -26,8 +26,10 @@ def read_exact(uart, size, timeout_ms=500):
 
 def request(uart, command, size):
     """명령을 보내고 (머리 7바이트, 본문) 을 돌려줍니다. 실패하면 None."""
-    while uart.any():
-        uart.read()
+    for _ in range(16):
+        if not uart.any():
+            break
+        uart.read(512)
     uart.write(command)
     head = read_exact(uart, 7)
     if len(head) != 7 or head[:2] != b"\xa5\x5a":

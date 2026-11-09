@@ -10,8 +10,10 @@ PATTERN = bytes(range(256))
 
 def main():
     uart = machine.UART(1, baudrate=115200, rx=32, tx=33, rxbuf=4096)
-    while uart.any():
-        uart.read()
+    for _ in range(16):
+        if not uart.any():
+            break
+        uart.read(512)
     uart.write(PATTERN)
     time.sleep_ms(100)  # 256 바이트 @115200 ≈ 22 ms
     got = uart.read() or b""
