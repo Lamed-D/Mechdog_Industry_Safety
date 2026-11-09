@@ -1,7 +1,9 @@
 # 장착 비전 모듈과 호스트 감지 경계
 
 카메라는 장착된 ESP32-S3 모듈을 사용합니다. MechDog 공식 Hiwonder Python 연결은
-`robot/vision.py`의 `ESP32S3Cam(IIC(2))`이며 `face_recognition()` 결과 유형·존재만 진단합니다.
+`robot/vision.py`의 `ESP32S3Cam(IIC(2))`이며 최신 제조사 얼굴 예제의 `read_face()`를 우선 사용합니다.
+이전 메서드만 있는 장치에서는 `face_recognition()`을 사용하고 결과 유형·존재만 진단합니다.
+제조사 연결 그림의 본체 물리 IIC 포트 1이 코드 IIC(2)에 대응합니다.
 메인 보드와 비전 보드의 펌웨어는 다릅니다. 카메라를 다른 보드로 교체하거나 Arduino로 전환하는 절차가 아닙니다.
 
 ## 현재 실행 가능 범위

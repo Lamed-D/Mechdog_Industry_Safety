@@ -53,6 +53,7 @@ class BringupTest(unittest.TestCase):
         result = module.run(fakes.Hiwonder_IIC, clock)
         self.assertEqual(result["status"], "observed")
         self.assertEqual(result["fallen_person"], "unknown")
+        self.assertEqual(result["method"], "read_face")
         fakes.Hiwonder_IIC.fake_set_face(OSError(5))
         failure = module.run(fakes.Hiwonder_IIC, clock)
         self.assertEqual(failure["status"], "unknown")
@@ -74,6 +75,16 @@ class BringupTest(unittest.TestCase):
         Broken.IIC = staticmethod(lambda bus: object())
         result = module.run(Broken, FakeClock())
         self.assertEqual((result["stage"], result["errno"]), ("camera_init", 5))
+
+    def test_vision_probe_legacy_method_only_when_new_method_missing(self):
+        class LegacyCamera:
+            def face_recognition(self):
+                return False
+        class LegacyApi:
+            IIC = staticmethod(lambda bus: object())
+            ESP32S3Cam = staticmethod(lambda bus: LegacyCamera())
+        result = load("vision_probe").run(LegacyApi, FakeClock())
+        self.assertEqual((result["method"], result["status"]), ("face_recognition", "observed"))
 
     def test_mechdog_only_does_not_construct_robot_or_open_uart(self):
         result = load("mechdog_only").main()

@@ -16,7 +16,10 @@ class Vision:
         if self.camera is None:
             return {"status": "unknown", "reason": self.error}
         try:
-            result = self.camera.face_recognition()
+            reader = getattr(self.camera, "read_face", None)
+            if not callable(reader):
+                reader = self.camera.face_recognition
+            result = reader()
         except Exception:
             return {"status": "unknown", "reason": "camera_read_failed"}
         if result is None:

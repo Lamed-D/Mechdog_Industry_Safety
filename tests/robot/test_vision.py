@@ -30,6 +30,14 @@ class VisionTests(unittest.TestCase):
                 raise OSError("unavailable")
         self.assertEqual(Vision(Broken()).read_face()["status"], "unknown")
 
+    def test_read_face_error_is_not_hidden_by_legacy_retry(self):
+        camera = Vision(fakes.Hiwonder_IIC)
+        fakes.Hiwonder_IIC.fake_set_face(OSError(19))
+        result = camera.read_face()
+        self.assertEqual(result["status"], "unknown")
+        self.assertIn(("read_face", ()), fakes.Hiwonder_IIC.calls)
+        self.assertNotIn(("face_recognition", ()), fakes.Hiwonder_IIC.calls)
+
     def test_app_camera_read_is_independent_and_does_not_move(self):
         from app import App
         from tests.fakes.fake_socket import FakeNet
