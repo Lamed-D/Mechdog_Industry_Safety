@@ -1,17 +1,20 @@
 # Codex 명령 규칙 (prefix_rule). decision: allow | prompt | forbidden
-# 승인·병합은 사용자만, main 직접 푸시·강제 푸시·훅 우회 금지
-prefix_rule(pattern=["gh", "pr", "merge"], decision="forbidden")
+# 병합은 상대 에이전트 승인 후 PR 작성자가(docs/dev/agents.md 6절). main 직접 푸시·강제 푸시·훅 우회 금지
+prefix_rule(pattern=["gh", "pr", "merge"], decision="allow")
 prefix_rule(pattern=["gh", "pr", "review"], decision="forbidden")
 prefix_rule(pattern=["gh", "repo", "delete"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "--force"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "-f"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "--force-with-lease"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "origin", "main"], decision="forbidden")
+prefix_rule(pattern=["git", "push", "-u", "origin", "main"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "origin", "--delete"], decision="forbidden")
 prefix_rule(pattern=["git", "push", "--no-verify"], decision="forbidden")
 prefix_rule(pattern=["git", "commit", "--no-verify"], decision="forbidden")
 prefix_rule(pattern=["git", "commit", "-n"], decision="forbidden")
 prefix_rule(pattern=["git", "config", "core.hooksPath"], decision="forbidden")
+prefix_rule(pattern=["git", "config", "--unset", "core.hooksPath"], decision="forbidden")
+prefix_rule(pattern=["git", "config", "--get"], decision="allow")
 
 # 실제 로봇에 펌웨어·파일을 올리는 명령은 매번 사용자에게 묻는다
 prefix_rule(pattern=["esptool"], decision="prompt")
@@ -33,3 +36,8 @@ prefix_rule(pattern=["gh", "issue", "list"], decision="allow")
 prefix_rule(pattern=["gh", "issue", "view"], decision="allow")
 prefix_rule(pattern=["python", "-m", "unittest"], decision="allow")
 prefix_rule(pattern=["python", "tools/check_confidential.py"], decision="allow")
+prefix_rule(pattern=["gh", "pr", "create"], decision="allow")
+prefix_rule(pattern=["gh", "pr", "comment"], decision="allow")
+prefix_rule(pattern=["gh", "issue", "create"], decision="allow")
+prefix_rule(pattern=["gh", "issue", "comment"], decision="allow")
+prefix_rule(pattern=["git", "push", "-u", "origin"], decision="allow")

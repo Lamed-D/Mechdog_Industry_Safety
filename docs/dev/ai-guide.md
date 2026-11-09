@@ -12,28 +12,31 @@ Mechdog Industry Safety는 Hiwonder MechDog 사족보행 로봇으로 산업 현
 부가 서보(9·10번)에 연결된 장치도 없습니다. 로봇은 ESP32 + MicroPython으로 동작하며, **모든 제어는 Hiwonder 공식 MechDog
 Python API**(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)로 합니다 → [MechDog 제어 API 규칙](mechdog-api.md).
 
-이 저장소는 **Claude(로봇 쪽)와 Codex(Pi 5 호스트 쪽) 두 에이전트**가 각자 다른 작업 폴더에서 함께 작업합니다
+이 저장소는 **claude1(로봇 쪽)과 codex1(Pi 5 호스트 쪽) 두 에이전트**가 각자 다른 작업 폴더에서 함께 작업합니다
 → [에이전트 협업 규칙](agents.md). 참고 자료는 기밀입니다 → [비공개 자료 규칙](confidentiality.md).
 
 ## 2. 구조
 
 ```text
 (코드가 들어오면 실제 구조에 맞게 고칩니다. 괄호는 담당 에이전트)
-docs/                  설계·개발 규칙 문서 (docs/protocol.md 는 Claude)
-robot/                 MechDog 메인 ESP32에 올리는 MicroPython 코드 (Claude)
-custom_sensors/        추가(비공식) 센서 읽기 드라이버. 센서 하나에 파일 하나 (Claude)
-tools/bringup/         실물 확인용 REPL 스크립트 (Claude)
-host/                  Raspberry Pi 5 쪽 Python: 라이다 수신, 로봇 명령, 카메라, 대시보드 (Codex)
-ros2/                  ROS 2 실행 설정·노드 (Codex)
-tools/mock/            가짜 로봇·가짜 라이다 서버 (Codex)
+docs/                  설계·개발 규칙 문서 (docs/protocol.md 는 claude1)
+robot/                 MechDog 메인 ESP32에 올리는 MicroPython 코드, Hiwonder 공식 Python 기반 (claude1)
+custom_sensors/        추가(비공식) 센서 읽기 드라이버. 센서 하나에 파일 하나 (claude1)
+tools/bringup/         실물 확인용 REPL 스크립트 (claude1)
+host/                  Raspberry Pi 5 쪽 Python: 라이다 수신, 로봇 명령, 카메라, 대시보드 (codex1)
+ros2/                  ROS 2 실행 설정·노드 (codex1)
+dashboard/             관리자 대시보드 (claude2)
+scenario/              시연 시나리오 상태기계 (claude2)
+tools/mock/            가짜 로봇·가짜 라이다 서버 (codex1)
 tools/hooks/           비공개 자료 커밋 방지 훅 (사용자)
-tests/fakes/           HW_MechDog·Hiwonder·Hiwonder_IIC·machine 가짜 모듈 (Claude)
+tools/setup_agent.py   작업 폴더 초기 설정: 에이전트 이름·훅 설치·점검 (사용자가 실행)
+tests/fakes/           HW_MechDog·Hiwonder·Hiwonder_IIC·machine 가짜 모듈 (claude1)
 tests/robot/, tests/host/  각 쪽 자동 테스트 (실제 로봇 없이 돌아가야 함)
 ```
 
 ## 3. 반드시 지킬 것
 
-0. **내가 Claude인지 Codex인지, 내 작업 폴더와 담당 영역이 맞는지 먼저 확인합니다.** [에이전트 협업 규칙](agents.md)대로
+0. **`git config --get agent.name`으로 내 이름(claude1·codex1·claude2)을 확인하고, 내 작업 폴더와 담당 영역이 맞는지 먼저 확인합니다.** [에이전트 협업 규칙](agents.md)대로
    작업 표시·충돌 확인·교차 리뷰를 합니다.
 0. **참고한 외부 저장소·자료를 기록에 남기지 않습니다.** 이름·경로·코드·문구 모두 → [비공개 자료 규칙](confidentiality.md).
    커밋 훅(`tools/hooks`)을 끄거나 우회하지 않습니다.
@@ -68,9 +71,9 @@ tests/robot/, tests/host/  각 쪽 자동 테스트 (실제 로봇 없이 돌아
    ```
    (테스트 도구가 바뀌면 이 명령을 갱신합니다.)
 4. 실제 로봇에서 확인이 필요한 변경은 사용자에게 확인을 요청하고, 확인하지 못했으면 PR에 그렇게 씁니다.
-5. 커밋: `feat:`/`fix:`/`docs:`/`test:`/`refactor:`/`chore:` + **한국어 요약**, 본문에 한국어 설명. 본문 끝에 `Agent: Claude`/`Agent: Codex`.
+5. 커밋: `feat:`/`fix:`/`docs:`/`test:`/`refactor:`/`chore:` + **한국어 요약**, 본문에 한국어 설명. 본문 끝에 `Agent: claude1`/`Agent: codex1`.
    사용자가 커밋을 에이전트에게 맡겼으므로 작업 단위가 끝나면 따로 묻지 않고 커밋합니다(푸시·PR은 별도 확인).
-6. PR: 첫 줄에 `작업자: Claude`/`Codex`, 템플릿을 채우고 [코드 리뷰 규칙](code-review.md)의 체크리스트를 스스로 먼저 점검합니다.
+6. PR: 첫 줄에 `작업자: claude1`/`codex1`, 제목 앞에 `[claude1]`/`[codex1]`, 템플릿을 채우고 [코드 리뷰 규칙](code-review.md)의 체크리스트를 스스로 먼저 점검합니다.
 7. 결과 보고: 무엇을 했는지, **검증하지 못한 것**(예: 실제 로봇 동작, 현장 조명·소음 환경)을 숨기지 않고 적습니다.
 
 ## 5. 자주 하는 작업
@@ -83,7 +86,8 @@ tests/robot/, tests/host/  각 쪽 자동 테스트 (실제 로봇 없이 돌아
 
 ## 6. AI 코드 리뷰를 할 때
 
-- 다른 에이전트의 PR을 리뷰합니다(Claude ↔ Codex). 자기 PR 승인, 병합은 하지 않습니다.
+- 다른 에이전트의 PR을 리뷰합니다(claude1 ↔ codex1). 승인은 `[내 이름] 리뷰: 승인` 코멘트로 하고, 병합은 조건을 채운 뒤 PR 작성자가 합니다
+  ([에이전트 협업 규칙](agents.md) 6절). 자기 PR을 스스로 승인하지 않습니다.
 - [코드 리뷰 규칙](code-review.md)의 우선순위(물리 안전 → 공식 API 사용 → 감지 정확성 → 보안 → 테스트 → 품질) 순서로 봅니다.
 - 지적마다 `[차단]/[제안]/[사소]/[질문]` 접두어, 파일:줄, **구체적인 실패 상황과 결과**를 씁니다.
 - 직접 확인하지 못한 추측은 `[질문]`으로 낮춥니다. 스타일 지적으로 중요한 문제를 묻히지 않게 합니다.

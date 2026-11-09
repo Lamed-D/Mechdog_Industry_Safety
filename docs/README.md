@@ -12,6 +12,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [dev/agents.md](dev/agents.md) | Claude·Codex 두 에이전트의 작업 폴더, 담당 영역, 충돌 방지, 교차 리뷰 |
+| [agents/claude2.md](agents/claude2.md) | claude2(다른 사람의 Claude Code) 담당·할 일·준비·시작 프롬프트 |
 | [dev/confidentiality.md](dev/confidentiality.md) | 참고 자료·개인정보를 기록에 남기지 않는 규칙과 자동 검사 |
 | [dev/mechdog-api.md](dev/mechdog-api.md) | 모든 로봇 제어는 Hiwonder 공식 MechDog Python API 사용, API 요약, 포즈·동작 목록, 추가(비공식) 센서 규칙·배선 표 |
 | [dev/branch-rules.md](dev/branch-rules.md) | 브랜치 `feat/`·`issue/` 규칙, 커밋 메시지, 병합 흐름 |
