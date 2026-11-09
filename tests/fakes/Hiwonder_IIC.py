@@ -29,6 +29,10 @@ class ESP32S3Cam:
         calls.append(("face_recognition", ()))
         return outcome(_face[0])
 
+    def read_face(self):
+        calls.append(("read_face", ()))
+        return outcome(_face[0])
+
 
 def fake_set_angle(value):
     """다음 read_angle() 결과. 제조사 예제는 [0]·[1]만 씀. None·예외 객체로 실패를 흉내 냅니다."""
