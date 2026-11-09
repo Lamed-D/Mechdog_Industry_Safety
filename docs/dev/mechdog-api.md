@@ -64,6 +64,8 @@ Super), 지도 작성·자기 위치·경로 계획·쓰러진 사람 감지를 
 | 몸체 자세 | `mechdog.set_pose([x,y,z], [a,b,c], time)` | 인자 의미·단위 미기재. 예제 값만 사용 |
 | 기본 자세 | `mechdog.set_default_pose()` | 네 다리로 서기 |
 | 동작 그룹 | `mechdog.action_run("name")` | [4.1절](#41-동작-그룹-action_run) 16종. 끝날 때까지 기다리지 않으므로 뒤에 `time.sleep()` |
+| 동작 그룹 끝남 확인 | `mechdog.action_is_over()` | 인자 없음. 끝났으면 참으로 보임(제조사 예제: `action_run` 뒤 짧게 기다린 다음 반복 확인). 공개 강좌에는 없음 |
+| 동작 그룹 멈춤 | `mechdog.stop_action()` | 인자 없음. 실행 중인 동작 그룹을 멈춤(제조사 예제). 바로 멈추는지 실물 확인 전이므로 **항상 `move(0, 0)`과 함께** 부름 |
 | 자기 균형 | `mechdog.homeostasis(True)` / `mechdog.read_homeostasis_status()` | 기울기 20° 넘으면 균형 모드 해제 |
 | 부가 서보 | `mechdog.set_servo(servo_id, pulse, time_ms)` | 9·10번 부가 서보용. 다리 관절용이 아님. **우리 로봇은 연결된 장치가 없으므로 쓰지 않음** |
 
@@ -150,6 +152,7 @@ Super), 지도 작성·자기 위치·경로 계획·쓰러진 사람 감지를 
 실제로 확인하면 이 문서를 고치고 PR에 적습니다.
 
 - `set_gait_params`의 시간 단위, `set_pose`의 리스트 의미와 시간 단위
+- `action_is_over()`·`stop_action()`이 순정 펌웨어에 있는지, `stop_action()`이 동작 그룹을 바로 멈추는지(제조사 예제에만 있고 공개 강좌에 없음)
 - `transform` 회전축 방향(4.2절)
 - `homeostasis`를 끄는 Python 호출 없음(시리얼 프로토콜 `CMD|1|3|0|$`만 문서에 있음)
 - IMU 원시값·배터리 전압을 읽는 Python 호출 없음(시리얼 `CMD|5|$`, `CMD|6|$`만 있음)
