@@ -10,7 +10,7 @@
 #define CAM_HAS_SECRETS 0
 #endif
 
-#define CAM_FW_VERSION "0.1.2"
+#define CAM_FW_VERSION "0.1.3"
 
 // ── 로봇 ID: "A" 또는 "B". mDNS 이름은 mechdog-<소문자 ID>-cam ──
 #ifndef CAM_ROBOT_ID
@@ -47,10 +47,24 @@
 #endif
 
 // ── 영상 기본값 ──
-// VGA(640x480) JPEG 품질 12: 사람·자세 판단에 쓰기 충분하고, 한 장 약 20~40KB로
-// 두 대가 같은 공유기를 써도 대역이 남는 크기. 실측 후 docs/vision-cam-firmware.md 에 기록합니다.
-#define CAM_FRAME_SIZE FRAMESIZE_VGA
-#define CAM_JPEG_QUALITY 12        // 0~63, 낮을수록 고화질·큰 파일
+// 모델 입력용 시작값입니다. 실측 성능 보장이 아니며 두 대 동시 측정으로 조정합니다.
+// 제조사 예제 품질 16보다 압축을 줄이고, 무제한 FPS 대신 수신·추론 여유를 둡니다.
+#ifndef CAM_VIDEO_PROFILE
+#define CAM_VIDEO_PROFILE 1
+#endif
+#if CAM_VIDEO_PROFILE == 1
+#define CAM_PROFILE_NAME "balanced"
+#define CAM_FRAME_SIZE FRAMESIZE_VGA  // 640x480
+#define CAM_JPEG_QUALITY 10
+#define CAM_TARGET_FPS 15
+#elif CAM_VIDEO_PROFILE == 2
+#define CAM_PROFILE_NAME "detail"
+#define CAM_FRAME_SIZE FRAMESIZE_SVGA  // 800x600, 먼 사람 윤곽 확인용
+#define CAM_JPEG_QUALITY 10
+#define CAM_TARGET_FPS 10
+#else
+#error "CAM_VIDEO_PROFILE must be 1 (balanced) or 2 (detail)"
+#endif
 #define CAM_FB_COUNT 2             // PSRAM 프레임 버퍼 수(최신 프레임 모드)
 #define CAM_XCLK_HZ 15000000       // 제조사 예제와 같은 15MHz
 // 영상 방향: -1 이면 센서별 기본(OV2640·OV3660·GC032A 상하 반전), 0/1 이면 강제

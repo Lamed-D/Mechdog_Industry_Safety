@@ -1,7 +1,8 @@
 # 비전 모듈(ESP32-S3 카메라) 맞춤 펌웨어
 
 로봇 A·B 앞쪽 비전 모듈에 올리는 우리 펌웨어의 설치·설정·확인·복구·빌드 안내입니다.
-소스는 v0.1.2이며 저장소의 기존 합본 이미지는 v0.1.1입니다. v0.1.2는 직접 빌드한 산출물을 사용합니다.
+소스는 v0.1.3입니다. 최신 합본은 `python tools/build_vision_cam.py --release`로 생성합니다. 이전 바이너리는 보관하지 않습니다.
+기본은 640×480·JPEG 품질 10·최대 약 15fps이며, [Pi 모델용 화질·측정 기준](vision-quality.md)을 따릅니다.
 **목표는 카메라 영상을 Wi-Fi로 Pi 5에 보내는 것**입니다. 쓰러진 사람 인식은 Pi 5가 영상으로 합니다.
 
 > **이 문서의 굽기·백업 명령은 사용자가 직접 실행합니다.** 에이전트는 카메라·로봇에 펌웨어를 올리지 않습니다.
@@ -27,8 +28,8 @@
 
 | 경로 | 내용 |
 | --- | --- |
-| `firmware/vision_cam/release/mechdog_vision_cam_v0.1.1_0x0.bin` | **바로 굽는 합본 이미지**(주소 `0x0`). 부트로더·파티션 표·앱 포함, 약 1.06 MB |
-| `firmware/vision_cam/release/*.sha256` | 위 파일의 SHA-256 |
+| `build/vision_cam/latest/mechdog_vision_cam_0x0.bin` | **바로 굽는 합본 이미지**(주소 `0x0`). 부트로더·파티션 표·앱 포함, 약 1.06 MB |
+| `build/vision_cam/latest/*.sha256`, `manifest.json` | 위 파일의 SHA-256·버전·프로필·FQBN·실물 미검증 표시 |
 | `firmware/vision_cam/*.ino, *.cpp, *.h` | 소스(한국어 주석) |
 | `firmware/vision_cam/config.h` | 기본값(해상도·품질·포트·I2C 주소·시간) |
 | `firmware/vision_cam/secrets.example.h` | 빌드 때 설정을 넣고 싶을 때의 예시. 실제 `secrets.h`는 커밋 금지(.gitignore) |
@@ -71,7 +72,7 @@
 - [ ] esptool 준비. Arduino IDE ESP32 패키지에 들어 있습니다:
       `%LOCALAPPDATA%\Arduino15\packages\esp32\tools\esptool_py\<버전>\esptool.exe`
       (또는 `pip install esptool` 뒤 `python -m esptool`). 아래 예시는 `esptool`로 줄여 씁니다.
-- [ ] 이미지 확인(PowerShell): `Get-FileHash firmware\vision_cam\release\mechdog_vision_cam_v0.1.1_0x0.bin -Algorithm SHA256`
+- [ ] 이미지 확인(PowerShell): `Get-FileHash build\vision_cam\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256`
       값이 같은 폴더 `.sha256` 파일과 같아야 합니다.
 
 ### 4.2 (1) 현재 플래시 전체 백업 — 반드시 먼저
@@ -89,7 +90,7 @@ esptool --chip esp32s3 --port COM10 --baud 460800 read-flash 0 ALL C:\camera-bac
 ### 4.3 (2) 맞춤 펌웨어 굽기
 
 ```powershell
-esptool --chip esp32s3 --port COM10 --baud 460800 write-flash 0x0 firmware\vision_cam\release\mechdog_vision_cam_v0.1.1_0x0.bin
+esptool --chip esp32s3 --port COM10 --baud 460800 write-flash 0x0 build\vision_cam\latest\mechdog_vision_cam_0x0.bin
 ```
 
 제조사 플래시 다운로드 도구를 쓸 때도 제조사 안내와 같은 설정입니다: ChipType **ESP32-S3**, 파일 하나 체크, 주소 **0x0000**,
@@ -197,7 +198,7 @@ HTTPS가 아니므로 공유기 안에서 엿볼 수 있는 사람에게는 보�
 
 ```powershell
 python tools/build_vision_cam.py            # 컴파일만 → build/vision_cam (커밋 안 됨)
-python tools/build_vision_cam.py --release  # + firmware/vision_cam/release/ 합본 bin·sha256
+python tools/build_vision_cam.py --release  # + build/vision_cam/latest/ 최신 합본·sha256·manifest.json
 ```
 
 - 도구: Arduino IDE에 들어 있는 `arduino-cli`, ESP32 Arduino 코어 **3.3.12**(ESP-IDF 5.5.5), 같은 패키지의 esptool.
@@ -233,8 +234,8 @@ python tools/build_vision_cam.py --release  # + firmware/vision_cam/release/ 합
 
 | 값 | 기본 | 근거 / 바꾸는 곳 |
 | --- | --- | --- |
-| 해상도 | VGA 640×480 | 사람 자세 판단 입력으로 충분, 두 대 동시 전송 대역 여유. `CAM_FRAME_SIZE` |
-| JPEG 품질 | 12 | 한 장 약 20~40 KB 예상 **[가정]**. `CAM_JPEG_QUALITY` |
+| 해상도 | 기본 VGA 640×480 | 모델용 시작값, 정확도·대역 여유는 미검증. detail은 800×600 |
+| JPEG 품질 | 10 | 제조사 예제의 16보다 압축 감소. 실제 크기·대역은 실측 필요 |
 | 프레임 버퍼 | PSRAM 2개, 최신 프레임 모드 | 지연 최소화. PSRAM 없으면 QVGA·1개로 자동 낮춤 |
 | 동시 스트림 | 2 | Pi 5 + 점검용 브라우저. `CAM_MAX_STREAM_CLIENTS` |
 | 촬영 쉬기 | 10초 무요청 | 발열 감소. `CAM_IDLE_MS` |

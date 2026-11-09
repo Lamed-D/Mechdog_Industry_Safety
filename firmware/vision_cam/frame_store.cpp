@@ -137,11 +137,13 @@ static void capture_task(void *) {
   uint32_t drop = 0;
   bool was_idle = true;
   uint32_t window_frames = 0;
+  uint32_t window_bytes = 0;
   int64_t window_start = esp_timer_get_time();
 
   for (;;) {
     esp_task_wdt_reset();
     int64_t now = esp_timer_get_time();
+    int64_t cycle_start = now;
 
     if (!frame_store_stats().camera_ok) {
       if (camera_init()) {
@@ -173,6 +175,7 @@ static void capture_task(void *) {
         xSemaphoreTake(s_lock, portMAX_DELAY);
         s_stats.idle = true;
         s_stats.fps = 0;
+        s_stats.kbps = 0;
         xSemaphoreGive(s_lock);
       }
       was_idle = true;
@@ -184,6 +187,7 @@ static void capture_task(void *) {
       drop = CAM_FB_COUNT;
       was_idle = false;
       window_frames = 0;
+      window_bytes = 0;
       window_start = now;
       xSemaphoreTake(s_lock, portMAX_DELAY);
       s_stats.idle = false;
@@ -211,18 +215,29 @@ static void capture_task(void *) {
       continue;
     }
     now = esp_timer_get_time();
-    bool stored = store_frame(fb, now);
+    // 버퍼를 복사한 시각이 아니라 드라이버가 기록한 실제 취득 시각을 전달합니다.
+    int64_t captured = (int64_t)fb->timestamp.tv_sec * 1000000 + fb->timestamp.tv_usec;
+    bool stored = captured > 0 && captured <= now && store_frame(fb, captured);
+    size_t frame_bytes = fb->len;
     esp_camera_fb_return(fb);
-    if (stored) window_frames++;
+    if (stored) {
+      window_frames++;
+      window_bytes += frame_bytes;
+    }
 
     if (now - window_start >= 1000000) {
       float fps = window_frames * 1000000.0f / (float)(now - window_start);
       xSemaphoreTake(s_lock, portMAX_DELAY);
       s_stats.fps = fps;
+      s_stats.kbps = window_bytes * 8000.0f / (float)(now - window_start);
       xSemaphoreGive(s_lock);
       window_frames = 0;
+      window_bytes = 0;
       window_start = now;
     }
+    // 센서는 최신 버퍼를 계속 갱신합니다. 전송용 사본 생성 속도만 제한합니다.
+    int64_t wait_us = 1000000 / CAM_TARGET_FPS - (esp_timer_get_time() - cycle_start);
+    if (wait_us >= 1000) vTaskDelay(pdMS_TO_TICKS((uint32_t)(wait_us / 1000)));
   }
 }
 

@@ -15,6 +15,7 @@ struct CamStats {
   uint8_t quality;
   const char *sensor;
   float fps;
+  float kbps;           // 저장에 성공한 JPEG 바이트 기준, HTTP 중복 수신자는 별도
   uint32_t frames;
   uint32_t failures;
   uint32_t reinits;
