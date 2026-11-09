@@ -3,6 +3,15 @@ from dataclasses import dataclass
 import math
 
 
+def finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class Observation:
     robot: str
@@ -14,8 +23,9 @@ class Observation:
 
 class EvidenceMonitor:
     def __init__(self, threshold=0.8, hold_s=2.0, max_gap_s=0.5):
-        if not (0 < threshold <= 1 and math.isfinite(hold_s) and hold_s > 0
-                and math.isfinite(max_gap_s) and max_gap_s > 0):
+        if not (finite_number(threshold) and 0 < threshold <= 1
+                and finite_number(hold_s) and hold_s > 0
+                and finite_number(max_gap_s) and max_gap_s > 0):
             raise ValueError("invalid evidence thresholds")
         self.threshold, self.hold_s, self.max_gap_s = threshold, hold_s, max_gap_s
         self.windows = {}
@@ -25,14 +35,13 @@ class EvidenceMonitor:
         item = observation
         if item.robot not in ("A", "B"):
             raise ValueError("unknown robot")
-        valid = (math.isfinite(now) and math.isfinite(item.timestamp)
+        valid = (finite_number(now) and finite_number(item.timestamp)
                  and 0 <= now - item.timestamp <= self.max_gap_s
-                 and item.candidate in (True, False) and isinstance(item.candidate, bool)
-                 and isinstance(item.confidence, (int, float)) and not isinstance(item.confidence, bool)
-                 and math.isfinite(item.confidence) and 0 <= item.confidence <= 1
+                 and isinstance(item.candidate, bool)
+                 and finite_number(item.confidence) and 0 <= item.confidence <= 1
                  and item.source in ("model", "synthetic"))
         previous = self.latest.get(item.robot)
-        if previous is not None and item.timestamp <= previous:
+        if valid and previous is not None and item.timestamp <= previous:
             valid = False
         if not valid:
             self.windows.pop(item.robot, None)

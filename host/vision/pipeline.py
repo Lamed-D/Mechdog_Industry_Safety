@@ -6,7 +6,7 @@ import math
 import threading
 import time
 
-from host.vision.evidence import EvidenceMonitor, Observation
+from host.vision.evidence import EvidenceMonitor, Observation, finite_number
 from host.vision.camera_client import Frame, MAX_FRAME_BYTES, is_jpeg
 
 
@@ -42,7 +42,7 @@ class VisionPump:
     def __init__(self, receivers, infer, *, source, clock=time.monotonic, max_result_age_s=0.5, monitor=None):
         if set(receivers) != {"A", "B"} or source not in ("model", "synthetic"):
             raise ValueError("both robots and explicit evidence source required")
-        if not math.isfinite(max_result_age_s) or max_result_age_s <= 0:
+        if not finite_number(max_result_age_s) or max_result_age_s <= 0:
             raise ValueError("invalid result age")
         self.receivers, self.infer, self.source, self.clock = receivers, infer, source, clock
         self.max_age = max_result_age_s
@@ -66,8 +66,7 @@ class VisionPump:
                 continue
             if (not isinstance(frame, Frame) or frame.robot != robot
                     or type(frame.seq) is not int or frame.seq < 0
-                    or isinstance(frame.captured_at, bool) or not isinstance(frame.captured_at, (int, float))
-                    or not math.isfinite(frame.captured_at) or not isinstance(frame.jpeg, bytes)
+                    or not finite_number(frame.captured_at) or not isinstance(frame.jpeg, bytes)
                     or not 0 < len(frame.jpeg) <= MAX_FRAME_BYTES or not is_jpeg(frame.jpeg)):
                 self._metrics[robot]["errors"] += 1
                 self._publish(robot, self.monitor.missing(robot), None, "invalid_frame")

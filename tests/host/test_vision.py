@@ -4,6 +4,23 @@ from host.vision.evidence import from_official_result
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_invalid_clock_values_break_window_without_raising(self):
+        for value in (None, "1", True, float("nan"), float("inf"), 10 ** 1000):
+            for field in ("timestamp", "now"):
+                with self.subTest(value_type=type(value).__name__, field=field):
+                    monitor = EvidenceMonitor(hold_s=1)
+                    monitor.update(Observation("A", 0, .9, True, "synthetic"), 0)
+                    timestamp, now = (value, .2) if field == "timestamp" else (.2, value)
+                    result = monitor.update(Observation("A", timestamp, .9, True, "synthetic"), now)
+                    self.assertEqual(result["status"], "unknown")
+                    self.assertNotIn("A", monitor.windows)
+
+    def test_invalid_configuration_is_rejected_before_use(self):
+        for field in ("threshold", "hold_s", "max_gap_s"):
+            for value in (None, "1", True, float("nan"), float("inf"), 10 ** 1000):
+                with self.subTest(field=field, value_type=type(value).__name__), self.assertRaises(ValueError):
+                    EvidenceMonitor(**{field: value})
+
     def test_sustained_evidence_keeps_minimum_confidence_and_source(self):
         monitor = EvidenceMonitor(hold_s=1)
         for i in range(5):

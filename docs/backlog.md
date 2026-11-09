@@ -4,7 +4,7 @@
 
 ## 현재 검증 결과와 진행 경계
 
-- 전체 unittest 317개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
+- 전체 unittest 320개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
 - 카메라 v0.1.4 balanced/detail 컴파일 성공. 앱 1,019,888바이트, 합본 1,085,424바이트.
   최신 배포는 balanced이며 `python tools/build_vision_cam.py --verify-release`로 현재 소스·설정·바이너리 일치를 확인함.
 - 본체 A/B 단일 main은 각각 47,991바이트로 생성됨. 실제 MicroPython 실행은 미검증.
@@ -32,6 +32,9 @@
 - 명세·예비 골격·안내: [#63](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/63), [#64](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/64), [#77](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/77), [#80](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/80)
 
 ## 완료
+
+- 감지 시간 창의 시각·설정·신뢰도 수치 검사 보강. bool/비수치/무한값/과대 정수는 예외나 임계값으로 수락하지 않음.
+  잘못된 관측은 unknown으로 전환하고 누적 시간 창을 끊음.
 
 - 추론 전에 오래되거나 미래인 프레임 거절. A/B 출처·프레임 형식·크기·시각 검사와 잘못된 수신 상태의 unknown 처리 보강.
   한 수신기의 잘못된 객체가 다른 로봇의 추론 작업을 중단하지 않는 합성 검사 추가.
@@ -112,7 +115,7 @@
 - 빌드 루트의 구형 중간 산출물 일괄 정리는 실행 정책이 차단해 보류했습니다. 우회하지 않았습니다.
   최신 사용자 배포물은 build/vision_cam/latest의 manifest와 해시로 구분합니다.
 - 주·보조 역할의 실제 갱신·승계·대시보드 표시를 두 로봇으로 확인해야 합니다.
-  합성 통합 테스트 포함 전체 317개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
+  합성 통합 테스트 포함 전체 320개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
 
 - stop_action의 실제 정지 지연과 공식 API의 블로킹 시간은 실물에서 확인해야 합니다.
 - 호스트 가짜 테스트는 MicroPython 스레드 스케줄링·잠금 지연을 검증하지 못합니다.

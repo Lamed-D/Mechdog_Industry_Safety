@@ -101,6 +101,7 @@ class PipelineTests(unittest.TestCase):
     def test_invalid_or_wrong_robot_frame_does_not_kill_other_receiver(self):
         for frame in (object(), Frame("B", metadata_jpeg(), 1, 0, self.now),
                       Frame("A", metadata_jpeg(), True, 0, self.now),
+                      Frame("A", metadata_jpeg(), 1, 0, 10 ** 1000),
                       Frame("A", metadata_jpeg(), 1, 0, float("nan"))):
             with self.subTest(frame=frame):
                 self.receivers["A"].frame = frame
@@ -115,6 +116,11 @@ class PipelineTests(unittest.TestCase):
         pump = self.make()
         pump.apply(self.core)
         self.assertEqual(self.events[0]["status"], "unknown")
+
+    def test_invalid_result_age_configuration_is_rejected(self):
+        for age in (True, None, "0.5", float("inf"), 10 ** 1000):
+            with self.subTest(age_type=type(age).__name__), self.assertRaises(ValueError):
+                VisionPump(self.receivers, None, source="synthetic", max_result_age_s=age)
 
     def test_frame_context_refers_to_processed_frame_and_is_not_mutable(self):
         self.feed(seq=1)
