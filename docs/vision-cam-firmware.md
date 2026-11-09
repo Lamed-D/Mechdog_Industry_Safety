@@ -29,7 +29,7 @@
 | 경로 | 내용 |
 | --- | --- |
 | `build/vision_cam/latest/mechdog_vision_cam_0x0.bin` | **바로 굽는 합본 이미지**(주소 `0x0`). 부트로더·파티션 표·앱 포함, 약 1.06 MB |
-| `build/vision_cam/latest/*.sha256`, `manifest.json` | 위 파일의 SHA-256·버전·프로필·FQBN·실물 미검증 표시 |
+| `build/vision_cam/latest/*.sha256`, `manifest.json` | 바이너리·소스 SHA-256·버전·프로필·FQBN·코어 버전·실물 미검증 표시 |
 | `firmware/vision_cam/*.ino, *.cpp, *.h` | 소스(한국어 주석) |
 | `firmware/vision_cam/config.h` | 기본값(해상도·품질·포트·I2C 주소·시간) |
 | `firmware/vision_cam/secrets.example.h` | 빌드 때 설정을 넣고 싶을 때의 예시. 실제 `secrets.h`는 커밋 금지(.gitignore) |
@@ -204,6 +204,12 @@ ERASE를 누르지 않았다는 사실이 설정 보존을 뜻하지 않습니�
 python tools/build_vision_cam.py            # 컴파일만 → build/vision_cam (커밋 안 됨)
 python tools/build_vision_cam.py --release  # + build/vision_cam/latest/ 최신 합본·sha256·manifest.json
 ```
+
+`python tools/build_vision_cam.py --verify-release`는 장치·컴파일러에 접속하지 않고 최신 합본과 해시 파일,
+명세의 버전·설정·소스 해시가 현재 작업 폴더와 맞는지 확인합니다. 소스는 UTF-8·LF로 정규화해
+프로젝트 내부 상대 경로별 SHA-256과 합성 해시를 기록하며 카메라 C/C++/헤더와 빌드 도구 두 파일을 포함합니다.
+배포는 코어 3.3.12와 컴파일 전후·합본 생성 후 소스 일치를 요구합니다. 파일이 바뀌거나 컴파일이 실패하면 이전 latest를 유지합니다.
+해시는 오래된 산출물·우발적 변경을 찾는 용도이며 서명·출처 인증이나 실제 하드웨어 검증은 아닙니다.
 
 - 도구: Arduino IDE에 들어 있는 `arduino-cli`, ESP32 Arduino 코어 **3.3.12**(ESP-IDF 5.5.5), 같은 패키지의 esptool.
   다른 위치면 환경 변수 `ARDUINO_CLI`, `ESPTOOL_PATH`로 지정합니다.
