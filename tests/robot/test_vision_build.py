@@ -102,3 +102,37 @@ class BuildPublicationTests(unittest.TestCase):
                     (folder / "build.options.json").write_text(json.dumps({"hardwareFolders": versions}))
                     with self.subTest(versions=versions), self.assertRaises(SystemExit):
                         builder.compiled_core_version()
+
+    def test_publish_rename_failure_restores_previous_release(self):
+        with tempfile.TemporaryDirectory(dir=builder.ROOT / "build") as directory:
+            build = Path(directory)
+            latest, staging = build / "latest", build / "release-pending"
+            latest.mkdir()
+            staging.mkdir()
+            (latest / "previous.bin").write_bytes(b"keep")
+            (staging / "new.bin").write_bytes(b"new")
+            rename = Path.rename
+
+            def fail_install(path, target):
+                if path == staging:
+                    raise OSError("synthetic installation failure")
+                return rename(path, target)
+
+            with patch.multiple(builder, BUILD=build, RELEASE=latest), \
+                    patch.object(Path, "rename", autospec=True, side_effect=fail_install):
+                with self.assertRaises(OSError):
+                    builder.publish(staging)
+            self.assertEqual((latest / "previous.bin").read_bytes(), b"keep")
+            self.assertTrue(staging.exists())
+            self.assertFalse((build / "release-previous").exists())
+
+    def test_unknown_previous_backup_is_preserved_and_blocks_publication(self):
+        with tempfile.TemporaryDirectory(dir=builder.ROOT / "build") as directory:
+            build = Path(directory)
+            previous = build / "release-previous"
+            previous.mkdir()
+            (previous / "keep.bin").write_bytes(b"keep")
+            with patch.multiple(builder, BUILD=build, RELEASE=build / "latest"):
+                with self.assertRaises(SystemExit):
+                    builder.publish(build / "release-pending")
+            self.assertEqual((previous / "keep.bin").read_bytes(), b"keep")

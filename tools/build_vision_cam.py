@@ -75,6 +75,33 @@ def verify_release():
     return manifest
 
 
+def publish(staging):
+    previous = BUILD / "release-previous"
+    if (not BUILD.resolve().is_relative_to(ROOT.resolve()) or staging != BUILD / "release-pending"
+            or RELEASE != BUILD / "latest"):
+        sys.exit("배포 교체 경로가 지정된 작업 폴더와 다릅니다.")
+    for target in (RELEASE, staging, previous):
+        if (target.is_symlink() or getattr(target, "is_junction", lambda: False)()
+                or target.resolve().parent != BUILD.resolve()):
+            sys.exit("배포 교체 대상이 허용된 빌드 경로가 아닙니다.")
+    if previous.exists():
+        sys.exit("이전 배포 복구 폴더가 남아 있어 자동 교체를 중단합니다.")
+    had_release = RELEASE.exists()
+    if had_release:
+        RELEASE.rename(previous)
+    try:
+        staging.rename(RELEASE)
+    except OSError:
+        if had_release:
+            previous.rename(RELEASE)
+        raise
+    if had_release:
+        try:
+            shutil.rmtree(previous)
+        except OSError:
+            print("새 배포는 완료됐으나 이전 복구 폴더 정리는 실패했습니다. 다음 배포 전 확인이 필요합니다.")
+
+
 def find_tool(env, default, pattern):
     if os.environ.get(env):
         return pathlib.Path(os.environ[env])
@@ -151,13 +178,8 @@ def main():
         "app_bytes": app.stat().st_size, "merged_bytes": len(data), "sha256": digest,
         "profile": args.profile, "core_version": core_version, **sources,
         "hardware_verified": False}, indent=2) + "\n", encoding="utf-8")
-    # 성공한 합본만 최신으로 교체합니다. 삭제 대상은 이 작업 폴더 build 하위로 제한합니다.
-    for target in (RELEASE, staging):
-        if not target.resolve().is_relative_to(BUILD.resolve()):
-            sys.exit("빌드 정리 대상이 build 밖입니다.")
-    if RELEASE.exists():
-        shutil.rmtree(RELEASE)
-    staging.rename(RELEASE)
+    # 성공한 합본만 교체하며, 새 폴더 설치 실패 시 이전 배포를 되돌립니다.
+    publish(staging)
     print("release %s: %d bytes, sha256 %s" % (out.name, len(data), digest))
 
 
