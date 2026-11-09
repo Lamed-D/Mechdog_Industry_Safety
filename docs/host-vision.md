@@ -14,6 +14,12 @@ PC/Pi 스트림 수신 URL·두 대 동시 연결·추론·낙상 정확도는 �
 제조사 연결 그림의 본체 물리 IIC 포트 1이 코드 IIC(2)에 대응합니다.
 메인 보드와 비전 보드의 펌웨어는 다릅니다. 카메라를 다른 보드로 교체하거나 Arduino로 전환하는 절차가 아닙니다.
 
+## 맞춤 카메라 펌웨어 수신
+
+[맞춤 펌웨어](vision-cam-firmware.md)를 올리면 카메라가 전용 공유기에 붙고 Pi 5는 `host/vision/camera_client.py`로
+`/status`, `/capture`, `:81/stream`(최신 프레임만)을 받습니다. 형식과 신선도 규칙은 [통신 규약 11절](protocol.md#11-비전-모듈-맞춤-펌웨어-영상i2c).
+오래되거나 끊긴 영상은 `unknown`이며 "사람 없음"이 아닙니다. 영상은 메모리에만 둡니다.
+
 ## 현재 실행 가능 범위
 
 - PC: `python -m unittest discover -s tests`로 합성 관측·오류·무응답·신선도 검증.

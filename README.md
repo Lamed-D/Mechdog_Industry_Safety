@@ -37,6 +37,7 @@ PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
 | --- | --- | --- |
 | `host/` | PC·Pi 5의 수신·판단 로직 | 장치에 업로드하지 않음 |
 | `ros2/` | Pi 5의 ROS 메시지 어댑터 | 해당 설치 안내에 따라 실행 |
+| `firmware/vision_cam/` | 앞쪽 ESP32-S3 비전 모듈의 맞춤 펌웨어(Arduino) | [설치 안내](docs/vision-cam-firmware.md)대로 사용자가 굽기, 기존 플래시 백업 |
 | `robot/` | MechDog 메인 보드의 MicroPython 펌웨어 | 업로드·실행 전 대상별 승인, 기존 main.py 백업 |
 | `custom_sensors/` | 로봇의 추가 라이다 중계 | robot 파일과 함께 장치 최상위에 배치하는 구조 |
 | `tools/bringup/` | 파일별로 PC/Pi 또는 로봇 REPL에서 실행 | [실물 확인 절차](docs/bringup.md)의 실행 위치 확인 |
@@ -85,7 +86,9 @@ MQTT는 기존 CMD/TEL 내용과 안전 감시를 유지하는 선택형 통신 
 
 ### 비전 모듈: ESP32-S3 카메라 (로봇 앞쪽)
 
-- 제조사 기본 펌웨어로 영상을 Wi-Fi로 보냅니다. Pi 5가 이 영상을 받아 쓰러진 사람을 감지합니다(영상 수신 방식은 실물 확인 예정).
+- 영상을 Wi-Fi로 Pi 5에 보내고, Pi 5가 쓰러진 사람을 감지합니다.
+- 전용 공유기에 붙어 두 대 영상을 동시에 보내는 **맞춤 펌웨어**를 준비했습니다(실물 미검증):
+  [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md), 바로 굽는 이미지 `firmware/vision_cam/release/`.
 - 5V 2A 이상 전원이 필요합니다.
 
 ### 라이다: [SLAMTEC] 슬램텍 RPLIDAR A1M8-R6 360도 거리측정 라이다 센서 - 12m

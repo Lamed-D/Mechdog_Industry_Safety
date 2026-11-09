@@ -19,6 +19,7 @@ Thumbs.db
 .env.*
 !.env.example
 secrets.py
+secrets.h
 config_local.py
 *.pem
 *.key
