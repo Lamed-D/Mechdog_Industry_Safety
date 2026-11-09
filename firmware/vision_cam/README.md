@@ -2,9 +2,11 @@
 
 로봇 앞쪽 ESP32-S3 카메라용입니다. **MechDog 메인 보드에 올리지 않습니다.**
 카메라 영상을 전용 공유기 Wi-Fi로 Pi 5에 보냅니다. 인식은 Pi 5가 합니다.
-현재 소스 v0.1.2와 아래 기존 배포 이미지 v0.1.1을 구분합니다. v0.1.2는 직접 빌드하며 산출물은 커밋하지 않습니다.
+현재 소스 v0.1.3은 아래 명령으로 최신 합본을 만듭니다. 이전 배포 이미지는 제거했고 산출물은 build에만 둡니다.
 
 자세한 설치·설정·복구·빌드: [docs/vision-cam-firmware.md](../../docs/vision-cam-firmware.md)
+
+저장소 루트에서 `python tools/build_vision_cam.py --release`를 먼저 실행합니다.
 
 ## 빠른 설치 (사용자)
 
@@ -15,8 +17,8 @@
    (본체 전원 끄기는 공식 절차가 아닌 우리 안전 권고: USB·본체 전원 동시 공급을 피하기 위함)
 2. **현재 플래시 백업** (저장소 밖에 보관):
    `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin`
-3. **굽기**: `release/mechdog_vision_cam_v0.1.1_0x0.bin` 을 주소 **0x0** 에
-   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 release/mechdog_vision_cam_v0.1.1_0x0.bin`
+3. **굽기**: `build/vision_cam/latest/mechdog_vision_cam_0x0.bin` 을 주소 **0x0** 에
+   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build/vision_cam/latest/mechdog_vision_cam_0x0.bin`
    (제조사 플래시 도구: ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, ERASE 누르지 않음)
 4. **Wi-Fi 설정**: 시리얼 115200bps, 줄 끝 Newline 으로 연 뒤
    ```text

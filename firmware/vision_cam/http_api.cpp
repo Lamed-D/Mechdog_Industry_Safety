@@ -107,7 +107,8 @@ static esp_err_t status_handler(httpd_req_t *req) {
            "{\"robot\":\"%s\",\"host\":\"%s\",\"fw\":\"%s\",\"uptime_s\":%lu,"
            "\"wifi\":{\"mode\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"reconnects\":%lu},"
            "\"camera\":{\"ok\":%s,\"sensor\":\"%s\",\"psram\":%s,\"width\":%u,\"height\":%u,"
-           "\"quality\":%u,\"fps\":%.1f,\"idle\":%s,\"frames\":%lu,\"failures\":%lu,\"reinits\":%lu,"
+           "\"quality\":%u,\"profile\":\"%s\",\"target_fps\":%u,\"jpeg_kbps\":%.1f,"
+           "\"fps\":%.1f,\"idle\":%s,\"frames\":%lu,\"failures\":%lu,\"reinits\":%lu,"
            "\"frame_age_ms\":%ld,\"frame_bytes\":%u},"
            "\"stream\":{\"port\":%d,\"clients\":%d,\"max_clients\":%d},"
            "\"memory\":{\"heap_free\":%u,\"psram_free\":%u},"
@@ -115,7 +116,8 @@ static esp_err_t status_handler(httpd_req_t *req) {
            settings_robot(), net_hostname(), CAM_FW_VERSION, (unsigned long)(esp_timer_get_time() / 1000000),
            net_mode(), ip, net_rssi(), (unsigned long)net_sta_reconnects(),
            st.camera_ok ? "true" : "false", st.sensor ? st.sensor : "unknown", st.psram ? "true" : "false",
-           st.width, st.height, st.quality, st.fps, st.idle ? "true" : "false", (unsigned long)st.frames,
+           st.width, st.height, st.quality, CAM_PROFILE_NAME, (unsigned)CAM_TARGET_FPS, st.kbps,
+           st.fps, st.idle ? "true" : "false", (unsigned long)st.frames,
            (unsigned long)st.failures, (unsigned long)st.reinits, frame_age, (unsigned)st.last_len,
            CAM_STREAM_PORT, http_stream_clients(), CAM_MAX_STREAM_CLIENTS,
            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
