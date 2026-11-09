@@ -31,14 +31,21 @@ PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
 4. **구동 시험:** 읽기 확인 결과를 검토한 뒤, 대상 로봇과 실행 범위를 별도로 승인하고 진행합니다.
    기존 장치 `main.py`를 보존하고 전원 차단 수단과 지지 장치를 준비합니다.
 
+## 펌웨어 방침
+
+- **메인 보드(ESP32):** MicroPython(Hiwonder 공식 Python API)을 먼저 개발하는 주 펌웨어로 쓰고, 검증 후 같은 동작을 Arduino로 옮겨 예비 펌웨어로 둡니다. Scratch는 쓰지 않습니다.
+- **비전 모듈(ESP32-S3):** Arduino IDE로 개발합니다.
+- 자세한 순서와 규칙: [펌웨어 방침](docs/firmware-strategy.md)
+
 ## 파일과 실행 위치
 
 | 경로 | 실행 위치 / 용도 | 사용자 행동 |
 | --- | --- | --- |
 | `host/` | PC·Pi 5의 수신·판단 로직 | 장치에 업로드하지 않음 |
 | `ros2/` | Pi 5의 ROS 메시지 어댑터 | 해당 설치 안내에 따라 실행 |
-| `firmware/vision_cam/` | 앞쪽 ESP32-S3 비전 모듈의 맞춤 펌웨어(Arduino) | [설치 안내](docs/vision-cam-firmware.md)대로 사용자가 굽기, 기존 플래시 백업 |
-| `robot/` | MechDog 메인 보드의 MicroPython 펌웨어 | 업로드·실행 전 대상별 승인, 기존 main.py 백업 |
+| `robot/` | MechDog 메인 보드의 MicroPython 펌웨어 (주 펌웨어) | 업로드·실행 전 대상별 승인, 기존 main.py 백업 |
+| `firmware/vision_cam/` | 앞쪽 ESP32-S3 비전 모듈용 Arduino 펌웨어(영상 → Pi 5) | [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md)대로 사용자가 굽기, 굽기 전 플래시 백업 |
+| `firmware/main_arduino/` | 메인 보드용 Arduino 예비 펌웨어 (Python 판 검증 후 작성 예정) | 굽기 전 플래시 백업, 순정 MicroPython 복구 절차 확인 |
 | `custom_sensors/` | 로봇의 추가 라이다 중계 | robot 파일과 함께 장치 최상위에 배치하는 구조 |
 | `tools/bringup/` | 파일별로 PC/Pi 또는 로봇 REPL에서 실행 | [실물 확인 절차](docs/bringup.md)의 실행 위치 확인 |
 | `tools/mock/`, `tests/` | PC에서만 실행하는 합성 서버·가짜 모듈 | 로봇에 업로드하지 않음 |

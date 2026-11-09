@@ -34,6 +34,8 @@ Super), 지도 작성·자기 위치·경로 계획·쓰러진 사람 감지를 
 
 - 제어 보드: **ESP32(클래식)**, 순정 펌웨어 **MicroPython v1.21.0 (ESP-IDF v5.0.2)**. `machine.UART` 핀·버퍼 지정, `network.WLAN.PM_NONE` 지원.
 - 업로드: Hiwonder Python Editor로 연결 후 다운로드. 로봇은 시작 시 장치의 `main.py`를 실행합니다.
+- 펌웨어 방침: 메인 보드는 **MicroPython(이 문서의 공식 Python API)이 주 펌웨어**, Arduino 판은 Python 판 검증 후 옮겨 만드는 예비 펌웨어입니다.
+  비전 모듈(ESP32-S3)은 Arduino로 개발합니다 → [펌웨어 방침](../firmware-strategy.md).
 - 장치에 있는 기존 `main.py`를 덮어쓰거나 지우는 일, 펌웨어를 새로 굽는 일(ERASE 포함)은
   **사용자 확인 후에만** 합니다.
 
