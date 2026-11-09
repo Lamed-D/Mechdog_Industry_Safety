@@ -156,6 +156,16 @@ Super), 지도 작성·자기 위치·경로 계획·쓰러진 사람 감지를 
 
 ## 5. 문서에서 불확실한 점
 
+제조사 예제와 순정 펌웨어 문자열 추가 대조: `Hiwonder.Battery_power()`(mV),
+`Hiwonder_IIC.MPU(Hiwonder_IIC.IIC(1)).read_angle()`은 양쪽에 근거가 있습니다.
+`stop_action`·`action_is_over`도 순정 문자열에서 확인했습니다. 실제 인자·반환값·지연은 REPL 확인이 필요합니다.
+상세 사용 범위는 [대조표](../robot-api-check.md), 업로드는 [복구 절차](../robot-upload.md)를 따릅니다.
+
+문자열에서만 확인한 후보: `run_status`, `wait_action_over`, `read_servo`, `read_all_servo`,
+`read_offset`, `set_offset`, `save_offset`, `set_angleoffset`.
+**후보 — 실물 REPL 확인 전 사용 금지.** 인자와 단위를 추측하지 않습니다.
+특히 보정 저장·서보 쓰기는 단순 존재 확인만 하고 호출하지 않습니다.
+
 실제로 확인하면 이 문서를 고치고 PR에 적습니다.
 
 - `set_gait_params`의 시간 단위, `set_pose`의 리스트 의미와 시간 단위
