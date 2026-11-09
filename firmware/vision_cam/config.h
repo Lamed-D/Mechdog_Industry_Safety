@@ -10,8 +10,7 @@
 #define CAM_HAS_SECRETS 0
 #endif
 
-#define CAM_FW_VERSION "0.1.0"
-#define CAM_FW_VERSION_BYTE 0x01  // I2C 상태 레지스터에 싣는 버전(상위 4비트 major, 하위 4비트 minor)
+#define CAM_FW_VERSION "0.1.1"
 
 // ── 로봇 ID: "A" 또는 "B". mDNS 이름은 mechdog-<소문자 ID>-cam ──
 #ifndef CAM_ROBOT_ID
@@ -27,7 +26,8 @@
 #endif
 // STA 접속이 이 시간 동안 안 되면 설정·점검용 AP를 켭니다(STA 재시도는 계속).
 #define CAM_STA_FALLBACK_MS 30000
-#define CAM_STA_RETRY_MS 10000
+#define CAM_STA_RETRY_MS 15000
+#define CAM_STA_RETRY_AP_BUSY_MS 60000  // 점검용 AP에 접속자가 있을 때
 // 네트워크가 이 시간 동안 전혀 없으면(STA 끊김 + AP 접속자 없음) 재부팅합니다.
 #define CAM_NET_RESTART_MS (10UL * 60UL * 1000UL)
 // AP 비밀번호가 8자 미만이면 AP를 켜지 않습니다(열린 AP로 영상이 새지 않게).
@@ -68,6 +68,7 @@
 #define CAM_STREAM_PORT 81         // /stream (제조사 기본 펌웨어와 같은 포트)
 #define CAM_MAX_STREAM_CLIENTS 2   // Pi 5 한 개 + 점검용 브라우저 한 개
 #define CAM_FRAME_WAIT_MS 3000     // 새 프레임을 이 시간 넘게 못 받으면 스트림을 끊음
+#define CAM_CAPTURE_WAIT_MS 1500   // /capture 는 짧게 기다리고 503(:80 서버가 오래 막히지 않게)
 
 // ── I2C 슬레이브(메인 보드 공식 ESP32S3Cam 호환) ──
 // 0x53: 메인 보드 공식 라이브러리의 레지스터형 읽기(얼굴 0xB0, 색 0xC5 등)를 쓰는 주소.

@@ -39,6 +39,7 @@ static esp_err_t send_text(httpd_req_t *req, const char *status, const char *tex
   httpd_resp_set_status(req, status);
   httpd_resp_set_type(req, "text/plain");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+  if (status[0] != '2') httpd_resp_set_hdr(req, "Connection", "close");  // 거절한 연결이 자리를 차지하지 않게
   return httpd_resp_sendstr(req, text);
 }
 
@@ -63,10 +64,10 @@ static uint8_t *alloc_buf(size_t *cap) {
 }
 
 // 새 프레임을 buf 로 가져옵니다. 버퍼가 작으면 키워서 다시 시도합니다. 실패하면 0.
-static size_t fetch(uint8_t **buf, size_t *cap, uint32_t after, uint32_t *seq, int64_t *ts) {
+static size_t fetch(uint8_t **buf, size_t *cap, uint32_t after, uint32_t wait_ms, uint32_t *seq, int64_t *ts) {
   for (int tries = 0; tries < 3; tries++) {
     size_t need = 0;
-    size_t len = frame_store_copy(*buf, *cap, after, CAM_FRAME_WAIT_MS, seq, ts, &need);
+    size_t len = frame_store_copy(*buf, *cap, after, wait_ms, seq, ts, &need);
     if (len > 0) return len;
     if (need == 0) return 0;  // 시간 초과
     size_t before = *cap;
@@ -135,7 +136,7 @@ static esp_err_t capture_handler(httpd_req_t *req) {
   uint32_t seq = 0;
   int64_t ts = 0;
   // 요청 뒤에 찍힌 프레임만 보냅니다(쉬고 있던 카메라의 옛 프레임 방지).
-  size_t len = fetch(&s_capture_buf, &s_capture_cap, frame_store_seq(), &seq, &ts);
+  size_t len = fetch(&s_capture_buf, &s_capture_cap, frame_store_seq(), CAM_CAPTURE_WAIT_MS, &seq, &ts);
   if (len == 0) return send_text(req, "503 Service Unavailable", "no frame\n");
   char seq_text[12], age_text[12], ts_text[22];
   snprintf(seq_text, sizeof(seq_text), "%lu", (unsigned long)seq);
@@ -165,7 +166,7 @@ static void stream_task(void *arg) {
       int64_t ts = 0;
       uint32_t next = 0;
       // 보내는 동안 쌓인 프레임은 건너뛰고 가장 최신 것만 가져옵니다.
-      size_t len = fetch(&buf, &cap, seq, &next, &ts);
+      size_t len = fetch(&buf, &cap, seq, CAM_FRAME_WAIT_MS, &next, &ts);
       if (len == 0) break;
       seq = next;
       char head[200];
@@ -179,6 +180,8 @@ static void stream_task(void *arg) {
     }
     free(buf);
   }
+  // 스트림이 끝나면(카메라 시간 초과·수신자 끊김) 연결을 닫아 다음 수신자가 바로 붙을 수 있게 합니다.
+  httpd_sess_trigger_close(req->handle, httpd_req_to_sockfd(req));
   httpd_req_async_handler_complete(req);
   s_clients--;
   vTaskDelete(nullptr);
