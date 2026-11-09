@@ -1,11 +1,12 @@
 # Mechdog Industry Safety — AI agent instructions
 
-Two AI agents work here: **Claude** (Claude Code) and **Codex** (OpenAI Codex CLI), each in its own git worktree.
+Two AI agents work here: **claude1** (Claude Code) and **codex1** (OpenAI Codex CLI), each in its own git worktree.
+Prefix issue/PR titles, comments and reports with `[claude1]` / `[codex1]`; talk to each other through GitHub issues (labels from:/to:/agent:*).
 Codex reads this file; Claude reads CLAUDE.md. Coordinate only through GitHub (branches, issues, PRs).
 
 Read these before changing code (Korean):
 
-- docs/dev/agents.md — identity, separate workspaces, ownership (Claude = robot side, Codex = Pi 5 host side), cross-review
+- docs/dev/agents.md — identity, separate workspaces, ownership (claude1 = robot side, Hiwonder official Python based; codex1 = Pi 5 host side), cross-review and self-merge rules
 - docs/dev/confidentiality.md — never record referenced external repos/materials or personal data in commits/PRs/docs
 - docs/dev/mechdog-api.md — all robot control must use the official Hiwonder MechDog Python API
 - docs/dev/ai-guide.md — project summary, mandatory rules, workflow
@@ -29,5 +30,7 @@ sensors in `custom_sensors/`, and Wi-Fi communication code (mechdog-api.md §6, 
 
 Never move the real robot or overwrite its `main.py` without the user's explicit confirmation, never weaken
 stop/safety logic, never commit secrets, personal data, real camera footage of people, or anything that names or
-copies referenced external materials. Never bypass git hooks (`--no-verify`). Never merge or approve PRs.
-Commit messages: `<type>: <한국어 요약>` + Korean body + `Agent: Claude|Codex`. Run the tests before committing.
+copies referenced external materials. Never bypass git hooks (`--no-verify`). Never approve your own PR. Merge your own PR only after the other agent's
+`[name] 리뷰: 승인` comment and the checks in docs/dev/agents.md §6 (`gh pr merge <n> --squash --delete-branch`);
+PRs that change shared rule/config files need the user's approval instead.
+Commit messages: `<type>: <한국어 요약>` + Korean body + `Agent: claude1|codex1`. Run the tests before committing.

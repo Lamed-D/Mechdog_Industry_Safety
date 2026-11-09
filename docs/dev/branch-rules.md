@@ -32,7 +32,8 @@ main ──┬── feat/obstacle-stop ──── PR ── 리뷰 ── squ
 2. 작업 단위마다 커밋합니다 (아래 커밋 메시지 규칙).
 3. 푸시하고 PR을 엽니다. PR 템플릿(`.github/pull_request_template.md`)을 채웁니다.
 4. [코드 리뷰 규칙](code-review.md)에 따라 리뷰를 받고 수정합니다.
-5. 테스트가 모두 통과하면 **squash merge** 하고 브랜치를 삭제합니다.
+5. 상대 에이전트의 승인과 검사 통과 등 [병합 조건](agents.md#6-서로-리뷰하고-스스로-병합)을 채우면, PR 작성자가 **squash merge** 하고 브랜치를 삭제합니다
+   (`gh pr merge <번호> --squash --delete-branch`).
 
 - 한 브랜치에는 한 가지 주제만 담습니다. 서로 관계없는 수정은 브랜치를 나눕니다.
 - 오래 걸리는 브랜치는 `main`을 주기적으로 병합(merge)해서 충돌을 미리 해소합니다.
