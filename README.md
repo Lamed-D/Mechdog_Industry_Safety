@@ -38,6 +38,15 @@ PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
 - **비전 모듈(ESP32-S3):** Arduino IDE로 개발합니다.
 - 자세한 순서와 규칙: [펌웨어 방침](docs/firmware-strategy.md)
 
+두 로봇은 같은 장비이며 A/B는 고정 ID입니다. 통신으로 주·보조를 배정하고,
+주 역할이 바뀌어도 정지 래치를 자동 해제하거나 이동을 재개하지 않습니다.
+[역할·승계 규약](docs/robot-redundancy.md), [사용자 통합 확인 순서](docs/user-tests/integrated-bringup.md)를 따릅니다.
+
+카메라 최신 배포물은 직접 빌드한 `build/vision_cam/latest/`의 합본·해시·명세입니다.
+`python tools/build_vision_cam.py --verify-release`로 현재 소스와 일치하는지 읽기 검사합니다.
+현재 v0.1.4는 VGA 기본/SVGA 상세 프로필을 제공하며, 실제 화질·Pi 모델 성능은 아직 미검증입니다.
+본체는 [A/B별 단일 main 생성·업로드·복구](docs/robot-upload.md)를 따르고 장치에 맞는 묶음만 사용합니다.
+
 ## 파일과 실행 위치
 
 | 경로 | 실행 위치 / 용도 | 사용자 행동 |
@@ -46,8 +55,8 @@ PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
 | `ros2/` | Pi 5의 ROS 메시지 어댑터 | 해당 설치 안내에 따라 실행 |
 | `robot/` | MechDog 메인 보드의 MicroPython 펌웨어 (주 펌웨어) | 업로드·실행 전 대상별 승인, 기존 main.py 백업 |
 | `firmware/vision_cam/` | 앞쪽 ESP32-S3 비전 모듈용 Arduino 펌웨어(영상 → Pi 5) | [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md)대로 사용자가 굽기, 굽기 전 플래시 백업 |
-| `firmware/main_arduino/` | 메인 보드용 Arduino 예비 펌웨어 (Python 판 검증 후 작성 예정) | 굽기 전 플래시 백업, 순정 MicroPython 복구 절차 확인 |
-| `custom_sensors/` | 로봇의 추가 라이다 중계 | robot 파일과 함께 장치 최상위에 배치하는 구조 |
+| `firmware/main_arduino/` | 메인 보드용 비구동 컴파일 골격·이식 대응표 | 설치 대상 아님. Python 실물 검증과 중단 API 근거 확보 후 이식 |
+| `custom_sensors/` | 로봇의 추가 라이다 중계 | robot 단일 main 묶음에 포함, 따로 실행하지 않음 |
 | `tools/bringup/` | 파일별로 PC/Pi 또는 로봇 REPL에서 실행 | [실물 확인 절차](docs/bringup.md)의 실행 위치 확인 |
 | `tools/mock/`, `tests/` | PC에서만 실행하는 합성 서버·가짜 모듈 | 로봇에 업로드하지 않음 |
 | `docs/user-tests/` | 사용자 전용 체크리스트·빈 결과 양식 | 결과를 GitHub 실물 확인 이슈에 기록 |
@@ -97,9 +106,10 @@ A/B ID와 별개로 [주·보조 역할을 통신으로 배정](docs/robot-redun
 ### 비전 모듈: ESP32-S3 카메라 (로봇 앞쪽)
 
 - 영상을 Wi-Fi로 Pi 5에 보내고, Pi 5가 쓰러진 사람을 감지합니다.
-- 전용 공유기에 붙어 두 대 영상을 동시에 보내는 **맞춤 펌웨어**를 준비했습니다(실물 미검증):
-  [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md), 바로 굽는 이미지 `firmware/vision_cam/release/`.
-- 5V 2A 이상 전원이 필요합니다.
+- 각 로봇의 모듈이 전용 공유기에 붙어 영상을 보내는 **맞춤 펌웨어**를 준비했습니다(실물 미검증):
+  [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md), 최신 합본은 `build/vision_cam/latest/`.
+  [화질·두 스트림 성능 측정](docs/vision-quality.md)과 [모델 검증 계획](docs/fall-detection-plan.md)을 함께 확인합니다.
+- 공급기 정격과 모듈 실제 소비전류를 구분합니다. 메인 보드 5V 레일의 여유 전류는 미확인입니다.
 
 ### 라이다: [SLAMTEC] 슬램텍 RPLIDAR A1M8-R6 360도 거리측정 라이다 센서 - 12m
 
