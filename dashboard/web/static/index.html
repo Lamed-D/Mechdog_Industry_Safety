@@ -63,6 +63,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":
 const PHASE = {standby:"대기", patrol:"순찰", alert:"발견·알림", dispatch:"호출·이동", at_manager:"관리자 앞",
   guiding:"안내 중", on_site:"사고 지점", returning:"복귀", suspended:"멈춤(사람 확인 필요)", estop:"전체 정지"};
 let token = "";
+const resetContexts = {A: null, B: null};
 try { token = sessionStorage.getItem("dash-token") || ""; $("token").value = token; } catch (e) {}
 $("token").addEventListener("change", () => { token = $("token").value; try { sessionStorage.setItem("dash-token", token); } catch (e) {} });
 
@@ -90,9 +91,12 @@ document.querySelectorAll("button.op").forEach((b) => b.addEventListener("click"
   show(r.ok ? b.textContent + " 완료" : b.textContent + " 거부: " + esc(JSON.stringify(r.reason)), r.ok ? "ok" : "warn");
 }));
 async function resetLatch(robot) {
+  const reset_context = resetContexts[robot];
+  if (!reset_context) { show("래치 해제 전 최신 상태를 확인하세요.", "warn"); return; }
   if (!confirm("로봇 " + robot + " 래치를 해제합니다. 주변이 안전하고 로봇을 지켜보고 있습니까?")) return;
-  const r = await post("/api/reset", {robot, confirmed: true});
-  show(r.ok ? robot + " 래치 해제 요청 보냄(텔레메트리로 확인)" : robot + " 래치 해제 거부: " + esc(r.reason), r.ok ? "ok" : "warn");
+  const r = await post("/api/reset", {robot, confirmed: true, reset_context});
+  const reason = r.reason === "reset_context_changed" ? "정지 상태가 바뀌었거나 확인 시간이 지났습니다. 새 상태에서 다시 확인하세요." : r.reason;
+  show(r.ok ? robot + " 래치 해제 요청 보냄(텔레메트리로 확인)" : robot + " 래치 해제 거부: " + esc(reason), r.ok ? "ok" : "warn");
 }
 
 function linkCls(v) { return v === "ok" ? "ok" : v === "stale" ? "warn" : "bad"; }
@@ -100,6 +104,7 @@ function render(s) {
   $("phase").textContent = "단계: " + (PHASE[s.phase] || s.phase);
   $("robot-list").innerHTML = ["A", "B"].map((r) => {
     const v = s.robots[r];
+    resetContexts[r] = v.reset_context || null;
     return `<div style="margin-bottom:10px"><b>로봇 ${r}</b>
       <div class="row"><span>통신</span><span class="${linkCls(v.link)}">${esc(v.link)}${v.last_seen_age_s != null ? " (" + v.last_seen_age_s + "초 전)" : ""}</span></div>
       <div class="row"><span>상태</span><span>${esc(v.state)}</span></div>

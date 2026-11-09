@@ -14,7 +14,7 @@ Supabase 계정·키·테이블·RLS를 만들거나 접속하지 않았습니�
 | `robot_id` | reset은 A 또는 B, 전체 estop/operator는 null |
 | `kind` | estop / reset / operator |
 | `created_at`, `expires_at` | UTC `YYYY-MM-DDTHH:MM:SS[.ffffff]Z`, 수명 0초 초과~10초 이하 |
-| `payload` | estop은 빈 객체, reset은 confirmed=true만, operator는 별도 허용된 event만 |
+| `payload` | estop은 빈 객체, reset은 confirmed=true와 reset_context, operator는 별도 허용된 event만 |
 
 기기 ID·허용 권한은 인증 채널에서 얻어 함수에 별도로 전달합니다. 본문의 ID나 확인 표시는 인증이 아닙니다.
 본문만 보고 권한을 만들어 넘기면 안 됩니다. JSON 중복 키·여분 필드·이동/주종 문자열 대상은 거절합니다.
@@ -23,6 +23,8 @@ A/B는 장비 ID이며 변할 수 있는 주·보조 역할을 조작 대상 ID�
 정지를 제외한 조작은 신뢰 가능한 UTC가 확인돼야 하며 미래·만료 시각은 거절합니다.
 전체 정지는 유효한 봉투·목적지·인증·권한을 확인한 뒤 지연·시각 미동기화에도 허용합니다.
 reset의 confirmed=true만으로 로봇 래치를 풀지 않습니다. 실행 계층은 신선한 TEL·배터리·현장 사람 확인을 다시 검사해야 합니다.
+reset_context는 실행 서비스가 발급한 공개 상태 확인 ID이며 현재 로봇의 새 정지·세션·만료·사용 여부를 실행 직전에 재검사해야 합니다.
+봉투 검사는 이 ID의 형식만 검사합니다. 원격 동기화에는 아직 연결하지 않았습니다.
 현재 지원하지 않는 정찰 조종·지도 확정·루틴 명령은 거절하며 수명 0.5초 조종 구현은 남아 있습니다.
 
 `ReplayWindow`는 단조 시계 기준 10초 동안 처리한 ID를 기억합니다. 가득 차면 기존 기록을 밀어내지 않고 거절합니다.

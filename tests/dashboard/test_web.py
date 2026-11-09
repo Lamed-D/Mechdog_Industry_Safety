@@ -124,12 +124,56 @@ class WebTests(unittest.TestCase):
         status, result = self.post("/api/reset", {"robot": "A", "confirmed": "yes"}, token="t0k")
         self.assertEqual(result["reason"], "confirmation_required")
         self.assertTrue(self.links["A"].latched)
-        status, result = self.post("/api/reset", {"robot": "A", "confirmed": True}, token="t0k")
+        context = json.loads(self.get("/api/state")[1])["robots"]["A"]["reset_context"]
+        status, result = self.post("/api/reset", {"robot": "A", "confirmed": True, "reset_context": context}, token="t0k")
         self.assertTrue(result["ok"])
         self.tick()
         self.assertEqual(self.core.scenario.snapshot()["ready"], ["A"])
         status, result = self.post("/api/operator", {"event": "start_patrol"}, token="t0k")
         self.assertTrue(result["ok"])
+
+    def test_new_estop_invalidates_previous_reset_confirmation(self):
+        self.tick()
+        self.post("/api/estop")
+        old = json.loads(self.get("/api/state")[1])["robots"]["A"].get("reset_context", "old")
+        self.post("/api/estop")
+        status, result = self.post("/api/reset", {"robot": "A", "confirmed": True, "reset_context": old}, token="t0k")
+        self.assertEqual((status, result["reason"]), (409, "reset_context_changed"))
+        self.assertTrue(self.links["A"].latched)
+        self.assertEqual(self.core.log.recent(1)[0]["detail"]["reason"], "reset_context_changed")
+
+    def test_missing_or_other_robot_reset_context_is_rejected(self):
+        self.tick()
+        state = json.loads(self.get("/api/state")[1])
+        for context in (None, state["robots"]["B"]["reset_context"]):
+            status, result = self.post("/api/reset", {"robot": "A", "confirmed": True,
+                                                     "reset_context": context}, token="t0k")
+            self.assertEqual((status, result["reason"]), (409, "reset_context_changed"))
+        self.assertTrue(self.links["A"].latched)
+
+    def test_reset_context_expires_and_cannot_be_reused(self):
+        now = [0]
+        self.server.context_clock = lambda: now[0]
+        self.tick()
+        old = json.loads(self.get("/api/state")[1])["robots"]["A"]["reset_context"]
+        now[0] = 5
+        self.assertEqual(self.post("/api/reset", {"robot": "A", "confirmed": True,
+                                                "reset_context": old}, token="t0k")[0], 409)
+        fresh = json.loads(self.get("/api/state")[1])["robots"]["A"]["reset_context"]
+        body = {"robot": "A", "confirmed": True, "reset_context": fresh}
+        self.assertTrue(self.post("/api/reset", body, token="t0k")[1]["ok"])
+        self.assertEqual(self.post("/api/reset", body, token="t0k")[0], 409)
+        self.assertEqual(self.links["A"].sent.count("RESET"), 1)
+
+    def test_robot_session_change_invalidates_reset_context(self):
+        self.tick()
+        old = json.loads(self.get("/api/state")[1])["robots"]["A"]["reset_context"]
+        with self.lock:
+            self.links["A"].latest.boot_id = "new-public-session"
+        status, result = self.post("/api/reset", {"robot": "A", "confirmed": True,
+                                                 "reset_context": old}, token="t0k")
+        self.assertEqual((status, result["reason"]), (409, "reset_context_changed"))
+        self.assertTrue(self.links["A"].latched)
 
     def test_loop_marks_link_lost_when_sim_robot_goes_offline(self):
         stop, thread = start_loop(self.core, self.links, self.lock, period_s=0.02)
