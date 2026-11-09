@@ -48,7 +48,7 @@ class DashboardServer:
         if path == "/api/estop":
             with self.lock:
                 return 200, self.core.estop_all(source="dashboard")
-        if self.token and not (token and hmac.compare_digest(token, self.token)):
+        if self.token and not (token and hmac.compare_digest(token.encode("utf-8"), self.token.encode("utf-8"))):
             return 401, {"ok": False, "reason": "token_required"}
         if path == "/api/operator":
             event = body.get("event")
@@ -70,6 +70,10 @@ class DashboardServer:
         server = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
+            def setup(self):
+                super().setup()
+                self.connection.settimeout(2)
+
             def log_message(self, *args):
                 pass
 
@@ -92,22 +96,32 @@ class DashboardServer:
                 return self._send(404, {"ok": False, "reason": "not_found"})
 
             def do_POST(self):
+                if self.path == "/api/estop":
+                    # 본문의 길이·도착·JSON을 기다리기 전에 먼저 멈춥니다.
+                    self.close_connection = True
+                    code, payload = server.handle_post(self.path, {}, None)
+                    return self._send(code, payload)
+                if self.headers.get("Transfer-Encoding") or len(self.headers.get_all("Content-Length", [])) > 1:
+                    return self._send(400, {"ok": False, "reason": "ambiguous_body"})
                 try:
                     length = int(self.headers.get("Content-Length") or 0)
                 except ValueError:
                     length = -1
                 if not 0 <= length <= MAX_BODY:
                     return self._send(400, {"ok": False, "reason": "bad_length"})
-                raw = self.rfile.read(length) if length else b"{}"
+                try:
+                    raw = self.rfile.read(length) if length else b"{}"
+                except TimeoutError:
+                    self.close_connection = True
+                    return self._send(408, {"ok": False, "reason": "body_timeout"})
+                if length and len(raw) != length:
+                    return self._send(400, {"ok": False, "reason": "incomplete_body"})
                 try:
                     body = json.loads(raw or b"{}")
                     if not isinstance(body, dict):
                         raise ValueError
                 except ValueError:
-                    # 전체 정지는 본문이 깨져도 받습니다.
-                    if self.path != "/api/estop":
-                        return self._send(400, {"ok": False, "reason": "bad_json"})
-                    body = {}
+                    return self._send(400, {"ok": False, "reason": "bad_json"})
                 code, payload = server.handle_post(self.path, body, self.headers.get("X-Dashboard-Token"))
                 return self._send(code, payload)
 

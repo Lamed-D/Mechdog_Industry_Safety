@@ -1,4 +1,6 @@
+import http.client
 import json
+import socket
 import threading
 import time
 import unittest
@@ -60,12 +62,62 @@ class WebTests(unittest.TestCase):
             self.assertTrue(link.latched)
         self.assertEqual(json.loads(self.get("/api/state")[1])["phase"], "estop")
 
+    def test_estop_ignores_invalid_length_without_waiting_for_body(self):
+        for length in ("9999999", "bad", "-1", "512"):
+            with self.subTest(length=length):
+                before = {robot: len(link.sent) for robot, link in self.links.items()}
+                conn = http.client.HTTPConnection(*self.server.address, timeout=1)
+                try:
+                    conn.putrequest("POST", "/api/estop")
+                    conn.putheader("Content-Length", length)
+                    conn.endheaders()  # 본문은 보내지 않습니다.
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 200)
+                    self.assertTrue(json.loads(response.read())["ok"])
+                    self.assertTrue(all(link.latched for link in self.links.values()))
+                    self.assertTrue(all(len(link.sent) > before[robot] for robot, link in self.links.items()))
+                finally:
+                    conn.close()
+
     def test_motion_operations_need_token(self):
         self.assertEqual(self.post("/api/operator", {"event": "start_patrol"})[0], 401)
         self.assertEqual(self.post("/api/operator", {"event": "start_patrol"}, token="wrong")[0], 401)
         self.assertEqual(self.post("/api/reset", {"robot": "A", "confirmed": True})[0], 401)
         status, result = self.post("/api/operator", {"event": "nope"}, token="t0k")
         self.assertEqual((status, result["reason"]), (400, "unknown_event"))
+        self.assertEqual(self.post("/api/reset", {"robot": "A", "confirmed": True}, token="é")[0], 401)
+
+    def test_incomplete_but_valid_json_never_resets(self):
+        conn = http.client.HTTPConnection(*self.server.address, timeout=1)
+        raw = b'{"robot":"A","confirmed":true}'
+        try:
+            conn.putrequest("POST", "/api/reset")
+            conn.putheader("X-Dashboard-Token", "t0k")
+            conn.putheader("Content-Length", str(len(raw) + 10))
+            conn.endheaders()
+            conn.send(raw)
+            conn.sock.shutdown(socket.SHUT_WR)
+            response = conn.getresponse()
+            self.assertEqual(response.status, 400)
+            self.assertEqual(json.loads(response.read())["reason"], "incomplete_body")
+        finally:
+            conn.close()
+
+    def test_ambiguous_body_framing_is_rejected_for_normal_operations(self):
+        for headers in ((("Content-Length", "0"), ("Content-Length", "512")),
+                        (("Transfer-Encoding", "chunked"),)):
+            with self.subTest(headers=headers):
+                conn = http.client.HTTPConnection(*self.server.address, timeout=1)
+                try:
+                    conn.putrequest("POST", "/api/reset")
+                    for key, value in headers:
+                        conn.putheader(key, value)
+                    conn.endheaders()
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 400)
+                    self.assertEqual(json.loads(response.read())["reason"], "ambiguous_body")
+                finally:
+                    conn.close()
 
     def test_reset_requires_confirmation_then_robot_becomes_ready(self):
         self.tick()
