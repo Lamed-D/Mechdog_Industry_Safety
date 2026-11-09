@@ -15,7 +15,7 @@ class JournalTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "commands.db"
         self.command = Command("00000000-0000-4000-8000-000000000001", "hub-test", "device-test", "A", "reset", 0, 10,
-                               (("confirmed", True),))
+                               (("confirmed", True), ("reset_context", "0" * 32 + ":1")))
 
     def open(self, **kwargs):
         journal = CommandJournal(self.path, **kwargs)

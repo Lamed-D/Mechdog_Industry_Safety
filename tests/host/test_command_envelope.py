@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 from host.command_envelope import ReplayWindow, validate_envelope
 
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp()
+CONTEXT = "0" * 32 + ":1"
 
 
 class EnvelopeTests(unittest.TestCase):
     def row(self, **updates):
         row = dict(v=1, id="00000000-0000-4000-8000-000000000001", hub_id="hub-test",
-                   device_id="device-test", robot_id="A", kind="reset", payload={"confirmed": True},
+                   device_id="device-test", robot_id="A", kind="reset", payload={"confirmed": True, "reset_context": CONTEXT},
                    created_at="2026-01-01T00:00:00Z", expires_at="2026-01-01T00:00:10Z")
         row.update(updates)
         return row
@@ -25,7 +26,7 @@ class EnvelopeTests(unittest.TestCase):
         row = self.row()
         command = self.validate(row)
         row["payload"]["confirmed"] = False
-        self.assertEqual(command.payload, (("confirmed", True),))
+        self.assertEqual(command.payload, (("confirmed", True), ("reset_context", CONTEXT)))
         self.assertEqual(command.robot_id, "A")
 
     def test_delay_expiry_future_and_untrusted_clock_reject_reset(self):
@@ -43,8 +44,10 @@ class EnvelopeTests(unittest.TestCase):
         for changes in (dict(authenticated_device="other"), dict(hub_id="other"), dict(permissions=())):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.validate(**changes)
-        for updates in (dict(kind="MOVE"), dict(robot_id="primary"), dict(payload={"confirmed": 1}),
-                        dict(payload={"confirmed": False}), dict(payload={"confirmed": True, "admin": True}),
+        for updates in (dict(kind="MOVE"), dict(robot_id="primary"), dict(payload={"confirmed": 1, "reset_context": CONTEXT}),
+                        dict(payload={"confirmed": False, "reset_context": CONTEXT}),
+                        dict(payload={"confirmed": True}), dict(payload={"confirmed": True, "reset_context": "old"}),
+                        dict(payload={"confirmed": True, "reset_context": CONTEXT, "admin": True}),
                         dict(v=True), dict(v=2), dict(expires_at="2026-01-01T00:00:11Z"),
                         dict(created_at="2026-01-01"), dict(expires_at="2026-01-01T00:00:00Z"),
                         dict(id="bad"), dict(id=1)):

@@ -72,7 +72,9 @@ def validate_envelope(raw, *, hub_id, authenticated_device, permissions, now_utc
     if not isinstance(payload, dict):
         raise ValueError("invalid command payload")
     if kind == "reset":
-        if row["robot_id"] not in ("A", "B") or payload != {"confirmed": True} or payload["confirmed"] is not True:
+        if (row["robot_id"] not in ("A", "B") or set(payload) != {"confirmed", "reset_context"}
+                or payload["confirmed"] is not True or not isinstance(payload["reset_context"], str)
+                or not re.fullmatch(r"[a-f0-9]{32}:[1-9][0-9]{0,15}", payload["reset_context"])):
             raise ValueError("human confirmation and robot required")
     elif row["robot_id"] is not None:
         raise ValueError("unexpected robot target")

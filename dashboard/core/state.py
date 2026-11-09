@@ -36,11 +36,14 @@ class DashboardCore:
         self.commands = deque()
         self._was_fresh = {r: False for r in ROBOTS}
         self._ready = {r: False for r in ROBOTS}
+        self.reset_epochs = {r: 0 for r in ROBOTS}  # 외부 확인 뒤 새 ESTOP가 있었는지 구분
 
     # ---- 사람 조작 ---------------------------------------------------------
     def estop_all(self, source="operator"):
         """전체 정지. 반환값의 errors 가 비어 있지 않으면 화면에 크게 알려야 합니다."""
         self.commands.clear()  # ESTOP 전에 쌓인 명령은 이후 어댑터에 전달하지 않음
+        for robot in ROBOTS:
+            self.reset_epochs[robot] += 1
         sent, errors = [], []
         for robot in ROBOTS:
             link = self.links.get(robot)
@@ -187,6 +190,8 @@ class DashboardCore:
         for item in out:
             if hasattr(item, "kind") and hasattr(item, "arg"):   # Command
                 if item.kind == "estop":
+                    if item.robot in self.reset_epochs:
+                        self.reset_epochs[item.robot] += 1
                     link = self.links.get(item.robot)
                     if link is not None:
                         try:
