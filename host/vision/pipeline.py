@@ -7,6 +7,7 @@ import threading
 import time
 
 from host.vision.evidence import EvidenceMonitor, Observation
+from host.vision.camera_client import Frame, MAX_FRAME_BYTES, is_jpeg
 
 
 def jpeg_size(data):
@@ -63,10 +64,21 @@ class VisionPump:
             if frame is None:
                 self._publish(robot, self.monitor.missing(robot), None)
                 continue
+            if (not isinstance(frame, Frame) or frame.robot != robot
+                    or type(frame.seq) is not int or frame.seq < 0
+                    or isinstance(frame.captured_at, bool) or not isinstance(frame.captured_at, (int, float))
+                    or not math.isfinite(frame.captured_at) or not isinstance(frame.jpeg, bytes)
+                    or not 0 < len(frame.jpeg) <= MAX_FRAME_BYTES or not is_jpeg(frame.jpeg)):
+                self._metrics[robot]["errors"] += 1
+                self._publish(robot, self.monitor.missing(robot), None, "invalid_frame")
+                continue
             identity = (frame.seq, frame.captured_at)
             if self._last_frame.get(robot) == identity:
                 continue  # 같은 프레임을 재추론해 시간 창을 채우지 않음
             self._last_frame[robot] = identity
+            if not 0 <= self.clock() - frame.captured_at <= self.max_age:
+                self._publish(robot, self.monitor.missing(robot), None, "stale_before_inference")
+                continue
             if self.infer is None:
                 self._publish(robot, self.monitor.missing(robot), None, "model_unavailable")
                 continue
@@ -120,6 +132,9 @@ class VisionPump:
                 state = receiver.state()
             except Exception:
                 state = {"status": "unknown"}
+            if (not isinstance(state, dict) or state.get("robot", robot) != robot
+                    or state.get("status") not in ("streaming", "unknown")):
+                state = {"status": "unknown", "reason": "invalid_receiver_state"}
             core.camera_state(robot, state)
             value = results.get(robot)
             if state.get("status") != "streaming":

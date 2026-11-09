@@ -89,6 +89,33 @@ class PipelineTests(unittest.TestCase):
         for data in (b"not jpeg", metadata_jpeg()[:9], metadata_jpeg(0, 480)):
             self.assertIsNone(jpeg_size(data))
 
+    def test_stale_or_future_frame_never_calls_model(self):
+        for captured in (self.now - .6, self.now + .1):
+            calls = []
+            self.receivers["A"].frame = Frame("A", metadata_jpeg(), 1, 0, captured)
+            pump = self.make(lambda jpeg: calls.append(jpeg) or {"candidate": True, "confidence": .9})
+            pump.step()
+            self.assertEqual(calls, [])
+            self.assertEqual(pump.snapshot()["A"]["event"]["status"], "unknown")
+
+    def test_invalid_or_wrong_robot_frame_does_not_kill_other_receiver(self):
+        for frame in (object(), Frame("B", metadata_jpeg(), 1, 0, self.now),
+                      Frame("A", metadata_jpeg(), True, 0, self.now),
+                      Frame("A", metadata_jpeg(), 1, 0, float("nan"))):
+            with self.subTest(frame=frame):
+                self.receivers["A"].frame = frame
+                self.feed("B")
+                pump = self.make()
+                pump.step()
+                self.assertEqual(pump.snapshot()["A"]["event"]["status"], "unknown")
+                self.assertEqual(pump.snapshot()["B"]["event"]["status"], "needs_check")
+
+    def test_malformed_receiver_state_is_unknown_in_control_loop(self):
+        self.receivers["A"].state = lambda: None
+        pump = self.make()
+        pump.apply(self.core)
+        self.assertEqual(self.events[0]["status"], "unknown")
+
     def test_frame_context_refers_to_processed_frame_and_is_not_mutable(self):
         self.feed(seq=1)
 
