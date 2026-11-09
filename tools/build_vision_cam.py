@@ -16,6 +16,11 @@ import shutil
 import subprocess
 import sys
 
+try:
+    from .arduino_workspace import configuration
+except ImportError:
+    from arduino_workspace import configuration
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKETCH = ROOT / "firmware" / "vision_cam"
 BUILD = ROOT / "build" / "vision_cam"
@@ -59,13 +64,14 @@ def main():
         sys.exit("secrets.h 가 있어 배포 이미지를 만들지 않습니다. 잠시 다른 곳으로 옮긴 뒤 다시 실행하세요.")
 
     cli = find_tool("ARDUINO_CLI", CLI_DEFAULT, None)
+    tool_config, tool_env = configuration()
     # 이미지 안의 소스 경로(__FILE__)에서 이 PC의 사용자 폴더를 지웁니다.
     remap = "-fmacro-prefix-map=%s=/arduino15 -fmacro-prefix-map=%s=/src" % (LOCAL / "Arduino15", ROOT)
     remap += " -DCAM_VIDEO_PROFILE=%d" % (1 if args.profile == "balanced" else 2)
     props = ["--build-property", "compiler.c.extra_flags=" + remap,
              "--build-property", "compiler.cpp.extra_flags=" + remap]
-    subprocess.run([str(cli), "compile", "--fqbn", FQBN, "--build-path", str(COMPILE),
-                    "--warnings", "all", *props, str(SKETCH)], check=True)
+    subprocess.run([str(cli), "--config-file", str(tool_config), "compile", "--fqbn", FQBN, "--build-path", str(COMPILE),
+                    "--warnings", "all", *props, str(SKETCH)], check=True, env=tool_env)
     app = COMPILE / "vision_cam.ino.bin"
     print("app %s: %d bytes" % (app.name, app.stat().st_size))
     if not args.release:
@@ -82,7 +88,7 @@ def main():
                     "0x0", str(COMPILE / "vision_cam.ino.bootloader.bin"),
                     "0x8000", str(COMPILE / "vision_cam.ino.partitions.bin"),
                     "0xe000", str(boot_app0),
-                    "0x10000", str(app)], check=True)
+                    "0x10000", str(app)], check=True, env=tool_env)
     data = out.read_bytes()
     for marker in (b"\\Users\\", b"/Users/"):  # 이 PC 경로가 남았는지
         if marker in data:
