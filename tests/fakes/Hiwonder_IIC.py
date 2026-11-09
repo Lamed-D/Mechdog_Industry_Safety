@@ -5,12 +5,29 @@ from tests.fakes._base import FakeHardwareError, check_int_range, outcome
 calls = []
 _angle = [[0.0, 0.0]]
 _distance_cm = [100]
+_face = [None]
 
 
 def fake_reset():
     del calls[:]
     _angle[0] = [0.0, 0.0]
     _distance_cm[0] = 100
+    _face[0] = None
+
+
+def fake_set_face(value):
+    _face[0] = value
+
+
+class ESP32S3Cam:
+    def __init__(self, iic):
+        if not isinstance(iic, IIC):
+            raise FakeHardwareError("camera requires official IIC")
+        calls.append(("ESP32S3Cam", (iic.bus,)))
+
+    def face_recognition(self):
+        calls.append(("face_recognition", ()))
+        return outcome(_face[0])
 
 
 def fake_set_angle(value):
