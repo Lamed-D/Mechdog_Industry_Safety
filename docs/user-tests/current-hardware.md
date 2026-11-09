@@ -19,6 +19,18 @@
 
 ## 카메라 공식 Python 읽기
 
+현재 실물 승인 범위는 **비전만**입니다. 위 본체 API·배터리 점검도 추가 승인 전에는 실행하지 않습니다.
+COM6의 일반 REPL에서 `tools/bringup/vision_probe.py`를 단독 실행하면 다른 프로젝트 파일을 올릴 필요가 없습니다.
+raw REPL이면 Ctrl+B로 나옵니다. Ctrl+D를 빈 일반 REPL에서 누르면 재부팅될 수 있으므로 누르지 않습니다.
+현재 main.py에 모션 초기화가 있을 수 있어 Download and Run·Reset은 사용하지 않습니다.
+정상 파일 첫 실행문은 함수 정의이며 `Hiwonder_IIC`와 `time`만 import합니다.
+`IndentationError`는 카메라 통신 실패가 아니라 파일 손상/붙여넣기 오류입니다. 파일 내용과 들여쓰기를 먼저 복구합니다.
+진단 출력은 VISION_ONLY_BEGIN, VISION_RESULT, VISION_ONLY_END입니다.
+실패 시 stage와 errno로 버스 생성(iic_init)·카메라 생성(camera_init)·인식 읽기(face_read)를 구분합니다.
+OSError만으로 카메라 고장이나 배선 오류를 확정하지 않습니다. 전원을 끈 상태에서 공식 IIC 케이블 연결을 확인합니다.
+제조사 안내에 따르면 기본 카메라 펌웨어는 영상 전송을 지원하지만 인식 기능에는 해당 기능용 펌웨어가 필요할 수 있습니다.
+현재 펌웨어 모드를 확인하기 전에는 카메라 펌웨어를 교체하지 않습니다. 영상 전송 성공과 face_recognition 성공은 별개입니다.
+
 카메라 펌웨어를 교체하지 않습니다. 제조사 예제 기준 연결은 `Hiwonder_IIC.IIC(2)`와
 `Hiwonder_IIC.ESP32S3Cam`입니다. 기존 main.py를 보존한 채 **메인 보드**에 `robot/vision.py`만
 `vision.py` 이름으로 준비하는 작업도 먼저 승인합니다. 이후 `tools/bringup/vision_official.py`를 REPL에서 실행합니다.
