@@ -1,7 +1,10 @@
 """Discover host tests without shadowing the production host package."""
 
-from tests.host import test_lidar
+import importlib
+from pathlib import Path
 
 
 def load_tests(loader, tests, pattern):
-    return loader.loadTestsFromModule(test_lidar)
+    for path in sorted((Path(__file__).parent / "host").glob("test_*.py")):
+        tests.addTests(loader.loadTestsFromModule(importlib.import_module("tests.host." + path.stem)))
+    return tests

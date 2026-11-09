@@ -25,7 +25,7 @@ def descriptor(size, mode, kind):
     return b"\xa5\x5a" + (size | mode << 30).to_bytes(4, "little") + bytes([kind])
 
 
-def room_sample(index, points=POINTS_PER_ROTATION, noise_mm=0, rng=None):
+def room_sample(index, points=POINTS_PER_ROTATION, noise_mm=0, rng=None, invalid=False):
     if points < 1 or not math.isfinite(noise_mm) or noise_mm < 0:
         raise ValueError("invalid synthetic scan parameters")
     angle = index % points * 360 / points
@@ -33,7 +33,9 @@ def room_sample(index, points=POINTS_PER_ROTATION, noise_mm=0, rng=None):
     distance = 2000 / max(abs(math.cos(radians)), abs(math.sin(radians)))
     distance += (rng or random).uniform(-noise_mm, noise_mm)
     distance = max(MIN_DISTANCE_MM, min(MAX_DISTANCE_MM, distance))
-    return (bytes([(40 << 2) | (1 if index % points == 0 else 2)])
+    if invalid:
+        distance = 0
+    return (bytes([((0 if invalid else 40) << 2) | (1 if index % points == 0 else 2)])
             + ((round(angle * 64) << 1) | 1).to_bytes(2, "little")
             + round(distance * 4).to_bytes(2, "little"))
 
@@ -78,7 +80,8 @@ class _Handler(socketserver.BaseRequestHandler):
                 if scanning and time.monotonic() >= next_batch:
                     batch = bytearray()
                     for _ in range(BATCH_SAMPLES):
-                        packet = room_sample(count, noise_mm=server.noise_mm, rng=rng)
+                        packet = room_sample(count, noise_mm=server.noise_mm, rng=rng,
+                                             invalid=bool(server.invalid_every and (count + 1) % server.invalid_every == 0))
                         count += 1
                         if server.corrupt_every and count % server.corrupt_every == 0:
                             packet = b"\x00" * 5
@@ -98,13 +101,16 @@ class MockLidar(socketserver.ThreadingTCPServer):
     block_on_close = True
 
     def __init__(self, address=("127.0.0.1", 20108), *, noise_mm=0,
-                 corrupt_every=0, disconnect_after=0, health=0):
+                 corrupt_every=0, disconnect_after=0, health=0, invalid_every=0):
         if not math.isfinite(noise_mm) or noise_mm < 0 or corrupt_every < 0 or disconnect_after < 0:
             raise ValueError("fault parameters must be nonnegative")
         self.noise_mm = noise_mm
         self.corrupt_every = corrupt_every
         self.disconnect_after = disconnect_after
         self.health = health
+        if isinstance(invalid_every, bool) or not isinstance(invalid_every, int) or invalid_every < 0:
+            raise ValueError("invalid_every must be a nonnegative integer")
+        self.invalid_every = invalid_every
         self.commands = []
         self.stopping = threading.Event()
         super().__init__(address, _Handler)
@@ -119,11 +125,12 @@ def main():
     parser.add_argument("--port", type=int, default=20108)
     parser.add_argument("--noise-mm", type=float, default=0)
     parser.add_argument("--corrupt-every", type=int, default=0)
+    parser.add_argument("--invalid-every", type=int, default=0)
     parser.add_argument("--disconnect-after", type=int, default=0)
     args = parser.parse_args()
     with MockLidar(port_address := ("127.0.0.1", args.port),
                    noise_mm=args.noise_mm, corrupt_every=args.corrupt_every,
-                   disconnect_after=args.disconnect_after) as server:
+                   disconnect_after=args.disconnect_after, invalid_every=args.invalid_every) as server:
         print("Mock lidar listening on", port_address)
         try:
             server.serve_forever(poll_interval=0.1)
