@@ -188,7 +188,7 @@ Super), 지도 작성·자기 위치·경로 계획·쓰러진 사람 감지를 
 
 | 센서 | 모델 | 연결 방식 | 핀 / 버스 | I2C 주소 | 전원 | 드라이버 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 라이다 | Slamtec RPLIDAR A1M8-R6 | UART(3.3V TTL, 115200bps) → 메인 ESP32 J5 → Wi-Fi(TCP) → Pi 5 | J5-4 IO32(RX), J5-3 IO33(TX), J5-2 GND ([lidar-integration.md](../lidar-integration.md) 4절) | — | 코어 5V 300~350mA(기동 최대 600mA) + 모터 5V 약 100mA, 1단계는 별도 5V | 중계: `main.py`, 처리: Pi 5 sllidar_ros2 |
+| 라이다 | Slamtec RPLIDAR A1M8-R6 | UART(3.3V TTL, 115200bps) → 메인 ESP32 J5 → Wi-Fi(TCP) → Pi 5 | J5-4 IO32(RX), J5-3 IO33(TX), J5-2 GND ([lidar-integration.md](../lidar-integration.md) 4절) | — | 코어 5V 300~350mA(기동 최대 600mA) + 모터 5V 약 100mA, 1단계는 별도 5V | 중계: `custom_sensors/lidar_bridge.py`(원시 양방향, 로봇을 움직이지 않음), 처리: Pi 5 |
 
 ## 7. 안전 사용 규칙
 
