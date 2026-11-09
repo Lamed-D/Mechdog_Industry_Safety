@@ -53,5 +53,5 @@
 | 순서 | 대상 | 방식 | 상태 |
 | --- | --- | --- | --- |
 | 1 | 메인 보드 | MicroPython (`robot/`, `custom_sensors/`) | 진행 중 — 주 펌웨어 |
-| 2 | 비전 모듈 | Arduino (`firmware/vision_cam/`) | v0.1.3 화질·전송 조정, 최신 build 산출물만 유지, 실물 미검증 ([안내](vision-cam-firmware.md)) |
+| 2 | 비전 모듈 | Arduino (`firmware/vision_cam/`) | v0.1.4 화질·전송 조정, 최신 build 산출물만 유지, 실물 미검증 ([안내](vision-cam-firmware.md)) |
 | 3 | 메인 보드 | Arduino (`firmware/main_arduino/`) | [설계·최소 컴파일 골격](../firmware/main_arduino/README.md)만 준비. 구동 API 중단/완료 대응 미확인, Python 실물 검증 후 이식 |

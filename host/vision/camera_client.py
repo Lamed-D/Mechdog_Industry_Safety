@@ -91,6 +91,10 @@ def parse_status(obj, robot):
             "stream_clients": stream["clients"],
             "max_stream_clients": stream["max_clients"],
             "recognition": obj["recognition"],
+            "dimensions_measured": camera.get("dimensions_measured"),
+            "quality": camera.get("quality"), "profile": camera.get("profile"),
+            "target_fps": camera.get("target_fps"), "jpeg_kbps": camera.get("jpeg_kbps"),
+            "psram": camera.get("psram"),
         }
     except (KeyError, TypeError) as error:
         raise ValueError("incomplete camera status") from error
@@ -102,8 +106,29 @@ def parse_status(obj, robot):
     for name in ("width", "height", "frame_age_ms", "rssi", "stream_clients", "max_stream_clients"):
         if not isinstance(result[name], int) or isinstance(result[name], bool):
             raise ValueError("invalid %s" % name)
-    if not isinstance(result["fps"], (int, float)) or not math.isfinite(result["fps"]) or result["fps"] < 0:
+    if isinstance(result["fps"], bool) or not isinstance(result["fps"], (int, float)) or not math.isfinite(result["fps"]) or result["fps"] < 0:
         raise ValueError("invalid fps")
+    if (any(not 0 <= result[n] <= 65535 for n in ("width", "height"))
+            or (result["camera_ok"] and (result["width"] == 0 or result["height"] == 0))
+            or result["frame_age_ms"] < -1 or not 0 <= result["stream_clients"] <= result["max_stream_clients"]
+            or result["max_stream_clients"] < 1):
+        raise ValueError("invalid camera dimensions or counters")
+    for name in ("dimensions_measured", "psram"):
+        if result[name] is not None and not isinstance(result[name], bool):
+            raise ValueError("invalid " + name)
+    for name in ("quality", "target_fps"):
+        value = result[name]
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("invalid " + name)
+        if (name == "quality" and not 0 <= value <= 63) or (name == "target_fps" and value <= 0):
+            raise ValueError("invalid " + name)
+    kbps = result["jpeg_kbps"]
+    if kbps is not None and (isinstance(kbps, bool) or not isinstance(kbps, (int, float)) or not math.isfinite(kbps) or kbps < 0):
+        raise ValueError("invalid jpeg_kbps")
+    if result["profile"] is not None and result["profile"] not in ("balanced", "detail"):
+        raise ValueError("invalid profile")
     if result["wifi_mode"] not in ("sta", "ap", "sta+ap", "none"):
         raise ValueError("invalid wifi mode")
     return result
@@ -133,6 +158,8 @@ class CameraClient:
         # Reachable is not healthy: a lost camera or stale frames are reported as unknown.
         if not status["camera_ok"]:
             return {**status, "status": "unknown", "reason": "camera_not_ok"}
+        if status["dimensions_measured"] is False:
+            return {**status, "status": "unknown", "reason": "no_measured_frame"}
         if not status["idle"] and not 0 <= status["frame_age_ms"] <= self.max_frame_age_ms:
             return {**status, "status": "unknown", "reason": "stale_frames"}
         return {**status, "status": "ok"}

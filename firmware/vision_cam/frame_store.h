@@ -10,6 +10,7 @@ struct CamStats {
   bool camera_ok;
   bool psram;
   bool idle;
+  bool dimensions_measured;
   uint16_t width;
   uint16_t height;
   uint8_t quality;
