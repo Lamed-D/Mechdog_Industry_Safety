@@ -1,0 +1,13 @@
+{
+  "source": "user-provided backup; not independently read from device",
+  "files": {
+    "boot.py.txt": {
+      "bytes": 150,
+      "sha256": "dd6fe7e570d3f609f3733c0f428d445975a0f8191260211a95551f4d236865f7"
+    },
+    "main.py.txt": {
+      "bytes": 12250,
+      "sha256": "06b27e492779c6d38a7c67799b94b49626b962b28e494aeeaa4c27ecf5fe7999"
+    }
+  }
+}

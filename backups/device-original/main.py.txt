@@ -1,0 +1,370 @@
+# Hiwonder MechDog
+# MicroPython - Wonderbot 앱 Bluetooth 제어 프로그램
+#
+# 주요 흐름
+# 1. start_main()  : 앱의 Bluetooth 명령을 받는다.
+# 2. start_main1() : 받은 명령을 바탕으로 걷기·동작·장애물 회피를 실행한다.
+# 3. start_main2() : 초음파 센서 거리를 계속 측정한다.
+
+import Hiwonder
+import time
+import Hiwonder_IIC
+from Hiwonder_BLE import BLE
+from HW_MechDog import MechDog
+import machine
+
+# 앱에서 받은 명령과 로봇 상태를 저장하는 변수
+_BLE_REC_DATA = 0
+_COMMAND = 0
+_SEND_DATA = 0
+_DATA = 0
+_distance = 0
+_SONER_DISTANCE = 0  # 초음파 센서 거리(cm). 원본 변수명 철자를 그대로 사용
+_self_balancing_flag = 0
+_RUN_STEP = 0
+_obstacle_avoidance_flag = 0
+_Pitch_angle = 0
+_Roll_angle = 0
+_ACTION_TYPE = 0
+_ACTION_NUM = 0
+_RUN_DIR = 0
+_REC_PARSE_VALUE = []
+_High_mm = 0
+
+# Bluetooth 장치 이름 예: MechDog_A1
+# 앱에서 이 이름으로 로봇을 찾아 연결한다.
+mac = machine.unique_id()
+ble = BLE(BLE.MODE_BLE_SLAVE, "MechDog_{:02X}".format(mac[5]))
+
+# MechDog 제어 객체와 IIC 초음파/RGB 센서 객체 생성
+mechdog = MechDog()
+i2c1 = Hiwonder_IIC.IIC(1)
+i2csonar = Hiwonder_IIC.I2CSonar(i2c1)
+
+time.sleep(1)
+
+
+def start_main():
+  """Bluetooth 명령 수신 전용 스레드.
+
+  앱에서 받은 CMD 형식의 메시지를 해석해 전역 상태값을 바꾼다.
+  실제 걷기·액션·장애물 회피는 start_main1()에서 수행한다.
+  """
+  global ble
+  global _BLE_REC_DATA
+  global _COMMAND
+  global _SEND_DATA
+  global _DATA
+  global _distance
+  global _SONER_DISTANCE
+  global _self_balancing_flag
+  global _RUN_STEP
+  global _obstacle_avoidance_flag
+  global _Pitch_angle
+  global _Roll_angle
+  global mechdog
+  global _ACTION_TYPE
+  global _ACTION_NUM
+  global _RUN_DIR
+  global _REC_PARSE_VALUE
+  global _High_mm
+
+  # 1: 앞쪽 자세, -1: 뒤쪽 자세. 방향 전환 때 몸의 위치를 보정한다.
+  dir_flag = 1
+
+  while True:
+    if ble.is_connected():
+      # 앱에서 CMD 메시지가 도착했을 때만 처리
+      if ble.contains_data("CMD"):
+        _BLE_REC_DATA = ble.read_uart_cmd()
+        if not _BLE_REC_DATA:
+          continue
+
+        # 예: "CMD|3|1|$" 형식의 메시지를 항목별로 분리
+        _REC_PARSE_VALUE = ble.parse_uart_cmd(_BLE_REC_DATA)
+        _COMMAND = int(_REC_PARSE_VALUE[0])
+
+        # 명령 6: 앱에 배터리 전압/잔량 정보 전송
+        if _COMMAND == 6:
+          _SEND_DATA = "CMD|6|{}|$".format(Hiwonder.Battery_power())
+          ble.send_data(_SEND_DATA)
+          continue
+
+        # 명령 4: 초음파 거리, 장애물 회피, 초음파 RGB LED 제어
+        if _COMMAND == 4:
+          _DATA = int(_REC_PARSE_VALUE[1])
+
+          # 데이터 1: 앱이 요청한 초음파 거리값 전송
+          if _DATA == 1:
+            _distance = round(_SONER_DISTANCE * 10)
+            if _distance > 5000:
+              _distance = 5000
+            _SEND_DATA = "CMD|4|{}|$".format(_distance)
+            ble.send_data(_SEND_DATA)
+
+          # 데이터 2: 장애물 회피 켜기(41) / 끄기(40)
+          elif (_DATA == 2) and (_self_balancing_flag == 0):
+            if int(_REC_PARSE_VALUE[2]) == 1:
+              mechdog.set_default_pose()
+              _Pitch_angle = 0
+              _Roll_angle = 0
+              _High_mm = 0
+              time.sleep(1)
+              _RUN_STEP = 41
+            else:
+              _RUN_STEP = 40
+
+          # 데이터 3: 앱에서 선택한 RGB 색상으로 초음파 센서 LED 변경
+          elif _DATA == 3:
+            i2csonar.setRGB(0, int(_REC_PARSE_VALUE[2]), int(_REC_PARSE_VALUE[3]), int(_REC_PARSE_VALUE[4]))
+          continue
+
+        # 명령 1: 자세 기울기, 높이, 기본 자세 제어
+        if (_COMMAND == 1) and (_obstacle_avoidance_flag == 0):
+          _DATA = int(_REC_PARSE_VALUE[1])
+
+          # 데이터 3: 셀프 밸런싱 켜기(131) / 끄기(130)
+          if _DATA == 3:
+            _DATA = int(_REC_PARSE_VALUE[2])
+            if _DATA == 1:
+              mechdog.set_default_pose()
+              _Pitch_angle = 0
+              _Roll_angle = 0
+              _High_mm = 0
+              time.sleep(1)
+              _RUN_STEP = 131
+            else:
+              _RUN_STEP = 130
+
+          # 셀프 밸런싱 중이 아닐 때만 자세/높이를 직접 조절
+          if (_obstacle_avoidance_flag == 0) and (_self_balancing_flag == 0):
+            # 데이터 1: 좌우 기울기(Roll) 조절
+            if _DATA == 1:
+              _DATA = int(_REC_PARSE_VALUE[2])
+              if _DATA == 1:
+                if _Roll_angle < 17:
+                  _Roll_angle += 1
+                  mechdog.transform([0, 0, 0], [-1, 0, 0], 80)
+              else:
+                if _Roll_angle > -17:
+                  _Roll_angle -= 1
+                  mechdog.transform([0, 0, 0], [1, 0, 0], 80)
+
+            # 데이터 2: 앞뒤 기울기(Pitch) 조절
+            if _DATA == 2:
+              _DATA = int(_REC_PARSE_VALUE[2])
+              if _DATA == 1:
+                if _Pitch_angle < 17:
+                  _Pitch_angle += 1
+                  mechdog.transform([0, 0, 0], [0, 1, 0], 80)
+              else:
+                if _Pitch_angle > -17:
+                  _Pitch_angle -= 1
+                  mechdog.transform([0, 0, 0], [0, -1, 0], 80)
+
+            # 데이터 4: 몸체 높이 조절(-25 ~ 15)
+            if _DATA == 4:
+              _DATA = int(_REC_PARSE_VALUE[2])
+              if _DATA == 1:
+                if _High_mm < 15:
+                  _High_mm += 1
+                  mechdog.transform([0, 0, 1], [0, 0, 0], 80)
+              else:
+                if _High_mm > -25:
+                  _High_mm -= 1
+                  mechdog.transform([0, 0, -1], [0, 0, 0], 80)
+
+            # 데이터 5: 네 발 기본 자세로 복귀
+            if _DATA == 5:
+              mechdog.set_default_pose()
+              _Pitch_angle = 0
+              _Roll_angle = 0
+              _High_mm = 0
+              time.sleep(1)
+            continue
+
+        # 명령 2: 앱의 액션 버튼 처리
+        if (_COMMAND == 2) and (_obstacle_avoidance_flag == 0) and (_self_balancing_flag == 0):
+          _RUN_STEP = 2
+          _ACTION_TYPE = int(_REC_PARSE_VALUE[1])
+          _ACTION_NUM = int(_REC_PARSE_VALUE[2])
+
+        # 명령 3: 앱의 방향키/조이스틱 이동 명령 처리
+        if (_COMMAND == 3) and (_obstacle_avoidance_flag == 0) and (_self_balancing_flag == 0):
+          _RUN_STEP = 3
+          _RUN_DIR = int(_REC_PARSE_VALUE[1])
+          if _RUN_DIR < 6:
+            if dir_flag != 1:
+              dir_flag = 1
+              mechdog.transform([10, 0, 0], [0, 0, 0], 100)
+          else:
+            if dir_flag != -1:
+              dir_flag = -1
+              mechdog.transform([-10, 0, 0], [0, 0, 0], 100)
+      else:
+        time.sleep(0.03)
+
+
+def start_main1():
+  """동작 실행 전용 스레드: 장애물 회피, 셀프 밸런싱, 액션, 걷기를 실행한다."""
+  global ble
+  global _SONER_DISTANCE
+  global _self_balancing_flag
+  global _RUN_STEP
+  global _obstacle_avoidance_flag
+  global mechdog
+  global _ACTION_TYPE
+  global _ACTION_NUM
+  global _RUN_DIR
+  global i2csonar
+  global _Pitch_angle
+  global _Roll_angle
+  global _High_mm
+
+  step = 0
+  while True:
+    # 수신 스레드가 지정한 작업 번호를 하나 받아 실행한다.
+    if step == 0:
+      step = _RUN_STEP
+      _RUN_STEP = 0
+      time.sleep(0.05)
+    else:
+      # 작업 41: 초음파 기반 장애물 회피
+      if step == 41:
+        _obstacle_avoidance_flag = 1
+        forward_flag = 1
+        while True:
+          # 작업 40을 받거나 플래그가 해제되면 장애물 회피 종료
+          if (_RUN_STEP == 40) or (_obstacle_avoidance_flag == 0):
+            _obstacle_avoidance_flag = 0
+            mechdog.move(0, 0)
+            i2csonar.setRGB(0, 0x33, 0x33, 0xff)
+            if forward_flag == 0:
+              forward_flag = 1
+              mechdog.transform([10, 0, 0], [0, 0, 0], 100)
+            time.sleep(1)
+            break
+
+          # 10cm 미만: 빨강 표시, 뒤로 이동
+          if _SONER_DISTANCE < 10:
+            i2csonar.setRGB(0, 0xff, 0x00, 0x00)
+            if forward_flag == 1:
+              forward_flag = 0
+              mechdog.transform([-10, 0, 0], [0, 0, 0], 100)
+            mechdog.move(-40, 0)
+            for count in range(30):
+              if _RUN_STEP == 40:
+                break
+              time.sleep(0.1)
+
+          # 10~40cm: 주황 표시, 방향을 틀며 전진
+          else:
+            if forward_flag == 0:
+              forward_flag = 1
+              mechdog.transform([10, 0, 0], [0, 0, 0], 100)
+            if _SONER_DISTANCE < 40:
+              i2csonar.setRGB(0, 0xff, 0xcc, 0x00)
+              mechdog.move(80, -50)
+              for count in range(50):
+                if _RUN_STEP == 40:
+                  break
+                time.sleep(0.1)
+
+            # 40cm 이상: 보라 표시, 직진
+            else:
+              i2csonar.setRGB(0, 0xcc, 0x33, 0xcc)
+              mechdog.move(120, 0)
+          time.sleep(0.02)
+
+      # 작업 131: 셀프 밸런싱 시작. 130을 받으면 종료한다.
+      if step == 131:
+        _self_balancing_flag = 1
+        mechdog.homeostasis(True)
+        time.sleep(2)
+        while True:
+          if _RUN_STEP == 130:
+            _self_balancing_flag = 0
+            mechdog.homeostasis(False)
+            time.sleep(2)
+            break
+          if not mechdog.read_homeostasis_status():
+            ble.send_data("CMD|1|3|0|$")
+            _self_balancing_flag = 0
+            break
+
+      # 작업 2: 앱에서 선택한 액션 그룹 실행
+      if step == 2:
+        mechdog.set_default_pose(duration=500)
+        _Pitch_angle = 0
+        _Roll_angle = 0
+        _High_mm = 0
+        time.sleep(1)
+        if _ACTION_TYPE == 1:
+          dong_zuo_zu_yun_xing(_ACTION_NUM)
+        else:
+          mechdog.action_run(str(_ACTION_NUM))
+
+      # 작업 3: 방향 번호에 맞춰 이동. 0은 정지이다.
+      if step == 3:
+        while True:
+          if _RUN_DIR == 0:
+            mechdog.move(0, 0)
+            break
+          elif _RUN_DIR == 1:
+            mechdog.move(80, -40)
+          elif _RUN_DIR == 2:
+            mechdog.move(90, -25)
+          elif _RUN_DIR == 3:
+            mechdog.move(120, 0)
+          elif _RUN_DIR == 4:
+            mechdog.move(90, 25)
+          elif _RUN_DIR == 5:
+            mechdog.move(80, 40)
+          elif _RUN_DIR == 6:
+            mechdog.move(-40, -20)
+          elif _RUN_DIR == 7:
+            mechdog.move(-40, 0)
+          elif _RUN_DIR == 8:
+            mechdog.move(-40, 20)
+      step = 0
+
+
+def dong_zuo_zu_yun_xing(dong_zuo):
+  """앱의 기본 액션 번호를 MechDog 액션 파일 이름으로 연결한다."""
+  global mechdog
+
+  # 액션 번호: (액션 파일 이름, 예상 실행 시간)
+  actions = {
+    1: ("left_foot_kick", 3), 2: ("right_foot_kick", 3),
+    3: ("stand_four_legs", 2), 4: ("sit_dowm", 2),
+    5: ("go_prone", 2), 6: ("stand_two_legs", 4),
+    7: ("handshake", 4), 8: ("scrape_a_bow", 4),
+    9: ("nodding_motion", 2), 10: ("boxing", 2),
+    11: ("stretch_oneself", 2), 12: ("pee", 2),
+    13: ("press_up", 2), 14: ("rotation_pitch", 2),
+    15: ("rotation_roll", 2)
+  }
+  if dong_zuo in actions:
+    action_name, wait_time = actions[dong_zuo]
+    mechdog.action_run(action_name)
+    time.sleep(wait_time)
+
+
+def start_main2():
+  """초음파 센서 거리 측정 전용 스레드."""
+  global _SONER_DISTANCE
+  global i2csonar
+
+  time.sleep(2)
+  while True:
+    _SONER_DISTANCE = i2csonar.getDistance()
+    time.sleep(0.08)
+
+
+# 세 작업을 병렬 스레드로 등록한다.
+Hiwonder.startMain(start_main)   # 앱 Bluetooth 통신
+Hiwonder.startMain(start_main1)  # 로봇 동작 실행
+Hiwonder.startMain(start_main2)  # 초음파 거리 측정
+
+
+
