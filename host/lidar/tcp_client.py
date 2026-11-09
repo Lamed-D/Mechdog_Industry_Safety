@@ -7,13 +7,18 @@ import time
 from .rplidar_protocol import Command, SampleParser, parse_descriptor, request
 
 
+class LidarHealthError(ValueError):
+    """Device error requires operator recovery; never reset automatically."""
+
+
 class LidarClient:
-    def __init__(self, host, port=20108, timeout=2, retry_delay=0.5):
+    def __init__(self, host, port=20108, timeout=2, retry_delay=0.5, on_health=None):
         if timeout <= 0 or retry_delay < 0:
             raise ValueError("invalid timing")
         self.address = (host, port)
         self.timeout = timeout
         self.retry_delay = retry_delay
+        self.on_health = on_health
 
     def _exact(self, sock, size, stop):
         data = bytearray()
@@ -64,8 +69,11 @@ class LidarClient:
                 sock.sendall(request(Command.GET_HEALTH))
                 self._descriptor(sock, (3, 0, 6), stop)
                 health = self._exact(sock, 3, stop)
+                code = int.from_bytes(health[1:3], "little")
+                if self.on_health:
+                    self.on_health(health[0], code)
                 if health[0] not in (0, 1):
-                    raise ValueError("lidar health error")
+                    raise LidarHealthError("lidar health error: status=%d code=%d" % (health[0], code))
                 sock.sendall(request(Command.SCAN))
                 self._descriptor(sock, (5, 1, 0x81), stop)
                 parser = SampleParser()
@@ -98,5 +106,7 @@ class LidarClient:
                     on_sample(sample)
             except (OSError, ValueError) as error:
                 on_disconnect(error)
+                if isinstance(error, LidarHealthError):
+                    return
             if stop.wait(self.retry_delay):
                 break
