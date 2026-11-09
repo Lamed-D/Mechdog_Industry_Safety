@@ -86,6 +86,9 @@ class RobotLink:
         self.intent = None
         self.emergency = False
         self.pending_reset = False
+        self.last_acked = 0
+        self.ack_wait_since = None
+        self.fault = None
 
     def observe(self, data):
         value = parse_telemetry(data)
@@ -98,9 +101,23 @@ class RobotLink:
             return False
         if self.latest and (value.tseq <= self.latest.tseq or value.uptime_ms < self.latest.uptime_ms):
             return False
+        if value.last_seq > self.seq or value.last_seq < self.last_acked:
+            self.intent = None
+            return False
+        now = self.clock()
+        if self.latest is not None and now - self.last_seen >= 0.4:
+            self._link_fault("telemetry_stale")
+        if value.last_seq > self.last_acked:
+            self.last_acked = value.last_seq
+            self.ack_wait_since = None if value.last_seq == self.seq else now
         self.latest, self.last_seen = value, self.clock()
         self.seq = max(self.seq, value.last_seq)
         return True
+
+    def _link_fault(self, reason):
+        if not self.emergency:
+            self.estop()
+        self.fault = reason
 
     def mark_scan(self, valid):
         self.last_scan = self.clock() if valid else -math.inf
@@ -127,6 +144,8 @@ class RobotLink:
         self.intent = None
         self.pending_reset = True
         self.next_send = -math.inf
+        self.ack_wait_since = None
+        self.fault = None
 
     def fresh(self):
         return self.latest is not None and 0 <= self.clock() - self.last_seen < 0.4
@@ -150,6 +169,10 @@ class RobotLink:
         if now < self.next_send:
             return
         self.next_send = now + 0.1  # No catch-up bursts.
+        if self.latest is not None and not self.fresh():
+            self._link_fault("telemetry_stale")
+        if self.ack_wait_since is not None and now - self.ack_wait_since >= 0.6:
+            self._link_fault("ack_stalled")
         if self.emergency:
             payload = self._command("ESTOP")
         elif not self.fresh():
@@ -176,8 +199,10 @@ class RobotLink:
             payload = self._command("STOP")
         try:
             self.send(payload)
+            if b"|HELLO|" not in payload and self.ack_wait_since is None:
+                self.ack_wait_since = now
         except Exception:
-            self.intent = None
+            self._link_fault("send_failed")
             self.latest = None
             raise
 
