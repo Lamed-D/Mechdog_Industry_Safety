@@ -2,6 +2,35 @@
 
 실물 업로드·굽기·구동은 사용자만 수행합니다. 합성 테스트 통과는 실물 검증을 뜻하지 않습니다.
 
+## 현재 검증 결과와 진행 경계
+
+- 전체 unittest 314개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
+- 카메라 v0.1.4 balanced/detail 컴파일 성공. 앱 1,019,888바이트, 합본 1,085,424바이트.
+  최신 배포는 balanced이며 `python tools/build_vision_cam.py --verify-release`로 현재 소스·설정·바이너리 일치를 확인함.
+- 본체 A/B 단일 main은 각각 47,991바이트로 생성됨. 실제 MicroPython 실행은 미검증.
+- 메인 Arduino는 컴파일 골격만 준비됐고 설치 대상이 아님. 이전 검증 앱 269,024바이트.
+- 원격에는 main만 남았고 열린 PR은 없음. 다른 작업 폴더의 로컬 브랜치는 정리 대상에서 제외.
+
+아래는 남은 구현이며 완료했다고 보지 않습니다. 검증되지 않은 물리 값·모델 판단·인증 권한을 임의로 정해 실행에 연결하지 않습니다.
+
+| 남은 구현 | 필요한 근거·사용자 작업 | 현재 제한 |
+| --- | --- | --- |
+| 실제 주행·SLAM·경로·역할별 임무 통합 | 본체 정지 지연·걸음 보정·라이다 고정/스캔·실제 지도·위치 추정·안전 여유 [확인 필요] | 고정 위치 어댑터는 이동·자세 차단. Pi 링크 완전 단절 시 현장 600ms 정지 유지 |
+| 실제 영상 모델·낙상 판단 보정 | 카메라 센서/PSRAM·두 스트림 Pi 디코딩/추론·장착 시야·오탐/미탐 결과 [확인 필요] | 모델 후보/측정/시간 창 연결 준비, 모델은 미설치. unknown은 감지 성공이 아님 |
+| Supabase 실행 동기화·노트북 화면 | 사용자 프로젝트·기기 인증 주체·권한/RLS·확인된 스키마·시계 동기화 [확인 필요] | 봉투 검사와 처리 ID 저널만 준비. 실제 계정·키·원격 조작에는 연결하지 않음 |
+| Arduino 구동 이식·추가 공식 API | Python 실물 결과와 공식 중단/완료 API 대응 [확인 필요] | 비구동 골격만. 후보 보정 API는 존재 확인 외 호출 금지 |
+| 기록 보존·사진 정책 | 실제 운영 목적·허용 데이터·보존 기간/접근 정책 [확인 필요] | JPEG 저장/업로드 없음, 기존 사건 기록 자동 삭제 없음 |
+
+이 근거가 필요한 단계는 사용자 결과를 받은 뒤 이어갑니다. 업로드·굽기·구동·계정/키 생성은 실행하지 않았습니다.
+
+## 이번 순환의 병합 PR
+
+- 안전·통신: [#51](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/51), [#54](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/54), [#60](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/60), [#68](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/68), [#69](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/69), [#73](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/73)
+- 본체 API·업로드: [#53](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/53), [#71](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/71)
+- 카메라·배포: [#55](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/55), [#59](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/59), [#70](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/70), [#78](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/78), [#79](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/79)
+- 호스트·감지·기록·지도·원격 안전: [#56](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/56), [#61](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/61), [#62](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/62), [#65](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/65), [#66](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/66), [#67](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/67), [#72](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/72), [#74](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/74), [#75](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/75), [#76](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/76), [#81](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/81)
+- 명세·예비 골격·안내: [#63](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/63), [#64](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/64), [#77](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/77), [#80](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/80)
+
 ## 완료
 
 - 시작 확인: codex1 준비 완료, 비공개 목록 존재만 확인, 인증·fetch 완료. 시작 브랜치 변경 없음.
@@ -80,7 +109,7 @@
 - 빌드 루트의 구형 중간 산출물 일괄 정리는 실행 정책이 차단해 보류했습니다. 우회하지 않았습니다.
   최신 사용자 배포물은 build/vision_cam/latest의 manifest와 해시로 구분합니다.
 - 주·보조 역할의 실제 갱신·승계·대시보드 표시를 두 로봇으로 확인해야 합니다.
-  합성 통합 테스트 포함 전체 302개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
+  합성 통합 테스트 포함 전체 314개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
 
 - stop_action의 실제 정지 지연과 공식 API의 블로킹 시간은 실물에서 확인해야 합니다.
 - 호스트 가짜 테스트는 MicroPython 스레드 스케줄링·잠금 지연을 검증하지 못합니다.
