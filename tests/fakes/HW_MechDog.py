@@ -83,12 +83,12 @@ class MechDog:
         self.action_running = name
 
     def action_is_over(self):
-        # 제조사 예제에서 action_run 뒤에 끝났는지 확인할 때 씀. mechdog-api.md 3절 표에는 아직 없음.
+        # 제조사 예제에서 action_run 뒤에 끝났는지 확인할 때 씀. 사용은 이슈 #12에서 승인됨.
         self.calls.append(("action_is_over", ()))
         return self.action_running is None
 
     def stop_action(self):
-        # 제조사 예제에서 실행 중인 동작 그룹을 멈출 때 씀. mechdog-api.md 3절 표에는 아직 없음.
+        # 제조사 예제에서 실행 중인 동작 그룹을 멈출 때 씀. 사용은 이슈 #12에서 승인됨.
         self.calls.append(("stop_action", ()))
         self.action_running = None
 

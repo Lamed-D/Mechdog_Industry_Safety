@@ -93,6 +93,13 @@ class MechDogTest(FakesTestCase):
         self.assertEqual(self.dog.fake_calls("transform"), [([0, 0, 20], [0, 0, 0], 1000)])
         with self.assertRaises(FakeHardwareError):
             self.dog.transform([0, 0], [0, 0, 0], 1000)
+        for bad in (float("nan"), float("inf"), -float("inf")):
+            with self.assertRaises(FakeHardwareError):
+                self.dog.transform([bad, 0, 0], [0, 0, 0], 1000)
+            with self.assertRaises(FakeHardwareError):
+                self.dog.set_pose([0, 0, 0], [0, bad, 0], 300)
+            with self.assertRaises(FakeHardwareError):
+                self.dog.move(bad, 0)
         with self.assertRaises(FakeHardwareError):
             self.dog.set_pose([0, 0, 0], [0, 0, 0], -1)
         with self.assertRaises(FakeHardwareError):
