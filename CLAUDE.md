@@ -14,3 +14,5 @@ Work rules for AI agents live in docs/dev. Read them before changing code.
 @docs/dev/ai-guide.md
 @docs/dev/branch-rules.md
 @docs/dev/code-review.md
+
+User-designated solo mode overrides ownership and cross-review rules: codex1 may implement, self-review, approve and merge all PRs under docs/dev/agents.md ?10. User-only hardware, spending, repository settings, confidentiality checks and secrets remain excluded.

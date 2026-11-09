@@ -38,3 +38,5 @@ PRs that change shared rule/config files also need a delegate approval: claude1 
 when claude1 is the author or requester); changes to tools/hooks or tools/check_confidential.py need the user. claude1 also answers
 `to:user` issues except real-robot actions, spending money, repository settings, security checks and secrets (docs/dev/agents.md §9).
 Commit messages: `<type>: <한국어 요약>` + Korean body + `Agent: claude1|codex1`. Run the tests before committing.
+
+User-designated solo mode overrides ownership and cross-review rules: codex1 may implement, self-review, approve and merge all PRs under docs/dev/agents.md ?10. User-only hardware, spending, repository settings, confidentiality checks and secrets remain excluded.
