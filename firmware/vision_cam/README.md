@@ -13,9 +13,9 @@
 1. 본체 전원을 끄고 카메라만 USB 데이터 케이블로 PC에 연결, 카메라 COM 포트를 확인합니다.
    (본체 전원 끄기는 공식 절차가 아닌 우리 안전 권고: USB·본체 전원 동시 공급을 피하기 위함)
 2. **현재 플래시 백업** (저장소 밖에 보관):
-   `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin`
-3. **굽기**: `release/mechdog_vision_cam_v0.1.0_0x0.bin` 을 주소 **0x0** 에
-   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 release/mechdog_vision_cam_v0.1.0_0x0.bin`
+   `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backupobot<ID>_cam_full.bin`
+3. **굽기**: `release/mechdog_vision_cam_v0.1.1_0x0.bin` 을 주소 **0x0** 에
+   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 release/mechdog_vision_cam_v0.1.1_0x0.bin`
    (제조사 플래시 도구: ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, ERASE 누르지 않음)
 4. **Wi-Fi 설정**: 시리얼 115200bps, 줄 끝 Newline 으로 연 뒤
    ```text

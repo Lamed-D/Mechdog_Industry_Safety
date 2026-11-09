@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <string.h>
 
+#include <atomic>
+
 #include "cam_board.h"
 #include "config.h"
 #include "esp_camera.h"
@@ -24,7 +26,8 @@ static size_t s_cap;
 static size_t s_len;
 static uint32_t s_seq;
 static int64_t s_ts_us;
-static volatile int64_t s_demand_us;
+// 마지막 요청 시각(ms). 여러 코어에서 쓰고 읽으므로 32비트 원자 변수(64비트는 찢어져 읽힐 수 있음).
+static std::atomic<uint32_t> s_demand_ms{0};
 static CamStats s_stats;
 
 static void apply_orientation(sensor_t *s) {
@@ -163,7 +166,7 @@ static void capture_task(void *) {
       continue;
     }
 
-    bool idle = now - s_demand_us > (int64_t)CAM_IDLE_MS * 1000;
+    bool idle = (uint32_t)(now / 1000) - s_demand_ms.load() > (uint32_t)CAM_IDLE_MS;
     if (idle) {
       if (!was_idle) {
         xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -235,7 +238,7 @@ bool frame_store_begin() {
   return ok;
 }
 
-void frame_store_demand() { s_demand_us = esp_timer_get_time(); }
+void frame_store_demand() { s_demand_ms.store((uint32_t)(esp_timer_get_time() / 1000)); }
 
 uint32_t frame_store_seq() {
   xSemaphoreTake(s_lock, portMAX_DELAY);
