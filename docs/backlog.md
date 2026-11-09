@@ -4,10 +4,10 @@
 
 ## 현재 검증 결과와 진행 경계
 
-- 전체 unittest 325개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
+- 전체 unittest 334개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
 - 카메라 v0.1.4 balanced/detail 컴파일 성공. 앱 1,019,888바이트, 합본 1,085,424바이트.
   최신 배포는 balanced이며 `python tools/build_vision_cam.py --verify-release`로 현재 소스·설정·바이너리 일치를 확인함.
-- 본체 A/B 단일 main은 각각 47,991바이트로 생성됨. 실제 MicroPython 실행은 미검증.
+- 본체 A/B 단일 main은 각각 48,976바이트로 생성됨. 실제 MicroPython 실행은 미검증이며 필수 동작 체크 전 적용 보류.
 - 메인 Arduino는 컴파일 골격만 준비됐고 설치 대상이 아님. 이전 검증 앱 269,024바이트.
 - 원격에는 main만 남았고 열린 PR은 없음. 다른 작업 폴더의 로컬 브랜치는 정리 대상에서 제외.
 
@@ -32,6 +32,10 @@
 - 명세·예비 골격·안내: [#63](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/63), [#64](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/64), [#77](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/77), [#80](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/80)
 
 ## 완료
+
+- 본체 main 전 필수 사용자 동작 체크리스트와 명시적 승인형 단독 이동/루프 시험 py 추가. 실제 A/B는 미실행.
+  실제 Python 구현 원본은 PC에서 미발견으로 대조 미완료. 제조사 예제/공식 문서는 보조 근거로만 사용.
+- 본체 모든 루프 등록 전 명령 처리를 막고 부분 등록 실패 시 래치/정지. main 초기화 실패도 양쪽 정지 시도.
 
 - ROS 지도 메시지 속성을 읽는 평면 Grid 어댑터 추가. signed 미확인 셀·좌표계·기하를 보존하고 비평면/비정규 회전 거절.
   합성 메시지에서 기존 미확인 공간 안전 검사까지 연결. 실제 ROS 구독·TF·주행은 연결하지 않음.
@@ -118,7 +122,7 @@
 - 빌드 루트의 구형 중간 산출물 일괄 정리는 실행 정책이 차단해 보류했습니다. 우회하지 않았습니다.
   최신 사용자 배포물은 build/vision_cam/latest의 manifest와 해시로 구분합니다.
 - 주·보조 역할의 실제 갱신·승계·대시보드 표시를 두 로봇으로 확인해야 합니다.
-  합성 통합 테스트 포함 전체 325개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
+  합성 통합 테스트 포함 전체 334개 통과. 사용자 코드 갱신은 호스트와 두 로봇을 함께 진행합니다.
 
 - stop_action의 실제 정지 지연과 공식 API의 블로킹 시간은 실물에서 확인해야 합니다.
 - 호스트 가짜 테스트는 MicroPython 스레드 스케줄링·잠금 지연을 검증하지 못합니다.
