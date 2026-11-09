@@ -33,5 +33,5 @@ except Exception:
         raise OSError("imu unavailable")  # 텔레메트리에 NA, imu_unknown
 
 app = App(config, mechdog, Hiwonder.Battery_power, read_tilt, network, socket, machine, time,
-          SSID, PASSWORD, vision=Vision(Hiwonder_IIC))
+          SSID, PASSWORD, vision=Vision(Hiwonder_IIC, config.VISION_RECOGNITION_ON_CAMERA))
 app.start(Hiwonder.startMain)

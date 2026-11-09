@@ -20,6 +20,7 @@ Python API**(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)로 합니다 → [MechDog
 ```text
 (코드가 들어오면 실제 구조에 맞게 고칩니다. 괄호는 담당 에이전트)
 docs/                  설계·개발 규칙 문서 (docs/protocol.md 는 claude1)
+firmware/vision_cam/   앞쪽 ESP32-S3 비전 모듈 맞춤 펌웨어(Arduino). 영상 → Pi 5, 메인 보드 I2C 호환
 robot/                 MechDog 메인 ESP32에 올리는 MicroPython 코드, Hiwonder 공식 Python 기반 (claude1)
 custom_sensors/        추가(비공식) 센서 읽기 드라이버. 센서 하나에 파일 하나 (claude1)
 tools/bringup/         실물 확인용 REPL 스크립트 (claude1)

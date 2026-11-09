@@ -50,3 +50,32 @@ class VisionTests(unittest.TestCase):
         app.vision_step()
         self.assertEqual(app.vision_status["fallen_person"], "unknown")
         self.assertEqual(dog.fake_calls("move"), [])
+
+
+class VisionResultShapeTests(unittest.TestCase):
+    """docs/protocol.md 11절: 맞춤 카메라 펌웨어의 '결과 없음'을 결과로 오인하지 않습니다."""
+
+    def setUp(self):
+        fakes.install()
+        self.addCleanup(fakes.uninstall)
+
+    def read(self, value, **kwargs):
+        camera = Vision(fakes.Hiwonder_IIC, **kwargs)
+        fakes.Hiwonder_IIC.fake_set_face(value)
+        return camera.read_face()
+
+    def test_empty_box_and_center_are_no_result(self):
+        for value in ([0, 0, 0, 0], (0, 0), False, 0):
+            result = self.read(value)
+            self.assertEqual(result["status"], "observed")
+            self.assertFalse(result["has_result"], value)
+
+    def test_box_with_width_is_result_but_never_fall(self):
+        result = self.read([40, 30, 25, 25])
+        self.assertTrue(result["has_result"])
+        self.assertEqual(result["fallen_person"], "unknown")
+
+    def test_recognition_location_is_reported(self):
+        self.assertEqual(self.read([0, 0, 0, 0])["recognition"], "off_on_camera")
+        self.assertEqual(self.read(True, recognition_on_camera=True)["recognition"], "on_camera")
+        self.assertEqual(self.read([0, 0, 0, 0])["camera_link"], "ok")

@@ -53,5 +53,5 @@
 | 순서 | 대상 | 방식 | 상태 |
 | --- | --- | --- | --- |
 | 1 | 메인 보드 | MicroPython (`robot/`, `custom_sensors/`) | 진행 중 — 주 펌웨어 |
-| 2 | 비전 모듈 | Arduino (`firmware/vision_cam/`) | 진행 예정 |
+| 2 | 비전 모듈 | Arduino (`firmware/vision_cam/`) | v0.1.0 작성·컴파일 확인, 실물 미검증 ([안내](vision-cam-firmware.md)) |
 | 3 | 메인 보드 | Arduino (`firmware/main_arduino/`) | Python 판 실물 검증 후 리팩토링 — 예비 펌웨어 |
