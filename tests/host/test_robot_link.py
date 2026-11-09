@@ -7,6 +7,33 @@ def tel(seq=1, *, state="idle", latch=0, reason="none", boot="b1", battery="7800
 
 
 class LinkTests(unittest.TestCase):
+    def test_estop_before_handshake_still_sends_hello_for_telemetry(self):
+        self.link.estop()
+        self.link.step()
+        self.assertTrue(any(b"|ESTOP|" in data for data in self.sent))
+        self.assertTrue(any(b"|HELLO|" in data for data in self.sent))
+
+    def test_reboot_regression_rotates_session_and_keeps_estop(self):
+        self.link.observe(tel(20, uptime=5000))
+        original = self.link.boot_id
+        self.assertFalse(self.link.observe(tel(1, uptime=1)))
+        self.assertTrue(self.link.emergency)
+        self.assertNotEqual(self.link.boot_id, original)
+        self.assertIsNone(self.link.latest)
+
+    def test_failed_estop_does_not_skip_recovery_hello(self):
+        calls = []
+        def send(data):
+            calls.append(data)
+            if b"|ESTOP|" in data:
+                raise OSError("injected failure")
+        self.link.send = send
+        self.link.estop()
+        with self.assertRaises(OSError):
+            self.link.step()
+        self.assertIn(b"|ESTOP|", calls[0])
+        self.assertTrue(any(b"|HELLO|" in data for data in calls))
+
     def test_fresh_telemetry_without_ack_progress_latches_estop(self):
         self.link.observe(tel())
         self.link.step()
@@ -70,8 +97,10 @@ class LinkTests(unittest.TestCase):
 
     def tick(self, seconds=0.11):
         self.now += seconds
+        before = len(self.sent)
         self.link.step()
-        return self.sent[-1]
+        emitted = self.sent[before:]
+        return next((data for data in reversed(emitted) if b"|HELLO|" not in data), self.sent[-1])
 
     def test_handshake_and_exact_wire_format(self):
         self.assertEqual(self.tick(), b"CMD|HELLO|A|b1|0|$")

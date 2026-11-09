@@ -204,6 +204,8 @@ class Robot:
             return
         if addr is not None:
             self.tel_addr = addr[0]
+        if self.moving or self.busy():
+            self._latch("link_lost")  # 복구 HELLO가 실행 중 동작의 생존 신호가 되지 않음
         if cmd.seq != self.boot_id:
             if self.roles.armed:
                 self._latch("link_lost")
