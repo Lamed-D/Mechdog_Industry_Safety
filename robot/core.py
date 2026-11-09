@@ -113,9 +113,8 @@ class Robot:
                 # 동작 그룹이 끝났다고 확인되지 않았으면 멈추고, 최대 시간까지 RESET 을 막음
                 if self.action_max_end is not None and self._before(self.action_max_end):
                     self.reset_block_until = self.action_max_end
-                self._stop_action()
-            else:
-                self._stop()
+            # ESTOP·예외에서는 상태 기록 전에 시작된 동작도 있을 수 있습니다.
+            self._stop_action()
         finally:
             if not (self.latched and self.latch_reason == "estop" and reason != "estop"):
                 if not self.latched or self.latch_reason != reason:
@@ -236,12 +235,13 @@ class Robot:
     def _action(self, name):
         if self.moving:
             self._stop()
-        self.motion.action(name)
+        # 공식 호출이 동작을 시작한 뒤 예외를 내도 정지 경로가 추적할 수 있게 먼저 기록합니다.
         self.action_name = name
         self.action_started = self._now()
         self.action_max_end = self.clock.ticks_add(self.action_started, self.cfg.ACTION_DURATION_MS[name])
         self.action_until = self.action_max_end
         self.need_default_pose = True
+        self.motion.action(name)
 
     def _pose(self, pose):
         name = proto.POSE_ACTION[pose]
