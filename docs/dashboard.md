@@ -177,6 +177,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | WP-D3 | `dashboard/web/` | 웹 서버·화면(가짜 로봇 모드) | 완료. Supabase 기준 대시보드가 생기기 전까지 개발·시험용 |
 | HUB-1 | `supabase/migrations/0001_init.sql` | [스키마·RLS 초안](supabase-schema.md), 기존 명령 봉투 열과 정적 계약 검사 | PC 정적 검사만. SQL/실제 계정/RLS 실행 미검증 |
 | HUB-2 | `host/hub/store.py` | [로컬 저장소](hub-store.md): 설정 사본·대기열·상태·기존 명령 저널 | PC SQLite 합성 검사. 실제 디스크/정전/클라우드 미검증 |
+| HUB-3 | `host/hub/sync.py` | [외부 동기화](hub-sync.md): FIFO 재시도·1초 명령 조회·REST 어댑터·메모리 모의 서버 | 실제 계정/HTTP/RLS 미검증. 실행 서비스 연결은 후속 단위 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 
