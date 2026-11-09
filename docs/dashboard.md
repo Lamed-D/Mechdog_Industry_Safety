@@ -175,6 +175,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | --- | --- | --- | --- |
 | WP-D2 | `dashboard/core/` | 핵심 상태·사람 조작·사건 기록(웹 없이 테스트) | 완료(PC 테스트). Pi 5 쪽 서비스로 옮겨 씀 |
 | WP-D3 | `dashboard/web/` | 웹 서버·화면(가짜 로봇 모드) | 완료. Supabase 기준 대시보드가 생기기 전까지 개발·시험용 |
+| HUB-1 | `supabase/migrations/0001_init.sql` | [스키마·RLS 초안](supabase-schema.md), 기존 명령 봉투 열과 정적 계약 검사 | PC 정적 검사만. SQL/실제 계정/RLS 실행 미검증 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 
