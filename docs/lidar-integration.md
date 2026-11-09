@@ -46,7 +46,8 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 
 - 제조사 Python 시리얼 통신 강좌 (마스터-슬레이브 통신 원리) 하드웨어 연결 절:
   USB 어댑터의 **TXD·RXD·GND를 MechDog의 IO32·IO33·GND에** 연결, TX/RX는 교차. 기본 9600bps 8N1.
-  → **IO32 = MechDog RX, IO33 = MechDog TX** 로 읽힙니다. 방향은 첫 테스트에서 **[확인 필요]**(바꿔 꽂아도 손상 위험은 낮음).
+  → **IO32 = MechDog RX, IO33 = MechDog TX** 입니다 **[확인]**. 제조사 Arduino 시리얼 예제가 `HardwareSerial(1)`을
+    `rxPin 32`, `txPin 33`으로 열어 같은 방향을 씁니다(첫 실물 연결에서 응답으로 다시 확인).
 - 같은 폴더 `MechDog Slave Device Programs/main.py`: `uart = Hiwonder.UART(9600)` — 공식 API가 이 포트를 UART로 엽니다.
   다만 `Hiwonder.UART`는 `CMD|...|$` 텍스트 명령용 메서드(`contains_data`, `read_uart_cmd`, `send_data`)만 보이고,
   라이다의 바이너리 데이터를 그대로 읽는 메서드는 자료에 없습니다 → 라이다에는 MicroPython `machine.UART`를 씁니다.
@@ -69,21 +70,23 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 주의: 제조사 Arduino 라이브러리는 터치 센서를 IO33(`Touch_Pin 33`), 조도 센서를 `analogRead(33)`으로 읽습니다.
 **우리는 J5에 라이다를 꽂으므로 터치·조도 센서를 J5에 같이 쓰지 않습니다.**
 
-### 2.5 추가 하드웨어 UART를 쓸 수 있는가 [확인 + 추정]
+### 2.5 추가 하드웨어 UART를 쓸 수 있는가 [확인]
 
 - 클래식 ESP32에는 UART0·1·2가 있고, 핀을 자유롭게 지정할 수 있습니다(ESP32 GPIO matrix).
 - UART0는 USB REPL(IO1/IO3)이 씁니다. 회로도에 "IO17/TX2, IO16/RX2"로 적힌 UART2 기본 핀은 **서보 5·6**이 씁니다.
-- 따라서 **UART1(또는 UART2)을 IO32(RX)·IO33(TX)에 지정**해서 씁니다: `machine.UART(1, baudrate=115200, rx=32, tx=33)` [추정: 펌웨어에서 동작 확인 필요]
+- 따라서 **UART1을 IO32(RX)·IO33(TX)에 지정**해서 씁니다: `machine.UART(1, baudrate=115200, rx=32, tx=33, rxbuf=4096)`.
+- 순정 펌웨어(MicroPython v1.21.0)의 `machine.UART`는 `baudrate`, `tx`, `rx`, `txbuf`, `rxbuf`, `timeout`, `timeout_char` 인자를
+  지원합니다 **[확인: 순정 펌웨어 바이너리의 UART 표현 문자열]**. 실제 동작은 J5 루프백 시험으로 확인합니다.
 
 ### 2.6 펌웨어 유지·Wi-Fi·Python 제어와 충돌하는가
 
 | 항목 | 판단 | 근거 |
 | --- | --- | --- |
-| 기존 펌웨어 유지 | **가능** — 펌웨어를 다시 굽지 않고 `main.py`만 작성 | `2. Software & Programs/1. Firmware.../MechDog_260306_0x000.bin`은 소스 없는 바이너리. 수정 대상 아님 |
+| 기존 펌웨어 유지 | **가능** — 펌웨어를 다시 굽지 않고 `main.py`만 작성 | 순정 펌웨어는 **MicroPython v1.21.0 (ESP-IDF v5.0.2, 2026-03-06 빌드)** 소스 없는 바이너리 [확인]. 수정 대상 아님 |
 | Wi-Fi | **가능** [확인] | 제조사 군집 제어 예제 `main.py`: `network.WLAN(network.STA_IF)`, `socket`(UDP), `machine.unique_id()`를 메인 보드에서 사용 |
 | 동시 실행(스레드) | **가능** [확인] | 군집 제어 예제와 시리얼 통신 예제가 `Hiwonder.startMain(func)`로 여러 루프를 동시에 돌림 |
-| 걸음 제어와 충돌 | **영향 작을 것으로 예상** [추정] | 제조사 Arduino 라이브러리는 걸음 제어에 50ms 주기 `esp_timer`, 서보 갱신에 5ms 주기 IRAM 타이머로 서보를 갱신 → 걸음은 C 타이머에서 돌고 Python 루프와 분리. MicroPython 펌웨어도 같은 구조인지는 **[확인 필요]** |
-| Wi-Fi 절전 끄기(`pm=PM_NONE`) | **[확인 필요]** | 자료 어디에도 없음. 공식 예제도 쓰지 않음 |
+| 걸음 제어와 충돌 | **영향 작을 것으로 예상** | 순정 펌웨어에 C로 만든 MechDog 모듈과 `pwm_servo_update_timer`가 들어 있음 [확인] → 서보 출력은 Python과 별개인 C 타이머가 갱신. UART 수신도 ESP-IDF 드라이버가 인터럽트로 `rxbuf`에 쌓음. 걸음 궤적 계산이 C인지 Python 래퍼인지는 **[확인 필요]** → 보행 중 중계 실측(10절 10단계) |
+| Wi-Fi 절전 끄기(`pm=PM_NONE`) | **지원** [확인] | 순정 펌웨어에 `PM_NONE`, `PM_PERFORMANCE` 상수가 있음. 실제 지연 개선은 실측 |
 
 덤으로 확인한 것: 공식 예제에서 `mechdog.homeostasis(False)`(균형 끄기), `Hiwonder_IIC.MPU(i2c1).read_angle()`(기울기),
 `Hiwonder.Battery_power()`(배터리)가 Python API로 쓰입니다(제조사 시리얼 통신 예제). mechdog-api.md 5절의 "없음" 항목을 고쳐야 합니다.
@@ -96,6 +99,34 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 | 속도 | 하드웨어 UART, 115200bps 여유 | I2C로 FIFO를 계속 읽어야 함. 비전 모듈과 같은 버스면 간섭 |
 | 드라이버 | MicroPython 내장 `machine.UART` | 직접 작성해야 함(레지스터 제어) |
 | 쓸 이유 | — | J5를 다른 용도로 꼭 써야 할 때만 |
+
+### 2.8 더 빠른 UART(예: 921600bps)를 쓸 수 있는가
+
+- **하드웨어·펌웨어:** 가능. ESP32 하드웨어 UART는 921600bps 이상을 처리하고, GPIO matrix로 IO32/IO33에 연결할 수 있으며,
+  순정 펌웨어의 `machine.UART`가 `baudrate`·`rxbuf`를 받습니다 [확인].
+- **우리 라이다에는 해당 없음:** RPLIDAR A1M8은 **115200bps 고정**입니다(공개 데이터시트). 921600bps는 다른 라이다로 바꿀 때만 의미가 있습니다.
+- **보행과 동시 실행 부담:**
+
+  | 속도 | 초당 데이터 | `rxbuf` 8KB가 차는 시간 | 평가 |
+  | --- | --- | --- | --- |
+  | 115200bps (A1M8) | 약 11.5KB | 약 0.7초 | 여유 있음 |
+  | 921600bps | 약 92KB | 약 0.09초 | Python이 90ms 안에 계속 꺼내 Wi-Fi로 보내야 해서 빠듯함 |
+
+  921600bps에서는 중계 스레드가 CPU를 많이 써서 명령 수신·600ms 통신두절 감시 스레드가 늦어질 위험이 있습니다(안전 문제).
+  쓰게 되면 중계 루프에 양보 시간을 두고, 감시 지연을 실측한 뒤 결정합니다.
+
+### 2.9 남는 GPIO와 5V 출력
+
+| 핀·전원 | 사용 | 근거 |
+| --- | --- | --- |
+| **IO32, IO33 (J5-4, J5-3)** | **유일하게 비어 있는 범용 GPIO** — 라이다 UART로 쓰면 남는 GPIO 없음 | 제조사 회로도, 시리얼 예제 |
+| IO0, IO4 (서보 포트 9·10번) | 사용 불가 — 부가 서보가 없어도 순정 서보 드라이버가 10개 채널을 모두 잡아 PWM을 냄. IO0은 부팅 핀 | 제조사 라이브러리 서보 핀 목록 |
+| IO12 (회로도 서보 11번) | 사용 불가 — 부팅 시 플래시 전압을 정하는 핀 | ESP32 일반 사양 |
+| IO36, IO39 | 사용 불가 — 커넥터에 나와 있지 않음 | 제조사 회로도 |
+| I2C 포트 2개 | I2C 장치 전용 | 제조사 회로도 |
+| **J5-1 5V** | 신호·소형 센서용. 라이다 전원으로는 실측 전까지 쓰지 않음 | 5절 |
+
+→ 센서를 더 달려면 I2C 방식 센서를 고르고, 라이다 모터 제어(CTRL_MOTO)는 5V에 묶어 항상 켜는 설계를 유지합니다.
 
 ## 3. 최종 권장 하드웨어 구성
 
@@ -153,9 +184,9 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 
 | 항목 | 값 | 근거 |
 | --- | --- | --- |
-| 배터리 | 7.4V 1500mAh 5C, 충전 8.4V 2A | 판매처 사양(cnx-software, RobotShop) / 충전기는 `1.2 Battery...pdf` |
+| 배터리 | 7.4V 1500mAh 5C, 충전 8.4V 2A | 판매처 사양(cnx-software, RobotShop) / 충전기는 제조사 배터리 안내 |
 | 보드 입력 | 6~8.4V | 제조사 기술 사양서 |
-| 5V 레일 | RT8289GSP 강압 컨버터 → ESP32 모듈, I2C 포트(비전 모듈 포함), J5-1 | 제조사 회로도 (V1.2) "ESP32 Module 5V Power Supply Circuit" |
+| 5V 레일 | 배터리 → RT8289GSP 강압 컨버터 → ESP32 코어 보드, I2C 포트(비전 모듈 포함, 권장 5V 2A), 초음파, J5-1이 함께 사용. 5V 레일에는 TVS만 있고 퓨즈 없음(1A 퓨즈 4개는 서보 전원 쪽) | 제조사 회로도 (V1.2) "ESP32 Module 5V Power Supply Circuit" |
 | 5V 레일 최대 전류 | **[확인 필요]** — 칩 정격과 인덕터·발열 한계가 자료에 없음 | — |
 | 서보 전원 | VIN(배터리) 직결, 서보 2개마다 1A 퓨즈(F1~F4) | 같은 회로도 |
 | 3PIN 전원 포트(P11) | VIN(배터리 전압) 출력 | 같은 회로도 "Servo Expansion Circuit" |
@@ -242,7 +273,7 @@ moving = False
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 try:
-    wlan.config(pm=network.WLAN.PM_NONE)   # 지원 여부 [확인 필요]
+    wlan.config(pm=network.WLAN.PM_NONE)   # 순정 펌웨어에 상수 있음 [확인], 실제 효과는 실측
 except Exception as e:
     print("pm config not supported:", e)
 wlan.connect(SSID, PASSWORD)
@@ -422,9 +453,9 @@ rviz2   # Fixed Frame: map, LaserScan 토픽 추가
 ## 11. 추가로 확인할 것
 
 1. 보드 회로도 버전(V1.0/V1.2)과 J5 1번 핀 위치, J5 커넥터 형번
-2. IO32/IO33의 TX/RX 방향(제조사 시리얼 통신 강좌 해석 검증)
-3. 펌웨어에서 `machine.UART(1, rx=32, tx=33, rxbuf=4096)`, `WLAN.PM_NONE` 지원 여부
-4. MicroPython 펌웨어에서도 걸음 제어가 C 타이머로 도는지(보행 중 라이다 중계 시 걸음 품질)
+2. ~~IO32/IO33의 TX/RX 방향~~ → 제조사 Arduino 시리얼 예제로 확인(IO32=RX, IO33=TX). 첫 연결에서 응답으로 재확인
+3. ~~펌웨어의 `machine.UART` 핀·버퍼 지정, `WLAN.PM_NONE` 지원~~ → 순정 펌웨어에서 확인. 실제 동작은 루프백·지연 실측
+4. 걸음 궤적 계산이 C인지 Python 래퍼인지(서보 출력은 C 타이머로 확인), 보행 중 라이다 중계 시 걸음 품질
 5. MechDog 5V 레일 여유 전류, 라이다 기동·정상 전류 실측(데이터시트: 합계 약 0.4~0.7A)
 6. 라이다 3핀·4핀 커넥터의 실물 1번 핀 방향(도면과 같은지), 키트 케이블 선 색
 7. sllidar_ros2 TCP 채널이 A1M8 + 중계 구성에서 동작하는지
