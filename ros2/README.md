@@ -28,4 +28,8 @@ ros2 topic echo /robot_b/scan --once
 건강 Warning/오류 코드를 로그로 노출하고 Error는 재시도를 중단합니다. 자동 RESET은 하지 않습니다.
 
 공개 메시지 정의: [LaserScan](https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/LaserScan.msg).
+
+지도 입력의 순수 변환은 `ros2.map_grid.from_occupancy_grid`를 사용합니다.
+평면 Pose·정규화 회전·셀 배열을 검사해 [지도 편집 안전 검사](../docs/map-review.md)의 Grid로 변환합니다.
+구독·지도 확정·이동은 실행하지 않으며 실제 ROS 메시지 연동은 Pi에서 확인해야 합니다.
 합성 프레임 변환은 검증했지만 Pi의 ROS 실행·QoS·실제 센서 방향·두 대 부하는 사용자 확인 항목입니다.
