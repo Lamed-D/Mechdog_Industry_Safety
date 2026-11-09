@@ -1,5 +1,13 @@
 # 장착 비전 모듈과 호스트 감지 경계
 
+## 사용자 확인 결과
+
+구입 당시 펌웨어에서 휴대폰 Wi-Fi `HW_ESP32S3CAM` 연결 후 `http://192.168.5.1/`의 Image 화면으로
+실시간 영상 표시가 성공했습니다. 원본 영상 사용을 우선하며 인식용 펌웨어로 바꾸지 않습니다.
+공식 IIC 얼굴 호출은 face_read/errno19로 실패했습니다. 두 결과는 별도 기능으로 기록합니다.
+PC/Pi 스트림 수신 URL·두 대 동시 연결·추론·낙상 정확도는 아직 미검증입니다. 영상 파일은 저장하지 않았습니다.
+공식 절차: [제조사 영상 안내](https://docs.hiwonder.com/projects/ESP32-S3/en/latest/docs/3.Image_Recognition_Course.html).
+
 카메라는 장착된 ESP32-S3 모듈을 사용합니다. MechDog 공식 Hiwonder Python 연결은
 `robot/vision.py`의 `ESP32S3Cam(IIC(2))`이며 최신 제조사 얼굴 예제의 `read_face()`를 우선 사용합니다.
 이전 메서드만 있는 장치에서는 `face_recognition()`을 사용하고 결과 유형·존재만 진단합니다.
