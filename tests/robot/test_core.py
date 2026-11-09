@@ -85,11 +85,22 @@ class BootAndHelloTest(CoreTestCase):
         self.robot.handle(b"CMD|HELLO|A|new1|0|$", PI)
         self.assertEqual(self.robot.last_cmd_seq, 0)
         self.assertEqual(self.moves()[-1], (0, 0))
-        self.assertFalse(self.robot.latched)  # 재시작이 래치를 걸거나 풀지 않음
-        self.send("MOVE", 40, 0, seq=1)
+        self.assertTrue(self.robot.latched)  # 움직이는 중 HELLO는 이전 동작을 이어가지 않음
+        self.send("RESET", seq=1)
+        self.send("MOVE", 40, 0, seq=2)
         self.assertEqual(self.moves()[-1], (40, 0))
-        self.robot.handle(b"CMD|HELLO|A|new1|0|$", PI)  # 같은 boot_id 는 무시
-        self.assertEqual(self.robot.last_cmd_seq, 1)
+        self.robot.handle(b"CMD|HELLO|A|new1|0|$", PI)
+        self.assertEqual(self.robot.last_cmd_seq, 2)
+        self.assertTrue(self.robot.latched)
+
+    def test_hello_during_action_cannot_keep_motion_alive(self):
+        self.ready()
+        self.send("ACTION", "nodding_motion")
+        self.robot.handle(b"CMD|HELLO|A|b00t|0|$", PI)
+        self.assertTrue(self.robot.latched)
+        self.assertEqual(self.robot.latch_reason, "link_lost")
+        self.assertEqual(self.dog.fake_calls("stop_action"), [()])
+        self.assertEqual(self.moves()[-1], (0, 0))
 
     def test_hello_wrong_version(self):
         self.tick()

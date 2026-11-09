@@ -113,6 +113,16 @@ class RobotLink:
             self.intent = None
             self.pending_reset = False
             return False
+        if self.latest and value.tseq <= self.latest.tseq and value.uptime_ms < self.latest.uptime_ms:
+            # 재부팅과 크게 지연된 옛 패킷을 확정 구별할 수 없으면 멈추고 새 세션으로 확인합니다.
+            self._link_fault("robot_restarted")
+            self.boot_id = secrets.token_hex(8)  # 인증 키가 아닌 공개 프로토콜 세션 ID
+            self.latest = self.role_ack = None
+            self.seq = self.last_acked = 0
+            self.ack_wait_since = None
+            self.last_seen = self.last_scan = -math.inf
+            self.next_send = self.next_hello = self.next_role = -math.inf
+            return False
         if self.latest and (value.tseq <= self.latest.tseq or value.uptime_ms < self.latest.uptime_ms):
             return False
         if value.last_seq > self.seq or value.last_seq < self.last_acked:
@@ -197,6 +207,10 @@ class RobotLink:
         return ("CMD|%s|%s|%d|%s" % (name, self.robot, self.seq,
                 "|".join(str(v) for v in args) + ("|" if args else "")) + "$").encode("ascii")
 
+    def _hello(self):
+        self.next_hello = self.clock() + settings.HOST_HELLO_RETRY_MS / 1000
+        return ("CMD|HELLO|%s|%s|%d|$" % (self.robot, self.boot_id, wire.PROTO_VERSION)).encode()
+
     def step(self):
         now = self.clock()
         if now < self.next_send:
@@ -212,8 +226,7 @@ class RobotLink:
             self.intent = None
             self.pending_reset = False
             if now >= self.next_hello:
-                payload = ("CMD|HELLO|%s|%s|%d|$" % (self.robot, self.boot_id, wire.PROTO_VERSION)).encode()
-                self.next_hello = now + settings.HOST_HELLO_RETRY_MS / 1000
+                payload = self._hello()
             else:
                 payload = self._command("STOP")
         elif self.pending_reset:
@@ -234,14 +247,21 @@ class RobotLink:
         else:
             self.intent = None
             payload = self._command("STOP")
-        try:
-            self.send(payload)
-            if b"|HELLO|" not in payload and self.ack_wait_since is None:
-                self.ack_wait_since = now
-        except Exception:
+        messages = [payload]
+        if self.emergency and not self.fresh() and now >= self.next_hello:
+            messages.append(self._hello())  # ESTOP을 먼저 보내고, 래치를 유지하며 TEL 목적지만 확인
+        failure = None
+        for message in messages:
+            try:
+                self.send(message)
+                if b"|HELLO|" not in message and self.ack_wait_since is None:
+                    self.ack_wait_since = now
+            except Exception as error:
+                failure = error  # 첫 송신 실패도 다음 정지/핸드셰이크 시도를 막지 않음
+        if failure is not None:
             self._link_fault("send_failed")
             self.latest = None
-            raise
+            raise failure
 
     def close(self):
         self.intent = None
