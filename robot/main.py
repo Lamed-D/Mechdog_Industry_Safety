@@ -12,6 +12,7 @@ from HW_MechDog import MechDog
 
 import config
 from app import App
+from vision import Vision
 
 try:
     import secrets  # 커밋하지 않는 파일 (secrets.example.py 참고)
@@ -32,5 +33,5 @@ except Exception:
         raise OSError("imu unavailable")  # 텔레메트리에 NA, imu_unknown
 
 app = App(config, mechdog, Hiwonder.Battery_power, read_tilt, network, socket, machine, time,
-          SSID, PASSWORD)
+          SSID, PASSWORD, vision=Vision(Hiwonder_IIC))
 app.start(Hiwonder.startMain)

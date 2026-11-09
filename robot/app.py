@@ -32,7 +32,7 @@ def safe_reader(func):
 
 class App:
     def __init__(self, cfg, dog, read_battery, read_tilt, network, socket, machine, clock,
-                 ssid=None, password=None, lock=None):
+                 ssid=None, password=None, lock=None, vision=None):
         self.cfg = cfg
         self.clock = clock
         self.motion = Motion(dog)
@@ -40,6 +40,8 @@ class App:
         self.robot = Robot(cfg, self.motion, clock, read_battery, safe_reader(read_tilt), self.lock)
         self.link = Link(cfg, network, socket, clock, ssid, password)
         self.lidar = LidarBridge(cfg, machine, socket)
+        self.vision = vision
+        self.vision_status = {"status": "unknown", "reason": "not_read"}
 
     def start(self, start_main):
         self.motion.stop()
@@ -48,6 +50,8 @@ class App:
         start_main(self.watchdog_loop)
         start_main(self.comm_loop)
         start_main(self.lidar_loop)
+        if self.vision is not None:
+            start_main(self.vision_loop)
 
     def _update_conditions(self):
         words = self.robot.conditions
@@ -72,6 +76,16 @@ class App:
 
     def lidar_step(self):
         self.lidar.service(self.link.connected())
+
+    def vision_step(self):
+        # IIC(2) camera read is outside the safety lock and never issues motion.
+        self.vision_status = self.vision.read_face()
+
+    def vision_failed(self):
+        self.vision_status = {"status": "unknown", "reason": "camera_read_failed"}
+
+    def vision_loop(self):
+        self._forever(self.vision_step, 200, self.vision_failed)
 
     # --- 반복 루프 ---
     def _forever(self, step, period_ms, on_error):

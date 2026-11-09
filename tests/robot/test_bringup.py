@@ -46,6 +46,13 @@ class FakeLidarUart:
 
 
 class BringupTest(unittest.TestCase):
+    def test_mechdog_only_does_not_construct_robot_or_open_uart(self):
+        result = load("mechdog_only").main()
+        self.assertEqual(result["battery_mv"], 7800)
+        self.assertTrue(all(result["api"].values()))
+        self.assertEqual(fakes.HW_MechDog.instances, [])
+        self.assertEqual(fakes.machine.uarts, [])
+
     def setUp(self):
         fakes.install()
         self.addCleanup(fakes.uninstall)
