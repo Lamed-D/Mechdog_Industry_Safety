@@ -16,9 +16,9 @@ from dashboard.web.sim import SimLink, start_loop
 from scenario.machine import Scenario
 
 
-def build_sim(log_path=":memory:"):
-    links = {"A": SimLink("A"), "B": SimLink("B")}
-    core = DashboardCore(Scenario(), links, EventLog(log_path))
+def build_sim(log_path=":memory:", *, clock=time.monotonic, wall=time.time):
+    links = {r: SimLink(r, clock=clock) for r in ("A", "B")}
+    core = DashboardCore(Scenario(clock=clock), links, EventLog(log_path, wall=wall), clock=clock, wall=wall)
     return core, links
 
 
