@@ -15,6 +15,7 @@ Read these before changing code (Korean):
 - docs/dev/branch-rules.md — branches `feat/<desc>` and `issue/<number>-<desc>`, Korean commit messages
 - docs/dev/code-review.md — review priorities and comment format
 - docs/lidar-integration.md, docs/demo-scenario.md — current design and demo goal
+- docs/firmware-strategy.md — main board: MicroPython first (primary), Arduino port later as backup; vision module: Arduino
 
 Demo goal: **two robots**; on detecting a fallen person with the camera, alert the manager via a dashboard, and one
 robot goes to the manager's location and guides them to the person.
