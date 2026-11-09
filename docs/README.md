@@ -7,7 +7,8 @@
 | [firmware-strategy.md](firmware-strategy.md) | 펌웨어 방침: 메인 보드 MicroPython 우선·Arduino 예비, 비전 모듈 Arduino |
 | [lidar-integration.md](lidar-integration.md) | RPLIDAR A1M8 → MechDog J5(UART) → Wi-Fi → Pi 5 연동 설계, 배선표, 테스트 계획, 확인 필요 사항 |
 | [vision-cam-firmware.md](vision-cam-firmware.md) | 비전 모듈(ESP32-S3 카메라) 맞춤 펌웨어: Pi 5로 영상 전송, 설치·Wi-Fi 설정·복구·빌드 |
-| [dashboard.md](dashboard.md) | 관리자 대시보드: 전체 정지·래치 해제·알림 처리 규칙, 사건 기록 |
+| [dashboard.md](dashboard.md) | 관리자 대시보드: 인터넷·Supabase 기준 구조, Pi 5 핫스팟 로봇망, 명령 경로, 전체 정지·래치 해제·알림 처리 규칙, Android 알림 명세 |
+| [mapping-and-patrol.md](mapping-and-patrol.md) | 운영 흐름: 정찰·지도 작성 → 사람이 대시보드에서 지도 확정(선택: 노트북 이미지 모델) → 구역 지정 → Pi 5 순찰 루틴(연결이 끊기면 서버 위치로 복귀 후 정지) |
 | [demo-scenario.md](demo-scenario.md) | 시연 시나리오: 쓰러진 사람 발견 → 대시보드 알림 → 로봇이 관리자 안내, 구현 전 결정 사항 |
 
 ## 개발 규칙 (GitHub 기준)
