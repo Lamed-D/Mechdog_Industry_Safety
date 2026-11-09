@@ -1,5 +1,8 @@
 # 명령 처리·감시·래치·저전압 (docs/protocol.md 4·5·6절).
 # 하드웨어는 motion(공식 API 호출), 배터리·기울기 읽기 함수, 시계로만 만집니다. 모두 주입받아 PC에서 시험합니다.
+#
+# 동시 실행: 수신 루프와 감시 루프가 따로 돌므로, 상태를 바꾸고 motion 을 부르는 일은 모두 잠금 안에서 합니다.
+# 시간이 걸릴 수 있는 센서 읽기(배터리·기울기)와 네트워크 입출력은 잠금 밖에서 합니다.
 
 import proto
 
@@ -13,14 +16,33 @@ WARN_ORDER = ("clipped", "busy", "latched", "move_stale", "reset_denied", "garba
               "batt_low", "batt_unknown", "imu_unknown", "pm_on", "lidar_uart")
 MAX_TEL_LEN = 160
 
+_NOT_READ = object()
+
+
+class NoLock:
+    """스레드가 하나일 때(테스트 등) 쓰는 빈 잠금."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return value - value == 0  # NaN·무한대는 거짓 (MicroPython 에 math.isfinite 가 없을 수 있음)
+
 
 class Robot:
-    def __init__(self, cfg, motion, clock, read_battery, read_tilt):
+    def __init__(self, cfg, motion, clock, read_battery, read_tilt, lock=None):
         self.cfg = cfg
         self.motion = motion
         self.clock = clock
         self._read_battery = read_battery
         self._read_tilt = read_tilt
+        self._lock = lock if lock is not None else NoLock()
         now = clock.ticks_ms()
         # 부팅 직후에는 사람이 RESET 하기 전까지 움직이지 않음 (5.1절)
         self.latched = True
@@ -28,8 +50,11 @@ class Robot:
         self.boot_id = None
         self.last_cmd_seq = 0
         self.moving = False
-        self.action_until = None      # 동작 그룹·자세 잡기가 끝나는 ticks (최대 시간)
-        self.action_started = None    # 동작 그룹을 시작한 ticks (자세 잡기는 None)
+        self.action_until = None      # 동작 그룹·자세 잡기 동안 다른 명령을 받지 않는 기한
+        self.action_name = None       # 끝났다고 확인되지 않은 동작 그룹. 확인 전에는 래치 때마다 stop_action
+        self.action_started = None
+        self.action_max_end = None    # 동작 그룹의 최대 끝 시각
+        self.reset_block_until = None  # 동작 중 래치가 걸렸을 때 이 시각 전에는 RESET 거부
         self.need_default_pose = False
         self.link_armed = False       # 첫 명령을 받은 뒤부터 통신 끊김 감시
         self.last_accept = now
@@ -55,8 +80,11 @@ class Robot:
     def _diff(self, a, b):
         return self.clock.ticks_diff(a, b)
 
+    def _before(self, deadline):
+        return deadline is not None and self._diff(deadline, self._now()) > 0
+
     def busy(self):
-        return self.action_until is not None and self._diff(self.action_until, self._now()) > 0
+        return self._before(self.action_until)
 
     def state(self):
         if self.latched:
@@ -71,15 +99,23 @@ class Robot:
         self.moving = False
         self.motion.stop()
 
-    def latch(self, reason):
+    def _stop_action(self):
+        try:
+            self.motion.stop_action()
+        except Exception:
+            pass  # 없거나 실패해도 아래 move(0, 0)은 반드시 부름
+        self._stop()
+
+    def _latch(self, reason):
         """정지 + 래치. estop 은 RESET 전까지 다른 사유로 덮지 않음 (5.2절)."""
         try:
-            if self.action_started is not None:
-                try:
-                    self.motion.stop_action()  # 동작 그룹도 멈춤. 아래 move(0, 0)과 함께
-                except Exception:
-                    pass
-            self._stop()
+            if self.action_name is not None:
+                # 동작 그룹이 끝났다고 확인되지 않았으면 멈추고, 최대 시간까지 RESET 을 막음
+                if self.action_max_end is not None and self._before(self.action_max_end):
+                    self.reset_block_until = self.action_max_end
+                self._stop_action()
+            else:
+                self._stop()
         finally:
             if not (self.latched and self.latch_reason == "estop" and reason != "estop"):
                 if not self.latched or self.latch_reason != reason:
@@ -89,23 +125,28 @@ class Robot:
 
     def fail_safe(self):
         """예상 못 한 예외가 난 경로에서 부릅니다. 멈추고 통신 끊김으로 래치."""
-        self.latch("link_lost")
+        with self._lock:
+            self._latch("link_lost")
 
     # ---------- 명령 수신 (4절) ----------
     def handle(self, data, addr=None):
-        kind, cmd = proto.parse(data, self.cfg.ROBOT_ID)
+        kind, cmd = proto.parse(data, self.cfg.ROBOT_ID)  # 해석은 상태를 바꾸지 않으므로 잠금 밖
+        with self._lock:
+            self._handle(kind, cmd, addr)
+
+    def _handle(self, kind, cmd, addr):
         if kind == proto.GARBAGE:
             self.events.add("garbage")
             return
         if kind == proto.OTHER:
             return
         if kind == proto.BAD:
-            self.latch("bad_cmd")
+            self._latch("bad_cmd")
             return
         name = cmd.name
         if name == "ESTOP":
             self._accept_if_newer(cmd.seq)
-            self.latch("estop")
+            self._latch("estop")
             return
         if name == "STOP":
             self._accept_if_newer(cmd.seq)
@@ -163,10 +204,12 @@ class Robot:
 
     def _reset(self):
         ok = (self.wifi_ok and self.battery_mv is not None
-              and self.battery_mv >= self.cfg.LOW_BATT_RESET_MV and not self.busy())
+              and self.battery_mv >= self.cfg.LOW_BATT_RESET_MV
+              and not self.busy() and not self._before(self.reset_block_until))
         if not ok:
             self.events.add("reset_denied")
             return
+        self.reset_block_until = None
         self.latched = False
         self.latch_reason = "none"
         self.urgent = True
@@ -194,9 +237,10 @@ class Robot:
         if self.moving:
             self._stop()
         self.motion.action(name)
-        duration = self.cfg.ACTION_DURATION_MS[name]
+        self.action_name = name
         self.action_started = self._now()
-        self.action_until = self.clock.ticks_add(self.action_started, duration)
+        self.action_max_end = self.clock.ticks_add(self.action_started, self.cfg.ACTION_DURATION_MS[name])
+        self.action_until = self.action_max_end
         self.need_default_pose = True
 
     def _pose(self, pose):
@@ -209,46 +253,64 @@ class Robot:
         self.need_default_pose = False
         self.action_until = self.clock.ticks_add(self._now(), self.cfg.DEFAULT_POSE_SETTLE_MS)
 
-    # ---------- 감시 (5절) : 수신과 다른 스레드에서 짧은 주기로 ----------
+    # ---------- 감시 (5절) : 수신과 다른 루프에서 짧은 주기로 ----------
     def tick(self, wifi_connected):
+        reading = _NOT_READ
+        now = self._now()
+        if self._last_batt_read is None or \
+                self._diff(now, self._last_batt_read) >= self.cfg.BATT_READ_PERIOD_MS:
+            reading = self._read_battery_safe()  # 잠금 밖에서 읽음
+        with self._lock:
+            self._tick(wifi_connected, reading)
+
+    def _read_battery_safe(self):
+        try:
+            value = self._read_battery()
+        except Exception:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return None  # 모르는 값을 "충분함"으로 보지 않음
+        return value
+
+    def _tick(self, wifi_connected, reading):
         now = self._now()
         self.uptime_ms += max(self._diff(now, self._last_tick), 0)
         self._last_tick = now
         self._check_action(now)
         if not wifi_connected and self.wifi_ok:
-            self.latch("link_lost")
+            self._latch("link_lost")
         self.wifi_ok = wifi_connected
         if self.link_armed and self._diff(now, self.last_accept) > self.cfg.LINK_TIMEOUT_MS:
             self.link_armed = False
-            self.latch("link_lost")
-        if self.moving and self._diff(now, self.last_move) > self.cfg.MOVE_HOLD_MS:
+            self._latch("link_lost")
+        if self.moving and (self.latched or self._diff(now, self.last_move) > self.cfg.MOVE_HOLD_MS):
             self._stop()
-            self.events.add("move_stale")
-        if self._last_batt_read is None or \
-                self._diff(now, self._last_batt_read) >= self.cfg.BATT_READ_PERIOD_MS:
+            if not self.latched:
+                self.events.add("move_stale")
+        if reading is not _NOT_READ:
             self._last_batt_read = now
-            self._check_battery(now)
+            self._check_battery(now, reading)
 
     def _check_action(self, now):
-        if self.action_until is None:
-            return
-        done = self._diff(now, self.action_until) >= 0
-        if not done and self.action_started is not None and                 self._diff(now, self.action_started) >= self.cfg.ACTION_MIN_MS:
+        if self.action_name is not None and self._diff(now, self.action_started) >= self.cfg.ACTION_MIN_MS:
             try:
-                done = bool(self.motion.action_over())  # 제조사 예제의 끝남 확인
+                result = self.motion.action_over()  # 제조사 예제의 끝남 확인
+                over = isinstance(result, (bool, int)) and bool(result)
             except Exception:
-                done = False  # 모르면 최대 시간까지 기다림
-        if done:
+                over = False  # 모르면 끝난 것으로 보지 않음
+            if over:
+                self.action_name = None
+                self.action_started = None
+                self.action_max_end = None
+                self.action_until = None
+                return
+        if self.action_until is not None and not self._before(self.action_until):
             self.action_until = None
-            self.action_started = None
+            if self.action_name is not None:
+                # 최대 시간이 지났는데 끝났다고 확인되지 않음: 멈추게 하고, 확인될 때까지 계속 추적
+                self._stop_action()
 
-    def _check_battery(self, now):
-        try:
-            value = self._read_battery()
-        except Exception:
-            value = None
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            value = None  # 모르는 값을 "충분함"으로 보지 않음
+    def _check_battery(self, now, value):
         self.battery_mv = value
         cfg = self.cfg
         if value is None:
@@ -256,14 +318,14 @@ class Robot:
             if self._batt_unknown_since is None:
                 self._batt_unknown_since = now
             if self._diff(now, self._batt_unknown_since) >= cfg.BATT_UNKNOWN_HOLD_MS:
-                self.latch("low_battery")
+                self._latch("low_battery")
             return
         self._batt_unknown_since = None
         if value < cfg.LOW_BATT_LATCH_MV:
             if self._batt_low_since is None:
                 self._batt_low_since = now
             if self._diff(now, self._batt_low_since) >= cfg.LOW_BATT_HOLD_MS:
-                self.latch("low_battery")
+                self._latch("low_battery")
         else:
             self._batt_low_since = None
 
@@ -277,16 +339,24 @@ class Robot:
             return None
         return (host, self.cfg.TEL_PORT)
 
-    def _tilt(self, words):
+    def _read_tilt_safe(self):
+        """(x, y) 문자열. 값이 없거나 숫자가 아니거나 NaN·무한대면 None."""
         try:
             angle = self._read_tilt()
-            return "%.1f" % angle[0], "%.1f" % angle[1]
+            x, y = angle[0], angle[1]
         except Exception:
-            words.add("imu_unknown")
-            return "NA", "NA"
+            return None
+        if not (finite_number(x) and finite_number(y)):
+            return None
+        return "%.1f" % x, "%.1f" % y
 
     def telemetry(self):
         """다음 텔레메트리 한 줄. 부르면 tseq 가 오르고 이벤트 warn 이 비워집니다."""
+        tilt = self._read_tilt_safe()  # 잠금 밖에서 읽음
+        with self._lock:
+            return self._telemetry(tilt)
+
+    def _telemetry(self, tilt):
         words = set(self.events) | self.conditions
         if self.battery_mv is None:
             words.add("batt_unknown")
@@ -295,11 +365,13 @@ class Robot:
             battery = str(self.battery_mv)
             if self.battery_mv < self.cfg.LOW_BATT_WARN_MV:
                 words.add("batt_low")
-        tilt_x, tilt_y = self._tilt(words)
+        if tilt is None:
+            words.add("imu_unknown")
+            tilt = ("NA", "NA")
         ordered = [w for w in WARN_ORDER if w in words]
         head = "TEL|%s|%d|%d|%s|%d|%s|%s|%s|%s|%d|%s|" % (
             self.cfg.ROBOT_ID, self.tseq, self.last_cmd_seq, self.state(), 1 if self.latched else 0,
-            self.latch_reason, battery, tilt_x, tilt_y, self.uptime_ms,
+            self.latch_reason, battery, tilt[0], tilt[1], self.uptime_ms,
             self.boot_id if self.boot_id is not None else "-")
         while ordered and len(head) + len(",".join(ordered)) + 2 > MAX_TEL_LEN:
             ordered.pop()  # 길이 제한: 뒤쪽(덜 급한) 낱말부터 뺌
