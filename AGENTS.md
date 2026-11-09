@@ -34,5 +34,7 @@ Never move the real robot or overwrite its `main.py` without the user's explicit
 stop/safety logic, never commit secrets, personal data, real camera footage of people, or anything that names or
 copies referenced external materials. Never bypass git hooks (`--no-verify`). Never approve your own PR. Merge your own PR only after the other agent's
 `[name] 리뷰: 승인` comment and the checks in docs/dev/agents.md §6 (`gh pr merge <n> --squash --delete-branch`);
-PRs that change shared rule/config files need the user's approval instead.
+PRs that change shared rule/config files also need a delegate approval: claude1 approves on the user's behalf (codex1 does it
+when claude1 is the author or requester); changes to tools/hooks or tools/check_confidential.py need the user. claude1 also answers
+`to:user` issues except real-robot actions, spending money, repository settings, security checks and secrets (docs/dev/agents.md §9).
 Commit messages: `<type>: <한국어 요약>` + Korean body + `Agent: claude1|codex1`. Run the tests before committing.
