@@ -1,5 +1,12 @@
 # 관리자 대시보드
 
+실물 없이 전체 흐름을 연습하려면 `python -m tools.mock.demo_scenario`를 실행합니다.
+`--finder B`로 두 ID의 동일 기능을 확인하고 `--fault link`, `--fault camera`, `--fault estop`으로 장애를 주입합니다.
+가짜 시계·가짜 링크·메모리 SQLite만 사용하며 소켓·카메라·모델을 열지 않습니다. 출력 JSON Lines는 모두 synthetic입니다.
+RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로 연습**하는 것이며 실물 자동 해제를 제공하지 않습니다.
+전체 정지 주입은 estop에서 끝나고 재이동하지 않습니다. 이 데모는 경로·낙상 정확도·실제 통신 검증을 대신하지 않습니다.
+사용자 실제 적용은 [통합 확인 순서](user-tests/integrated-bringup.md)를 따릅니다.
+
 시연 시나리오([demo-scenario.md](demo-scenario.md) 5절)의 관리자 화면입니다.
 
 ## 0. 기기 역할과 데이터 흐름 (사용자 결정, 2026-11-09 갱신)
