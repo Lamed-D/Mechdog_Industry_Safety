@@ -6,12 +6,13 @@ from host.roles import RoleCoordinator
 
 
 class RobotAdapter:
-    def __init__(self, hub, *, clock=None):
+    def __init__(self, hub, *, clock=None, vision=None):
         self.hub = hub
         options = {} if clock is None else {"clock": clock}
         self.links = {r: RobotLink(r, hub.sender(r), **options) for r in ("A", "B")}
         self.roles = RoleCoordinator(self.links, **options)
         self.failures = 0
+        self.vision = vision
 
     def step(self, core):
         try:
@@ -23,6 +24,8 @@ class RobotAdapter:
                 link.estop()
         self.roles.step()
         core.update()
+        if self.vision is not None:
+            self.vision.apply(core)  # 완료 결과만 읽으며 모델을 호출하지 않음
         for command in core.drain_commands():
             link = self.links[command.robot]
             if command.kind == "estop":

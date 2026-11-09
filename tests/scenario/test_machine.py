@@ -47,6 +47,24 @@ class ScenarioTestBase(unittest.TestCase):
 
 
 class HappyPathTests(ScenarioTestBase):
+    def test_vision_loss_stops_dispatch_and_guiding_until_human_retry(self):
+        for phase in ("dispatch", "guiding"):
+            with self.subTest(phase=phase):
+                self.setUp()
+                self.to_phase(phase)
+                out = self.s.detection(fall("B", status="unknown"))
+                self.assertIn(("B", "stop", None), commands(out))
+                self.assertEqual(self.s.phase, "suspended")
+                self.assertFalse(commands(self.s.retry()))
+                self.assertFalse(commands(self.s.detection(fall("B", status="unconfirmed"))))
+                self.assertEqual(self.s.phase, "suspended")
+                self.assertTrue(commands(self.s.retry()))
+
+    def test_unknown_camera_blocks_new_patrol_until_valid_evidence(self):
+        self.s.detection(fall("A", status="unknown"))
+        out = self.s.start_patrol()
+        self.assertNotIn(("A", "patrol", None), commands(out))
+
     def test_full_demo_flow(self):
         s = self.s
         self.assertEqual(s.phase, "patrol")

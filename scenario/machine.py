@@ -95,9 +95,11 @@ class Scenario:
         out = []
         if status == "unknown":
             out.append(Notice("vision_unknown", robot, {"reason": result.get("reason")}))
-            if self.activity[robot] == "patrol":
+            self.vision_paused.add(robot)
+            if self.activity[robot] not in ("idle", "stopped", "estop"):
                 self._cmd(out, robot, "stop")
-                self.vision_paused.add(robot)
+            if robot == self.guide and self.phase in ("dispatch", "guiding"):
+                self._suspend(out, "vision_unknown")
             return out
         if status == "unconfirmed":
             if robot in self.vision_paused:
@@ -199,7 +201,7 @@ class Scenario:
     def start_patrol(self):
         if self.phase not in ("standby", "estop", "patrol") or self.incident:
             return [_rejected("start_patrol", self.phase)]
-        movers = sorted(r for r in self.ready if self.activity[r] != "patrol")
+        movers = sorted(r for r in self.ready if self.activity[r] != "patrol" and r not in self.vision_paused)
         if not movers:
             return [_rejected("start_patrol", self.phase, reason="no_ready_robot")]
         out = []
@@ -296,13 +298,15 @@ class Scenario:
         out.append(Notice("phase", None, {"phase": phase}))
 
     def _dispatch(self, out):
-        if self.guide not in self.ready:
+        if self.guide not in self.ready or self.guide in self.vision_paused:
             out.append(Notice("no_guide", self.guide, {"id": self.incident["id"]}))
             return
         self._cmd(out, self.guide, "goto", "manager")
         self._set_phase(out, "dispatch")
 
     def _enter_guide_phase(self, phase):
+        if self.guide in self.vision_paused:
+            return [_rejected("retry", self.phase, robot=self.guide, reason="vision_unknown")]
         if self.guide not in self.ready:
             return [Notice("no_guide", self.guide, {"id": self.incident["id"]})]
         out = []
@@ -326,7 +330,7 @@ class Scenario:
         if self.returning:
             return
         # 복귀를 마친 로봇만 순찰을 다시 시작합니다(그 사이 준비된 로봇은 사람 조작을 기다림).
-        movers = sorted(self.returned & self.ready)
+        movers = sorted((self.returned & self.ready) - self.vision_paused)
         for robot in movers:
             self._cmd(out, robot, "patrol")
         self._set_phase(out, "patrol" if movers else "standby")
