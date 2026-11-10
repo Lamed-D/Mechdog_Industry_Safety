@@ -68,6 +68,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS config_copies (version INTEGER PRIMARY KEY, digest TEXT NOT NULL, payload TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS active_config (singleton INTEGER PRIMARY KEY CHECK(singleton=1), version INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS hub_status (robot TEXT PRIMARY KEY, payload TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS routine_reservations (run_key TEXT PRIMARY KEY);
             ''')
             self._db.execute('INSERT OR IGNORE INTO hub_identity VALUES (1,?,?)', (self.hub_id,self.device_id))
             existing = self._db.execute('SELECT hub,device FROM hub_identity WHERE singleton=1').fetchone()
@@ -177,6 +178,15 @@ class Store:
     def active_config(self):
         row = self._db.execute('SELECT c.version,c.digest,c.payload FROM config_copies c JOIN active_config a ON c.version=a.version').fetchone()
         return {'version':row[0], 'digest':row[1], 'value':json.loads(row[2])} if row else None
+
+    def reserve_run(self, key):
+        def write():
+            if not isinstance(key,str) or not 1<=len(key)<=256 or not key.isascii():
+                raise ValueError('bounded run key required')
+            if self._db.execute('SELECT COUNT(*) FROM routine_reservations').fetchone()[0]>=100_000:
+                raise ValueError('routine reservation capacity reached')
+            self._db.execute('INSERT INTO routine_reservations VALUES (?)',(key,))
+        return self._transaction(write)
 
     def close(self):
         try:
