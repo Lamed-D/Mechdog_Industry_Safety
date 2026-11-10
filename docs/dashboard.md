@@ -182,6 +182,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | HUB-5 | `host/hub/connectivity.py` | [연결 정책](hub-connectivity.md): 10초·약한 링크·복귀 실패 정지·사람만 재개 | 순수 상태기계 검사. 약한 링크 기준 실측·Navigator·실행 서비스 미구현 |
 | HUB-6 | `host/hub/config_sync.py` | [설정 활성화](hub-config.md): 파일/격자 해시·승인 셀·4종 지점·금지 구역·참조 검증 | 이전 활성 사본 유지. 실제 Storage/지도/경로 계획 미검증 |
 | HUB-7 | `host/hub/routines.py` | [루틴 스케줄러](hub-routines.md): 수동/매일 UTC/간격·준비 검사·영속 예약·사고 우선 | 실제 경로 실행·원격 루틴 명령·시계/Pi 미검증 |
+| HUB-8a | `dashboard/app/` | [인터넷 앱](dashboard-app.md): 로그인·상태/알림·전체 정지·확인 RESET·명령 결과 | 모듈 모의 검사. 지도/루틴/정찰 화면과 실제 인증·CORS·렌더링 미검증 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 

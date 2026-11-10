@@ -1,0 +1,10 @@
+:root {font-family:system-ui,"Malgun Gothic",sans-serif;color:#182637;background:#edf2f5}
+body {margin:0} header {padding:1.5rem;background:#142c41;color:white}
+h1 {margin:0;font-size:1.7rem} main {max-width:1080px;margin:auto;padding:1rem}
+section {background:white;border:1px solid #cad4de;border-radius:12px;padding:1.2rem;margin:1rem 0}
+aside {padding:1rem;background:#fff0d2;border-left:6px solid #a05700}
+form {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}
+label {display:grid;gap:.4rem} input,button {font:inherit;padding:.75rem;border-radius:6px;border:1px solid #8496a8}
+button {cursor:pointer;background:#173f61;color:white} button:disabled {opacity:.5;cursor:not-allowed}
+#estop {background:#b51d25;font-size:1.4rem;font-weight:bold;min-width:220px}
+.safety {border:2px solid #b51d25} pre {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}

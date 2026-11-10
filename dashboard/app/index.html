@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https:; img-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>MechDog 원격 관제</title><link rel="stylesheet" href="style.css"></head>
+<body><header><h1>MechDog 원격 관제</h1><p>노트북 → Supabase → Pi 5 · 두 로봇 A / B</p></header>
+<main><aside id="banner" role="status">로그인 전 · 실제 계정과 장비 연결 미검증</aside>
+<section><h2>인터넷 관제 연결</h2><form id="login">
+<label>Supabase 프로젝트 URL<input id="url" type="url" placeholder="https://PROJECT.supabase.co" required></label>
+<label>Publishable 키<input id="key" autocomplete="off" placeholder="sb_publishable_…" required></label>
+<label>허브 UUID<input id="hub" required></label><label>이 노트북 기기 UUID<input id="device" required></label>
+<label>이메일<input id="email" type="email" autocomplete="username" required></label>
+<label>비밀번호<input id="password" type="password" autocomplete="current-password" required></label>
+<button>로그인</button><button type="button" id="logout">로그아웃</button></form></section>
+<section class="safety"><h2>안전 조작</h2><button id="estop" disabled>전체 정지</button>
+<p>확인 창 없이 명령을 보냅니다. 화면의 전송 성공은 실제 정지 확인이 아닙니다.</p>
+<p id="action" role="status">조작 기록 없음</p>
+<button id="resetA" disabled>로봇 A 래치 해제 요청</button><button id="resetB" disabled>로봇 B 래치 해제 요청</button></section>
+<section><h2>로봇 상태</h2><pre id="robots">미수신</pre></section>
+<section><h2>알림</h2><pre id="alerts">미수신</pre></section>
+<section><h2>최근 명령 결과</h2><pre id="results">미수신</pre></section>
+<section><h2>지도와 루틴</h2><p>검토·그리기·루틴 편집·정찰 조종 화면은 후속 작업입니다. 현재 화면에서 실행할 수 없습니다.</p></section>
+</main><script type="module" src="app.mjs"></script></body></html>
