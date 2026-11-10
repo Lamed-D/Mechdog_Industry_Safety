@@ -29,7 +29,7 @@
 
 | 항목 | 파일 / 사용자 실행 | 정상 관측 | A | B |
 | --- | --- | --- | --- | --- |
-| 공식 API·배터리 | `mechdog_only.py`의 `main()` | 필요한 호출이 True, 양수 mV. 객체 생성·보행 없음 | 미실행 | 미실행 |
+| 공식 API·배터리 | `mechdog_only.py`의 `main()` | 필요한 호출이 True, 또는 `mechdog_kind: factory`면 null(확인 불가, 정상). 양수 mV. 객체 생성·보행 없음 | 미실행 | 미실행 |
 | 후보 API | `api_candidates.py` | 존재 여부만 기록. 후보 메서드는 호출하지 않음 | 미실행 | 미실행 |
 | I2C·IMU | `robot_imu_check.py`의 `run()` | angles·형식·호출 시간. 단위/칩 판별은 별도 확인. UART를 열지 않음 | 미실행 | 미실행 |
 | 4개 루프·양보 | 아래 `robot_loop_check.py` | counts=[50,50,50,50], done 모두 True, errors/registration_error 없음, REPL 응답 유지 | 미실행 | 미실행 |

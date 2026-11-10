@@ -30,6 +30,12 @@ def _wait(api, clock, duration_ms, done=None):
     return done is None
 
 
+def _require_methods(target):
+    for name in ("move", "stop_action", "action_run", "action_is_over"):
+        if not callable(getattr(target, name, None)):
+            raise ValueError("required_api_missing")
+
+
 def run(case, allow_motion=False, api=None, dog_class=None, clock=None):
     """대상·주변 안전 확인 뒤 사용자가 한 항목씩 호출합니다. 소프트웨어 완료는 실물 합격이 아닙니다."""
     if case not in CASES:
@@ -46,11 +52,15 @@ def run(case, allow_motion=False, api=None, dog_class=None, clock=None):
     result = {"case": case, "status": "unknown", "observation_required": True}
     try:
         _battery(api)
-        for name in ("move", "stop_action", "action_run", "action_is_over"):
-            if not callable(getattr(dog_class, name, None)):
-                raise ValueError("required_api_missing")
+        # 실물 MechDog 는 객체를 돌려주는 함수라 생성 전에는 메서드를 볼 수 없습니다.
+        # 클래스면 생성 전에, 함수면 생성 직후(다른 호출 전)에 필수 메서드를 확인합니다.
+        if isinstance(dog_class, type):
+            _require_methods(dog_class)
+        elif not callable(dog_class):
+            raise ValueError("required_api_missing")
         stage = "construct"  # 생성 자체의 움직임도 실물 확인 대상
         dog = dog_class()
+        _require_methods(dog)
         stage = "initial_stop"
         dog.stop_action()
         dog.move(0, 0)

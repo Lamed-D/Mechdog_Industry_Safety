@@ -2,16 +2,27 @@
 # MechDog 객체를 만들지 않으며 UART·네트워크·모터를 건드리지 않습니다.
 
 
+METHODS = ("move", "action_run", "stop_action", "action_is_over", "set_default_pose")
+
+
 def inspect(api, dog_class):
-    methods = ("move", "action_run", "stop_action", "action_is_over", "set_default_pose")
-    supported = {name: callable(getattr(dog_class, name, None)) for name in methods}
+    # 실물 본체(로봇 B)의 HW_MechDog.MechDog 는 클래스가 아니라 객체를 돌려주는 함수였습니다
+    # (type 이 function, dir 은 __class__·__name__·__globals__ 뿐). 함수에서는 메서드를 찾을 수 없으므로
+    # 객체를 만들지 않는 이 점검에서는 "확인 불가"로 남기고 False(없음)로 단정하지 않습니다.
+    if isinstance(dog_class, type):
+        supported = {name: callable(getattr(dog_class, name, None)) for name in METHODS}
+        kind = "class"
+    else:
+        supported = {name: None for name in METHODS}
+        kind = "factory" if callable(dog_class) else "missing"
     try:
         battery = api.Battery_power()
         if isinstance(battery, bool) or not isinstance(battery, int) or battery <= 0:
             battery = None
     except Exception:
         battery = None
-    return {"api": supported, "battery_mv": battery, "hardware_motion_tested": False}
+    # api 값: True/False=클래스에서 확인, None=객체 생성 전이라 확인 불가(factory)
+    return {"api": supported, "mechdog_kind": kind, "battery_mv": battery, "hardware_motion_tested": False}
 
 
 def main():
