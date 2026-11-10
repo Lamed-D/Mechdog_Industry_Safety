@@ -3,7 +3,7 @@
 
 MIN_BATTERY_MV = 7000  # 실측 전 가정. 본체 경고 기준과 동일
 MOVE_MS_DEFAULT = 300  # 첫 시험값
-MOVE_MS_MAX = 2000  # 관찰용으로 늘릴 수 있는 상한. 보폭·회전값은 바꾸지 않음
+MOVE_MS_MAX = 10000  # 관찰용 상한(사용자 지정, 2026-11-10). 보폭·회전값은 바꾸지 않음. 앞쪽 공간 확보
 CASES = {"stop": (0, 0), "forward": (20, 0), "backward": (-20, 0),
          "left": (20, 5), "right": (20, -5), "action": None}
 

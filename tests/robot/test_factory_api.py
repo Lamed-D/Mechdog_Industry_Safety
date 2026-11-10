@@ -76,11 +76,11 @@ class FactoryApiTests(unittest.TestCase):
     def test_move_ms_is_bounded_and_still_stops(self):
         probe = load("robot_motion_check")
         clock = FakeClock()
-        result = probe.run("forward", True, fakes.Hiwonder, mechdog_factory, clock, move_ms=2000)
+        result = probe.run("forward", True, fakes.Hiwonder, mechdog_factory, clock, move_ms=10000)
         self.assertEqual(result["status"], "calls_completed")
         self.assertEqual(fakes.HW_MechDog.instances[-1].last_move, (0, 0))
         count = len(fakes.HW_MechDog.instances)
-        for bad in (0, -1, 2001, 1.5, True, "1000"):
+        for bad in (0, -1, 10001, 1.5, True, "1000"):
             with self.assertRaises(ValueError):
                 probe.run("forward", True, fakes.Hiwonder, mechdog_factory, clock, move_ms=bad)
         self.assertEqual(len(fakes.HW_MechDog.instances), count)
