@@ -12,6 +12,7 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
+#include "esp_jpeg_enc.h"
 #include "img_converters.h"
 
 // 카메라 재초기화가 계속 실패해 재부팅한 횟수. 전원이 꺼지기 전까지 유지됩니다.
@@ -32,6 +33,57 @@ static std::atomic<uint32_t> s_demand_ms{0};
 static CamStats s_stats;
 // 센서가 JPEG 를 못 만든다는 것을 한 번 확인하면, 재초기화 때 JPEG 시도(오류 로그)를 반복하지 않습니다.
 static bool s_sensor_no_jpeg;
+
+// 소프트웨어 JPEG: ESP32-S3 최적화 인코더(코어에 포함된 esp_new_jpeg)를 먼저 쓰고, 열 수 없으면 frame2jpg.
+// 인코더와 출력 버퍼는 카메라 초기화 때 한 번 만들고 촬영 작업 안에서만 씁니다.
+static jpeg_enc_handle_t s_enc;
+static uint8_t *s_enc_out;
+static size_t s_enc_cap;
+
+static void soft_encoder_close() {
+  if (s_enc) jpeg_enc_close(s_enc);
+  s_enc = nullptr;
+  heap_caps_free(s_enc_out);
+  s_enc_out = nullptr;
+  s_enc_cap = 0;
+}
+
+static void soft_encoder_open(int width, int height) {
+  soft_encoder_close();
+  jpeg_enc_config_t cfg = DEFAULT_JPEG_ENC_CONFIG();
+  cfg.width = width;
+  cfg.height = height;
+  cfg.src_type = JPEG_PIXEL_FORMAT_RGB565_BE;  // 카메라 드라이버의 RGB565 는 상위 바이트가 먼저
+  cfg.subsampling = JPEG_SUBSAMPLE_420;
+  cfg.quality = CAM_SOFT_JPEG_QUALITY;
+  cfg.task_enable = false;  // 보조 작업을 만들지 않음(코어 0 은 Wi-Fi 와 워치독 감시 대상)
+  s_enc_cap = (size_t)width * height;  // 품질 80 VGA 실측 약 30KB, 넉넉한 상한
+  s_enc_out = (uint8_t *)heap_caps_malloc(s_enc_cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (s_enc_out == nullptr || jpeg_enc_open(&cfg, &s_enc) != JPEG_ERR_OK) {
+    s_enc = nullptr;
+    soft_encoder_close();
+    Serial.println("[cam] fast JPEG encoder unavailable, using frame2jpg");
+    return;
+  }
+  Serial.printf("[cam] fast JPEG encoder %dx%d q%d\n", width, height, CAM_SOFT_JPEG_QUALITY);
+}
+
+// RGB565 프레임을 JPEG 로. 성공하면 *owned 가 true 일 때만 호출자가 free 합니다.
+static bool soft_encode(camera_fb_t *fb, uint8_t **out, size_t *out_len, bool *owned) {
+  *out = nullptr;
+  *out_len = 0;
+  *owned = false;
+  if (s_enc) {
+    int size = 0;
+    if (jpeg_enc_process(s_enc, fb->buf, (int)fb->len, s_enc_out, (int)s_enc_cap, &size) != JPEG_ERR_OK || size <= 0)
+      return false;
+    *out = s_enc_out;
+    *out_len = (size_t)size;
+    return true;
+  }
+  *owned = true;
+  return frame2jpg(fb, CAM_SOFT_JPEG_QUALITY, out, out_len);
+}
 
 static void apply_orientation(sensor_t *s) {
   int vflip = 0;
@@ -100,6 +152,7 @@ static bool camera_init() {
   }
   apply_orientation(s);
   camera_sensor_info_t *info = esp_camera_sensor_get_info(&s->id);
+  if (soft) soft_encoder_open(resolution[c.frame_size].width, resolution[c.frame_size].height);
 
   xSemaphoreTake(s_lock, portMAX_DELAY);
   s_stats.psram = ps;
@@ -118,6 +171,7 @@ static bool camera_init() {
 
 static void camera_lost() {
   esp_camera_deinit();
+  soft_encoder_close();
   xSemaphoreTake(s_lock, portMAX_DELAY);
   s_stats.camera_ok = false;
   s_stats.dimensions_measured = false;
@@ -231,13 +285,15 @@ static void capture_task(void *) {
     camera_fb_t *fb = esp_camera_fb_get();
     uint8_t *jpg = nullptr;
     size_t jpg_len = 0;
+    bool jpg_owned = false;
     bool ok = fb != nullptr && frame_ok(fb, soft);
     if (ok && soft && drop == 0) {
       // 버리는 프레임은 변환하지 않습니다. 변환 실패·깨진 결과는 촬영 실패로 셉니다.
-      ok = frame2jpg(fb, CAM_SOFT_JPEG_QUALITY, &jpg, &jpg_len) && jpeg_bytes_ok(jpg, jpg_len);
+      ok = soft_encode(fb, &jpg, &jpg_len, &jpg_owned) && jpeg_bytes_ok(jpg, jpg_len);
       if (!ok) {
-        free(jpg);
+        if (jpg_owned) free(jpg);
         jpg = nullptr;
+        jpg_owned = false;
       }
     }
     if (!ok) {
@@ -267,7 +323,7 @@ static void capture_task(void *) {
     bool stored = captured > 0 && captured <= now &&
                   store_frame(out, frame_bytes, (uint16_t)fb->width, (uint16_t)fb->height, captured);
     esp_camera_fb_return(fb);
-    free(jpg);
+    if (jpg_owned) free(jpg);
     if (stored) {
       window_frames++;
       window_bytes += frame_bytes;
@@ -284,11 +340,12 @@ static void capture_task(void *) {
       window_start = now;
     }
     // 센서는 최신 버퍼를 계속 갱신합니다. 전송용 사본 생성 속도만 제한합니다.
-    // 소프트웨어 JPEG 처럼 한 주기가 목표 간격보다 길어도 매번 잠깐 쉽니다. 쉬지 않으면 같은 코어의
-    // Arduino loop(Wi-Fi 재접속·시리얼 설정·워치독 갱신)가 굶어 작업 워치독이 재부팅시킵니다(실물에서 확인).
     int64_t wait_us = 1000000 / CAM_TARGET_FPS - (esp_timer_get_time() - cycle_start);
-    if (wait_us < (int64_t)CAM_MIN_YIELD_MS * 1000) wait_us = (int64_t)CAM_MIN_YIELD_MS * 1000;
-    vTaskDelay(pdMS_TO_TICKS((uint32_t)(wait_us / 1000)));
+    // 소프트웨어 JPEG 는 한 주기가 목표 간격보다 길 수 있어 매번 최소로 쉽니다. 쉬지 않으면 같은 코어의
+    // Arduino loop(Wi-Fi 재접속·시리얼 설정·워치독 갱신)가 굶어 작업 워치독이 재부팅시킵니다(실물에서 확인).
+    // 센서 JPEG 는 기존(v0.1.4)과 같습니다.
+    if (soft && wait_us < (int64_t)CAM_MIN_YIELD_MS * 1000) wait_us = (int64_t)CAM_MIN_YIELD_MS * 1000;
+    if (wait_us >= 1000) vTaskDelay(pdMS_TO_TICKS((uint32_t)(wait_us / 1000)));
   }
 }
 
