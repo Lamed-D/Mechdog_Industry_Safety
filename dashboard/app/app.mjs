@@ -1,6 +1,8 @@
 import {Cloud,statusView} from './client.mjs';
+import {mapPanel} from './map-panel.mjs';
 const $ = id => document.getElementById(id);
 let cloud = null, snapshot = null, generation = 0, timer = null;
+const clearMaps = mapPanel(()=>cloud);
 const banner = message => { $('banner').textContent = message; };
 const action = message => { $('action').textContent = message; };
 function controls() {
@@ -30,6 +32,7 @@ async function poll(current, version) {
 $('login').addEventListener('submit',async event=>{
   event.preventDefault();
   generation++; clearTimeout(timer); cloud = null; snapshot = null; controls();
+  clearMaps();
   const version = generation;
   try {
     const current = new Cloud(Object.fromEntries(['url','key','hub','device'].map(id=>[id,$(id).value.trim()])));
@@ -41,6 +44,7 @@ $('login').addEventListener('submit',async event=>{
 });
 $('logout').addEventListener('click',async()=>{
   const old = cloud; generation++; clearTimeout(timer); cloud = null; snapshot = null; controls();
+  clearMaps();
   for (const id of ['robots','alerts','results']) $(id).textContent = '로그아웃';
   banner('로그아웃 · 메모리 세션 제거');
   try { await old?.logout(); } catch { banner('로컬 로그아웃 완료 · 원격 세션 폐기는 미확인'); }

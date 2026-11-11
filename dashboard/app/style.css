@@ -8,3 +8,7 @@ label {display:grid;gap:.4rem} input,button {font:inherit;padding:.75rem;border-
 button {cursor:pointer;background:#173f61;color:white} button:disabled {opacity:.5;cursor:not-allowed}
 #estop {background:#b51d25;font-size:1.4rem;font-weight:bold;min-width:220px}
 .safety {border:2px solid #b51d25} pre {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+select {font:inherit;padding:.75rem;max-width:100%}
+#mapCanvas {width:auto;height:auto;max-width:100%;max-height:600px;image-rendering:pixelated;background:#d8e2ec}
+#clearingList {max-height:240px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+#clearingList label {display:flex;align-items:center}
