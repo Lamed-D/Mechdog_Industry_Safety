@@ -25,7 +25,7 @@
 <p>흰색: 빈 칸 · 회색: 미확인 · 검정: 장애물 · 파랑: 변경 · 주황: 삭제 승인 필요 · 초록: 승인함</p>
 <canvas id="mapCanvas" width="1" height="1" aria-label="초안과 제안본 격자 비교"></canvas>
 <p>장애물 삭제 칸을 클릭하거나 아래 체크박스로 하나씩 승인하세요. 목록은 처음 1000칸이며 나머지는 지도에서 선택합니다.</p>
-<div id="clearingList"></div><button id="checkReview" disabled>셀 검토 완료 확인</button>
+<div id="clearingList"></div><button id="checkReview" disabled>검토한 지도 확정 요청</button>
 <p id="mapMessage" role="status">로그인 후 지도 목록을 불러오세요.</p>
-<p>서버 확정 전송·구역/경로·루틴 편집·정찰 조종은 후속 작업입니다.</p></section>
+<p>확정 요청은 commands를 거쳐 허브가 다시 검사합니다. 구역/경로·루틴 편집·정찰 조종은 후속 작업입니다.</p></section>
 </main><script type="module" src="app.mjs"></script></body></html>

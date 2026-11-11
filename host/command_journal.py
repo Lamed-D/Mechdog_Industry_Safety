@@ -8,7 +8,7 @@ from host.command_envelope import Command
 
 
 def _fingerprint(command):
-    if not isinstance(command, Command) or command.kind not in ("reset", "operator"):
+    if not isinstance(command, Command) or command.kind not in ("reset", "operator", "map_confirm"):
         raise ValueError("journal is for validated non-estop commands")
     data = json.dumps(asdict(command), sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(data.encode("utf-8")).hexdigest()

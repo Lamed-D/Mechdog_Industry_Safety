@@ -8,13 +8,21 @@ export function configuration(value) {
     throw Error('허브·기기 UUID와 publishable 키가 필요합니다.');
   return Object.freeze({...value, url: url.origin});
 }
-export function command(config, kind, {robot = null, context = null, confirmed = false} = {}, now = Date.now(), id = crypto.randomUUID()) {
+export function command(config, kind, {robot = null, context = null, confirmed = false, map = null} = {}, now = Date.now(), id = crypto.randomUUID()) {
   if (!UUID.test(id) || !Number.isFinite(now)) throw Error('명령 ID·시각 오류');
   let payload = {};
   if (kind === 'reset') {
     if (!['A','B'].includes(robot) || confirmed !== true || !/^[a-f0-9]{32}:[1-9][0-9]{0,15}$/.test(context || ''))
       throw Error('현재 상태 확인과 사람 확인이 필요합니다.');
     payload = {confirmed: true, reset_context: context};
+  } else if (kind === 'map_confirm' && robot === null) {
+    if (!map || Object.keys(map).sort().join() !== 'approved_clearings,base_map_id,base_sha256,proposal_map_id,proposal_sha256' ||
+        !UUID.test(map.base_map_id) || !UUID.test(map.proposal_map_id) || map.base_map_id === map.proposal_map_id ||
+        ![map.base_sha256,map.proposal_sha256].every(v=>typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) ||
+        !Array.isArray(map.approved_clearings) || map.approved_clearings.length > 128 ||
+        !map.approved_clearings.every(i=>Number.isInteger(i) && i >= 0 && i < 1000000) ||
+        new Set(map.approved_clearings).size !== map.approved_clearings.length) throw Error('지도 확정 요청 형식 오류 · 삭제 승인 최대 128칸');
+    payload = {...map,approved_clearings:[...map.approved_clearings]};
   } else if (kind !== 'estop' || robot !== null) throw Error('지원하지 않는 조작');
   return {v:1, id, hub_id:config.hub, device_id:config.device, robot_id:robot, kind,
     created_at:new Date(now).toISOString(), expires_at:new Date(now+10000).toISOString(), payload};

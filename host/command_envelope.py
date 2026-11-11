@@ -67,7 +67,7 @@ def validate_envelope(raw, *, hub_id, authenticated_device, permissions, now_utc
             or not _identity(row["device_id"]) or row["device_id"] != authenticated_device):
         raise ValueError("command destination or authenticated device mismatch")
     kind, payload = row["kind"], row["payload"]
-    if not isinstance(kind, str) or kind not in ("estop", "reset", "operator") or kind not in permissions:
+    if not isinstance(kind, str) or kind not in ("estop", "reset", "operator", "map_confirm") or kind not in permissions:
         raise ValueError("command not permitted")
     if not isinstance(payload, dict):
         raise ValueError("invalid command payload")
@@ -84,6 +84,22 @@ def validate_envelope(raw, *, hub_id, authenticated_device, permissions, now_utc
         if (set(payload) != {"event"} or not isinstance(payload["event"], str)
                 or payload["event"] not in operator_events):
             raise ValueError("operator event not allowed")
+    elif kind == "map_confirm":
+        required = {'base_map_id','proposal_map_id','base_sha256','proposal_sha256','approved_clearings'}
+        if set(payload) != required:
+            raise ValueError('invalid map confirmation fields')
+        for key in ('base_map_id','proposal_map_id'):
+            if not isinstance(payload[key],str) or str(uuid.UUID(payload[key])) != payload[key]:
+                raise ValueError('canonical map UUID required')
+        clearings = payload['approved_clearings']
+        if (payload['base_map_id'] == payload['proposal_map_id']
+                or any(not isinstance(payload[key],str) or not re.fullmatch('[a-f0-9]{64}',payload[key])
+                       for key in ('base_sha256','proposal_sha256'))
+                or not isinstance(clearings,list) or len(clearings)>128
+                or any(type(i) is not int or not 0<=i<1_000_000 for i in clearings)
+                or len(set(clearings))!=len(clearings)):
+            raise ValueError('invalid map confirmation')
+        payload['approved_clearings'] = tuple(clearings)
     created, expires = _stamp(row["created_at"]), _stamp(row["expires_at"])
     if not 0 < expires - created <= MAX_TTL_S:
         raise ValueError("invalid command lifetime")

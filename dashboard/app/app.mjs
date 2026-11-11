@@ -2,7 +2,7 @@ import {Cloud,statusView} from './client.mjs';
 import {mapPanel} from './map-panel.mjs';
 const $ = id => document.getElementById(id);
 let cloud = null, snapshot = null, generation = 0, timer = null;
-const clearMaps = mapPanel(()=>cloud);
+const clearMaps = mapPanel(()=>cloud,()=>cloud?.role === 'operator' && statusView(snapshot?.status || []).every(view=>view.fresh));
 const banner = message => { $('banner').textContent = message; };
 const action = message => { $('action').textContent = message; };
 function controls() {
