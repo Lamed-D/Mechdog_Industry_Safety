@@ -12,6 +12,8 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
+#include "esp_jpeg_enc.h"
+#include "img_converters.h"
 
 // 카메라 재초기화가 계속 실패해 재부팅한 횟수. 전원이 꺼지기 전까지 유지됩니다.
 // 카메라가 아예 없을 때 재부팅이 끝없이 반복되지 않도록, 이 횟수를 넘기면 재부팅 대신 느리게 재시도합니다.
@@ -29,6 +31,59 @@ static int64_t s_ts_us;
 // 마지막 요청 시각(ms). 여러 코어에서 쓰고 읽으므로 32비트 원자 변수(64비트는 찢어져 읽힐 수 있음).
 static std::atomic<uint32_t> s_demand_ms{0};
 static CamStats s_stats;
+// 센서가 JPEG 를 못 만든다는 것을 한 번 확인하면, 재초기화 때 JPEG 시도(오류 로그)를 반복하지 않습니다.
+static bool s_sensor_no_jpeg;
+
+// 소프트웨어 JPEG: ESP32-S3 최적화 인코더(코어에 포함된 esp_new_jpeg)를 먼저 쓰고, 열 수 없으면 frame2jpg.
+// 인코더와 출력 버퍼는 카메라 초기화 때 한 번 만들고 촬영 작업 안에서만 씁니다.
+static jpeg_enc_handle_t s_enc;
+static uint8_t *s_enc_out;
+static size_t s_enc_cap;
+
+static void soft_encoder_close() {
+  if (s_enc) jpeg_enc_close(s_enc);
+  s_enc = nullptr;
+  heap_caps_free(s_enc_out);
+  s_enc_out = nullptr;
+  s_enc_cap = 0;
+}
+
+static void soft_encoder_open(int width, int height) {
+  soft_encoder_close();
+  jpeg_enc_config_t cfg = DEFAULT_JPEG_ENC_CONFIG();
+  cfg.width = width;
+  cfg.height = height;
+  cfg.src_type = JPEG_PIXEL_FORMAT_RGB565_BE;  // 카메라 드라이버의 RGB565 는 상위 바이트가 먼저
+  cfg.subsampling = JPEG_SUBSAMPLE_420;
+  cfg.quality = CAM_SOFT_JPEG_QUALITY;
+  cfg.task_enable = false;  // 보조 작업을 만들지 않음(코어 0 은 Wi-Fi 와 워치독 감시 대상)
+  s_enc_cap = (size_t)width * height;  // 품질 80 VGA 실측 약 30KB, 넉넉한 상한
+  s_enc_out = (uint8_t *)heap_caps_malloc(s_enc_cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (s_enc_out == nullptr || jpeg_enc_open(&cfg, &s_enc) != JPEG_ERR_OK) {
+    s_enc = nullptr;
+    soft_encoder_close();
+    Serial.println("[cam] fast JPEG encoder unavailable, using frame2jpg");
+    return;
+  }
+  Serial.printf("[cam] fast JPEG encoder %dx%d q%d\n", width, height, CAM_SOFT_JPEG_QUALITY);
+}
+
+// RGB565 프레임을 JPEG 로. 성공하면 *owned 가 true 일 때만 호출자가 free 합니다.
+static bool soft_encode(camera_fb_t *fb, uint8_t **out, size_t *out_len, bool *owned) {
+  *out = nullptr;
+  *out_len = 0;
+  *owned = false;
+  if (s_enc) {
+    int size = 0;
+    if (jpeg_enc_process(s_enc, fb->buf, (int)fb->len, s_enc_out, (int)s_enc_cap, &size) != JPEG_ERR_OK || size <= 0)
+      return false;
+    *out = s_enc_out;
+    *out_len = (size_t)size;
+    return true;
+  }
+  *owned = true;
+  return frame2jpg(fb, CAM_SOFT_JPEG_QUALITY, out, out_len);
+}
 
 static void apply_orientation(sensor_t *s) {
   int vflip = 0;
@@ -73,7 +128,23 @@ static bool camera_init() {
   c.fb_location = ps ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
   c.grab_mode = ps ? CAMERA_GRAB_LATEST : CAMERA_GRAB_WHEN_EMPTY;
 
-  if (esp_camera_init(&c) != ESP_OK) return false;
+  // 센서에 JPEG 압축기가 없으면 드라이버가 ESP_ERR_NOT_SUPPORTED 로 거절합니다(실패 시 드라이버가 스스로 정리).
+  // 그때는 RGB565 로 다시 열고 칩에서 압축합니다. RGB565 VGA 버퍼(약 600KB)는 PSRAM 이 있어야 둡니다.
+  bool soft = s_sensor_no_jpeg;
+  esp_err_t err = ESP_FAIL;
+  if (!soft) {
+    err = esp_camera_init(&c);
+    if (err == ESP_ERR_NOT_SUPPORTED) {
+      s_sensor_no_jpeg = soft = true;
+      Serial.println("[cam] sensor has no JPEG encoder, using RGB565 + software JPEG");
+    }
+  }
+  if (soft) {
+    if (!ps) return false;
+    c.pixel_format = PIXFORMAT_RGB565;
+    err = esp_camera_init(&c);
+  }
+  if (err != ESP_OK) return false;
   sensor_t *s = esp_camera_sensor_get();
   if (s == nullptr) {
     esp_camera_deinit();
@@ -81,21 +152,26 @@ static bool camera_init() {
   }
   apply_orientation(s);
   camera_sensor_info_t *info = esp_camera_sensor_get_info(&s->id);
+  if (soft) soft_encoder_open(resolution[c.frame_size].width, resolution[c.frame_size].height);
 
   xSemaphoreTake(s_lock, portMAX_DELAY);
   s_stats.psram = ps;
   s_stats.width = resolution[c.frame_size].width;
   s_stats.height = resolution[c.frame_size].height;
   s_stats.quality = (uint8_t)c.jpeg_quality;
+  s_stats.soft_jpeg = soft;
   s_stats.sensor = info ? info->name : "unknown";
   s_stats.camera_ok = true;
   s_stats.dimensions_measured = false;
   xSemaphoreGive(s_lock);
+  Serial.printf("[cam] sensor %s (PID 0x%04X), %s\n", info ? info->name : "unknown", (unsigned)s->id.PID,
+                soft ? "software JPEG" : "sensor JPEG");
   return true;
 }
 
 static void camera_lost() {
   esp_camera_deinit();
+  soft_encoder_close();
   xSemaphoreTake(s_lock, portMAX_DELAY);
   s_stats.camera_ok = false;
   s_stats.dimensions_measured = false;
@@ -103,10 +179,10 @@ static void camera_lost() {
   xSemaphoreGive(s_lock);
 }
 
-static bool store_frame(const camera_fb_t *fb, int64_t now_us) {
+static bool store_frame(const uint8_t *buf, size_t len, uint16_t width, uint16_t height, int64_t now_us) {
   xSemaphoreTake(s_lock, portMAX_DELAY);
-  if (fb->len > s_cap) {
-    size_t want = fb->len + fb->len / 4;
+  if (len > s_cap) {
+    size_t want = len + len / 4;
     uint8_t *grown = (uint8_t *)heap_caps_realloc(s_buf, want, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (grown == nullptr) grown = (uint8_t *)realloc(s_buf, want);
     if (grown == nullptr) {
@@ -116,23 +192,29 @@ static bool store_frame(const camera_fb_t *fb, int64_t now_us) {
     s_buf = grown;
     s_cap = want;
   }
-  memcpy(s_buf, fb->buf, fb->len);
-  s_len = fb->len;
+  memcpy(s_buf, buf, len);
+  s_len = len;
   s_seq++;
   s_ts_us = now_us;
   s_stats.frames++;
   s_stats.last_frame_us = now_us;
-  s_stats.last_len = fb->len;
-  s_stats.width = (uint16_t)fb->width;
-  s_stats.height = (uint16_t)fb->height;
+  s_stats.last_len = len;
+  s_stats.width = width;
+  s_stats.height = height;
   s_stats.dimensions_measured = true;
   xSemaphoreGive(s_lock);
   return true;
 }
 
-static bool jpeg_ok(const camera_fb_t *fb) {
-  return fb->width > 0 && fb->height > 0 && fb->format == PIXFORMAT_JPEG && fb->len > 4 && fb->buf[0] == 0xFF && fb->buf[1] == 0xD8 &&
-         fb->buf[fb->len - 2] == 0xFF && fb->buf[fb->len - 1] == 0xD9;
+static bool jpeg_bytes_ok(const uint8_t *buf, size_t len) {
+  return buf != nullptr && len > 4 && buf[0] == 0xFF && buf[1] == 0xD8 && buf[len - 2] == 0xFF && buf[len - 1] == 0xD9;
+}
+
+// 센서 프레임이 쓸 수 있는 모양인지: JPEG 모드는 JPEG 바이트, 소프트 모드는 크기가 맞는 RGB565.
+static bool frame_ok(const camera_fb_t *fb, bool soft) {
+  if (fb->width == 0 || fb->height == 0) return false;
+  if (soft) return fb->format == PIXFORMAT_RGB565 && fb->len == (size_t)fb->width * fb->height * 2;
+  return fb->format == PIXFORMAT_JPEG && jpeg_bytes_ok(fb->buf, fb->len);
 }
 
 static void capture_task(void *) {
@@ -199,8 +281,22 @@ static void capture_task(void *) {
       xSemaphoreGive(s_lock);
     }
 
+    bool soft = s_sensor_no_jpeg;
     camera_fb_t *fb = esp_camera_fb_get();
-    if (fb == nullptr || !jpeg_ok(fb)) {
+    uint8_t *jpg = nullptr;
+    size_t jpg_len = 0;
+    bool jpg_owned = false;
+    bool ok = fb != nullptr && frame_ok(fb, soft);
+    if (ok && soft && drop == 0) {
+      // 버리는 프레임은 변환하지 않습니다. 변환 실패·깨진 결과는 촬영 실패로 셉니다.
+      ok = soft_encode(fb, &jpg, &jpg_len, &jpg_owned) && jpeg_bytes_ok(jpg, jpg_len);
+      if (!ok) {
+        if (jpg_owned) free(jpg);
+        jpg = nullptr;
+        jpg_owned = false;
+      }
+    }
+    if (!ok) {
       if (fb) esp_camera_fb_return(fb);
       fails++;
       xSemaphoreTake(s_lock, portMAX_DELAY);
@@ -222,9 +318,12 @@ static void capture_task(void *) {
     now = esp_timer_get_time();
     // 버퍼를 복사한 시각이 아니라 드라이버가 기록한 실제 취득 시각을 전달합니다.
     int64_t captured = (int64_t)fb->timestamp.tv_sec * 1000000 + fb->timestamp.tv_usec;
-    bool stored = captured > 0 && captured <= now && store_frame(fb, captured);
-    size_t frame_bytes = fb->len;
+    const uint8_t *out = soft ? jpg : fb->buf;
+    size_t frame_bytes = soft ? jpg_len : fb->len;
+    bool stored = captured > 0 && captured <= now &&
+                  store_frame(out, frame_bytes, (uint16_t)fb->width, (uint16_t)fb->height, captured);
     esp_camera_fb_return(fb);
+    if (jpg_owned) free(jpg);
     if (stored) {
       window_frames++;
       window_bytes += frame_bytes;
@@ -242,6 +341,10 @@ static void capture_task(void *) {
     }
     // 센서는 최신 버퍼를 계속 갱신합니다. 전송용 사본 생성 속도만 제한합니다.
     int64_t wait_us = 1000000 / CAM_TARGET_FPS - (esp_timer_get_time() - cycle_start);
+    // 소프트웨어 JPEG 는 한 주기가 목표 간격보다 길 수 있어 매번 최소로 쉽니다. 쉬지 않으면 같은 코어의
+    // Arduino loop(Wi-Fi 재접속·시리얼 설정·워치독 갱신)가 굶어 작업 워치독이 재부팅시킵니다(실물에서 확인).
+    // 센서 JPEG 는 기존(v0.1.4)과 같습니다.
+    if (soft && wait_us < (int64_t)CAM_MIN_YIELD_MS * 1000) wait_us = (int64_t)CAM_MIN_YIELD_MS * 1000;
     if (wait_us >= 1000) vTaskDelay(pdMS_TO_TICKS((uint32_t)(wait_us / 1000)));
   }
 }

@@ -1,7 +1,7 @@
 # 비전 모듈(ESP32-S3 카메라) 맞춤 펌웨어
 
 로봇 A·B 앞쪽 비전 모듈에 올리는 우리 펌웨어의 설치·설정·확인·복구·빌드 안내입니다.
-소스는 v0.1.4입니다. 최신 합본은 `python tools/build_vision_cam.py --release`로 생성합니다. 이전 바이너리는 보관하지 않습니다.
+소스는 v0.1.7입니다. 최신 합본은 `python tools/build_vision_cam.py --release`로 생성합니다. 이전 바이너리는 보관하지 않습니다.
 기본은 640×480·JPEG 품질 10·최대 약 15fps이며, [Pi 모델용 화질·측정 기준](vision-quality.md)을 따릅니다.
 **목표는 카메라 영상을 Wi-Fi로 Pi 5에 보내는 것**입니다. 쓰러진 사람 인식은 Pi 5가 영상으로 합니다.
 
@@ -48,7 +48,7 @@ IDE 메뉴 선택·검증·업로드·시리얼 설정·실물 확인 순서를 
 | 플래시 | 4 MB 설정, DIO, 80 MHz, 합본을 `0x0000`에 씀 | 제조사 기본 영상 펌웨어 이미지 머리글(4MB·DIO·80m)과 제조사 플래시 안내 |
 | PSRAM | **옥탈(OPI)** | 제조사 기본·인식 펌웨어 모두 옥탈 PSRAM 지원으로 빌드됨(이미지 안 문자열) |
 | 카메라 핀 | ESP32-S3-EYE 배치(XCLK 15, SIOD 4, SIOC 5, D0~D7 = 11·9·8·10·12·18·17·16, VSYNC 6, HREF 7, PCLK 13, PWDN·RESET 없음) | 제조사 비전 예제 전부가 이 보드 정의를 고름. 기본 영상 펌웨어에도 같은 카메라 모듈 이름이 들어 있음 |
-| 카메라 센서 | 2백만 화소. 드라이버가 자동 인식(OV2640 등) | 제조사 안내 그림 "2-Megapixel camera". `/status`의 `camera.sensor`로 실물 확인 |
+| 카메라 센서 | 2백만 화소. **로봇 B 실물은 GC2145**(PID 0x2145, JPEG 압축기 없음, 13절). 드라이버가 자동 인식 | 제조사 안내 그림 "2-Megapixel camera", 2026-11-10 로봇 B 실물 시리얼·`/status` |
 | 카메라 XCLK | 15 MHz | 제조사 예제와 같은 값 |
 | I2C(메인 보드 쪽) | SDA IO47, SCL IO48, 100 kHz, 슬레이브 | 제조사 카메라 예제 전부 같은 핀·속도 |
 | I2C 주소 | 메인 보드 공식 라이브러리 레지스터형 `0x53`, 제조사 기능별 카메라 펌웨어 `0x52` | 제조사 메인 보드 Arduino 라이브러리와 카메라 예제(7절) |
@@ -101,6 +101,14 @@ SPI SPEED **80MHz**, SPI MODE **DIO**, BAUD **460800**, 나머지 기본값, `ST
 
 - 쓰는 중에 케이블을 빼거나 전원을 끄지 않습니다.
 - 완료 뒤 카메라가 다시 시작합니다(esptool 기본 동작: 하드 리셋).
+
+**업데이트할 때는 프로그램만 굽기(설정 유지):** 같은 부트로더·파티션 표의 맞춤 펌웨어가 이미 들어 있는 카메라는
+`0x0` 합본 대신 컴파일된 앱만 `0x10000`(app0)에 씁니다. NVS(0x9000)를 건드리지 않아 로봇 ID·Wi-Fi 설정이 남습니다.
+앱 파일은 `build/vision_cam/compile/vision_cam.ino.bin`이며 합본의 0x10000 위치와 같은 내용입니다. 처음 굽는 카메라는 합본을 씁니다.
+
+```powershell
+esptool --chip esp32s3 --port COM10 --baud 460800 write-flash 0x10000 build\vision_cam\compile\vision_cam.ino.bin
+```
 
 ### 4.4 (3) Wi-Fi·로봇 ID 설정 (USB 시리얼)
 
@@ -246,6 +254,8 @@ python tools/build_vision_cam.py --release  # + build/vision_cam/latest/ 최신 
 소스가 없어 확인하지 못했습니다(Arduino 라이브러리 기준 추정). 굽고 나서 4.7에서 오류 19가 계속되면 `config.h`의
 `CAM_I2C_ADDR`를 `0x52`로 바꿔 직접 빌드(6절)한 뒤 다시 확인합니다. 결과는 이 표에 기록합니다.
 
+**실물 결과(로봇 B, 2026-11-10):** 기본 `0x53`에서 메인 보드 `vision_probe`가 `observed`로 응답했습니다(오류 19 없음). 로봇 A는 미확인입니다.
+
 ## 8. 기본값과 근거
 
 | 값 | 기본 | 근거 / 바꾸는 곳 |
@@ -299,3 +309,41 @@ python tools/build_vision_cam.py --release  # + build/vision_cam/latest/ 최신 
 Pi의 상태 클라이언트는 아직 실측 프레임이 없으면 unknown/no_measured_frame으로 표시합니다.
 quality·profile·target_fps·jpeg_kbps·PSRAM과 차원/카운터의 형식도 검증합니다.
 모델 사용 가능 여부는 실제 JPEG 디코딩·차원·속도·정확도로 확인하며 status만으로 확정하지 않습니다.
+
+## 13. v0.1.5~v0.1.7 JPEG 미지원 센서 대응 (로봇 B 실물 확인)
+
+로봇 B 비전 모듈 실물의 센서는 **GC2145**(PID 0x2145)였습니다. 이 센서는 JPEG 압축기가 없어
+v0.1.4는 `JPEG format is not supported on this sensor`로 카메라 초기화가 계속 실패했습니다(Wi-Fi·I2C는 정상).
+3절의 "OV2640 등" 추정은 이 장치에서 틀렸습니다.
+
+- 센서가 JPEG를 거절하면(`ESP_ERR_NOT_SUPPORTED`) RGB565로 다시 열고 ESP32-S3에서 JPEG로 변환합니다.
+  Pi로는 여전히 JPEG만 보냅니다. JPEG를 만드는 센서는 v0.1.4와 같은 경로·같은 쉼 규칙을 씁니다.
+- 변환은 Arduino 코어에 포함된 ESP32-S3 최적화 인코더(`esp_new_jpeg`, RGB565 big-endian 입력, 4:2:0, 보조 작업 없음)를
+  쓰고, 열 수 없으면 `frame2jpg`로 돌아갑니다. 새 라이브러리 설치는 없습니다.
+- 시작 로그에 `[cam] sensor <이름> (PID 0x....), software JPEG|sensor JPEG`, `[cam] fast JPEG encoder 640x480 q80`을 찍고,
+  `/status.camera.encoder`에 `software`/`sensor`를 표시합니다. 소프트웨어 모드의 실제 압축 품질은
+  `CAM_SOFT_JPEG_QUALITY`(1~100, 기본 80)이며 `quality`(센서 척도 0~63) 값은 그대로 10으로 보입니다.
+- v0.1.5는 변환(장당 약 0.3초) 때문에 촬영 작업이 쉬지 않아 같은 코어의 loop가 굶고 **작업 워치독이
+  스트림 10~20초 뒤 재부팅**시켰습니다. v0.1.6부터 소프트웨어 모드에서 매 주기 최소 `CAM_MIN_YIELD_MS`(30ms) 쉽니다.
+
+로봇 B 실물 측정(640×480, 같은 공유기의 Wi-Fi 노트북 수신, rssi 약 -51~-58, 3분 연속 스트림):
+
+| 항목 | v0.1.4 | v0.1.6 (frame2jpg) | v0.1.7 (최적화 인코더) |
+| --- | --- | --- | --- |
+| 안정성 | 카메라 시작 실패 | 재부팅·워치독 0 | 재부팅·워치독 0, failures·reinits 0 |
+| 카메라 내부 생성 | 0 | 약 3.2fps | 약 5.9fps |
+| 스트림 수신 | 0 | 약 1.5fps | 약 2.2fps (최대 간격 1.0초) |
+| 프레임 나이 평균 | — | 약 0.73초 | 약 0.38초 |
+| 한 장 크기 | — | 약 29KB | 약 31KB |
+| 내부 여유 메모리 | 약 220KB | 약 175KB | 약 104KB |
+| 색·방향 | — | 정상으로 보임 | 정상으로 보임(상하·좌우 반전 없음) |
+
+- **balanced 프로필의 약 15fps 목표에 못 미칩니다.** v0.1.7에서는 생성(5.9fps)보다 수신(2.2fps)이 느려
+  병목이 Wi-Fi 전송으로 옮겨 갔습니다. 코어에 미리 컴파일된 TCP 송신 버퍼가 약 5.7KB라 왕복 지연(측정 ping 평균 30ms,
+  최대 138ms)에 비례해 느려지는 것으로 추정합니다(미검증). 한 장 크기를 줄이면(품질 낮추기·해상도 낮추기) 수신 fps가
+  비례해 오를 것으로 예상하며, 받는 쪽을 유선으로 붙이면 지연이 줄 수 있습니다. 화질 기준 결정이 필요합니다.
+- 내부 여유 메모리가 약 104KB로 줄었습니다. 3분 동안은 문제없었지만 장시간 동작은 미확인입니다.
+- **본체 연결(로봇 B, v0.1.7):** 본체 IIC 포트 1에 연결해 본체 전원으로 켜졌고(`/status` camera ok), 메인 보드 공식 API
+  [vision_probe](../tools/bringup/vision_probe.py)가 `status: observed`, `has_result: False`, `read_ms: 2`로 응답했습니다.
+  I2C 주소 0x53이 이 메인 보드 라이브러리와 맞습니다(오류 19 없음, 7절). 본체 배터리 전원의 장시간 스트림은 미측정입니다.
+- 로봇 A 카메라의 센서, JPEG 센서 카메라에서의 동작은 미확인입니다.

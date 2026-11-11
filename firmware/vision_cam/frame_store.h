@@ -14,6 +14,7 @@ struct CamStats {
   uint16_t width;
   uint16_t height;
   uint8_t quality;
+  bool soft_jpeg;       // true: 센서 RGB565 → 칩에서 JPEG 변환
   const char *sensor;
   float fps;
   float kbps;           // 저장에 성공한 JPEG 바이트 기준, HTTP 중복 수신자는 별도
