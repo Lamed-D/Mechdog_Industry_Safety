@@ -1,3 +1,4 @@
+import {objectPath,verifiedGrid} from './map-review.mjs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export function configuration(value) {
   const url = new URL(value.url);
@@ -71,5 +72,35 @@ export class Cloud {
     const row = command(this.config,kind,options);
     await this.request('/rest/v1/commands', {method:'POST',body:row});
     return row.id;
+  }
+  async maps() {
+    const rows = await this.request(`/rest/v1/maps?hub_id=eq.${this.config.hub}&state=neq.archived&order=version.desc&limit=100`);
+    if (!Array.isArray(rows) || rows.some(row=>!UUID.test(row.id) || row.hub_id !== this.config.hub ||
+        !Number.isInteger(row.version) || row.version < 1 || !['draft','confirmed'].includes(row.state)))
+      throw Error('지도 목록 오류');
+    return rows;
+  }
+  async mapGrid(meta) {
+    if (!this.token || meta.hub_id !== this.config.hub || !UUID.test(meta.id)) throw Error('지도 접근 거부');
+    // Private maps bucket; never use a public/signed URL or another origin.
+    const response = await this.transport(this.config.url+'/storage/v1/object/authenticated/maps/'+objectPath(meta.object_path), {
+      headers:{apikey:this.config.key,Authorization:`Bearer ${this.token}`},
+      redirect:'error',credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(3000)});
+    if (!response.ok || !response.body) throw Error('지도 다운로드 실패');
+    const reader = response.body.getReader(), chunks = [];
+    let size = 0;
+    try {
+      while (true) {
+        const {done,value} = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 4194304) throw Error('지도 파일 크기 초과');
+        chunks.push(value);
+      }
+    } finally { await reader.cancel(); }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.byteLength; }
+    return verifiedGrid(meta,bytes);
   }
 }
