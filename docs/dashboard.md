@@ -187,6 +187,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | HUB-8a | `dashboard/app/` | [인터넷 앱](dashboard-app.md): 로그인·상태/알림·전체 정지·확인 RESET·명령 결과 | 모듈 모의 검사. 지도/루틴/정찰 화면과 실제 인증·CORS·렌더링 미검증 |
 | HUB-8b | `dashboard/app/map-review.mjs` | 비공개 지도 읽기·해시/기하 검사·초안/제안 겹침·삭제 셀 개별 승인 | 허브와 모든 셀 전이 대조. 확정 전송·실제 Storage/브라우저 미검증 |
 | HUB-8c | `host/hub/map_confirmation.py` | 해시·삭제 승인 결합 확정 명령, 파일 재검사·권한/만료 재대조 후 outbox 접수 | 실제 REST/Storage 서비스 조립·확정 행 반영·설정 활성화는 미검증 |
+| HUB-9a | `tools/mock/hub_cloud_demo.py` | 가짜 Supabase·저장소·명령·확정 설정·루틴·사고 확인·10초 단절·복귀 의도·재개 금지 통합 | 메모리·가짜 시계만. 운영 서비스/주행 실행기·실제 인증 미검증 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 
