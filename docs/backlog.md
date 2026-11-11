@@ -4,12 +4,12 @@
 
 ## 현재 검증 결과와 진행 경계
 
-- 전체 unittest 386개와 비공개 범위 검사 통과. 화면 JS 구문 검사 통과.
-- 카메라 v0.1.4 balanced/detail 컴파일 성공. 앱 1,019,888바이트, 합본 1,085,424바이트.
+- 전체 unittest 404개와 비공개 범위 검사 통과(Python 3.15 Windows). Python 3.12/Pi 실행은 미검증. 화면 JS 구문 검사 통과.
+- 카메라 v0.1.7 balanced 컴파일 성공. 앱 1,063,456바이트, 합본 1,128,992바이트. 이번 순환 detail 컴파일은 미실행.
   최신 배포는 balanced이며 `python tools/build_vision_cam.py --verify-release`로 현재 소스·설정·바이너리 일치를 확인함.
 - 본체 A/B 단일 main은 각각 48,976바이트로 생성됨. 실제 MicroPython 실행은 미검증이며 필수 동작 체크 전 적용 보류.
 - 메인 Arduino는 컴파일 골격만 준비됐고 설치 대상이 아님. 이전 검증 앱 269,024바이트.
-- 원격에는 main만 남았고 열린 PR은 없음. 다른 작업 폴더의 로컬 브랜치는 정리 대상에서 제외.
+- 완료 단위는 PR 자체 리뷰 후 squash 병합. 다른 작업 폴더의 로컬 브랜치와 기존 보관 작업은 정리 대상에서 제외.
 
 아래는 남은 구현이며 완료했다고 보지 않습니다. 검증되지 않은 물리 값·모델 판단·인증 권한을 임의로 정해 실행에 연결하지 않습니다.
 
@@ -17,13 +17,28 @@
 | --- | --- | --- |
 | 실제 주행·SLAM·경로·역할별 임무 통합 | 본체 정지 지연·걸음 보정·라이다 고정/스캔·실제 지도·위치 추정·안전 여유 [확인 필요] | 고정 위치 어댑터는 이동·자세 차단. Pi 링크 완전 단절 시 현장 600ms 정지 유지 |
 | 실제 영상 모델·낙상 판단 보정 | 카메라 센서/PSRAM·두 스트림 Pi 디코딩/추론·장착 시야·오탐/미탐 결과 [확인 필요] | 모델 후보/측정/시간 창 연결 준비, 모델은 미설치. unknown은 감지 성공이 아님 |
-| Supabase 실행 동기화·노트북 화면 | 사용자 프로젝트·기기 인증 주체·권한/RLS·확인된 스키마·시계 동기화 [확인 필요] | 봉투 검사와 처리 ID 저널만 준비. 실제 계정·키·원격 조작에는 연결하지 않음 |
+| Supabase 실행 동기화·노트북 화면 | 사용자 프로젝트·기기 인증 주체·권한/RLS·확인된 스키마·시계 동기화 [확인 필요] | 저장소/동기화/명령/지도 확정/설정/루틴 모듈과 화면 일부·합성 통합 완료. 운영 서비스·구역/루틴/정찰 편집은 남음 |
 | Arduino 구동 이식·추가 공식 API | Python 실물 결과와 공식 중단/완료 API 대응 [확인 필요] | 비구동 골격만. 후보 보정 API는 존재 확인 외 호출 금지 |
 | 기록 보존·사진 정책 | 실제 운영 목적·허용 데이터·보존 기간/접근 정책 [확인 필요] | JPEG 저장/업로드 없음, 기존 사건 기록 자동 삭제 없음 |
 
 이 근거가 필요한 단계는 사용자 결과를 받은 뒤 이어갑니다. 업로드·굽기·구동·계정/키 생성은 실행하지 않았습니다.
 
 ## 이번 순환의 병합 PR
+
+- 최근 허브/화면/문서: [#99](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/99), [#100](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/100), [#101](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/101), [#102](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/102), [#103](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/103).
+- 다른 작업자 리뷰/병합: [#97](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/97), [#98](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/98). 인계 #50 종료, 사용자 실물 #29·#30·#44 유지.
+
+## 다음 구현 순서
+
+1. 구역·4종 지점·경로/루틴 편집과 commands 경유 변경 요청. 확정 지도 파일/제안본 업로드와 버전 생성도 필요.
+2. 지도 작성 모드·0.5초 정찰 봉투와 허브 실행 전 검사. 실측 없는 물리 상한을 임의로 정하지 않음.
+3. 허브 운영 서비스 조립: 현재 권한 갱신·REST 지도/설정 조회·Storage 파일·상태/알림/감사 기록 게시·제어/동기화 작업자 분리.
+4. 사건별 사람 확인 토큰과 시나리오/루틴/연결 정책 우선순위 통합, 화면 렌더링/접근성·실제 RLS·Python 3.12 검사.
+5. 사용자만: Pi 설치·AP/방화벽·주소 예약·계정/키·SQL/Storage 준비, A/B 업로드·정지/영상/라이다/위치·부하 실물 검증.
+
+아래는 이전 순환과 각 단위 당시의 완료/제약 기록이다. 현재 범위와 다음 작업은 위 표와 목록을 우선한다.
+
+## 이전 순환의 병합 PR
 
 - 안전·통신: [#51](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/51), [#54](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/54), [#60](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/60), [#68](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/68), [#69](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/69), [#73](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/73)
 - 본체 API·업로드: [#53](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/53), [#71](https://github.com/Lamed-D/Mechdog_Industry_Safety/pull/71)
