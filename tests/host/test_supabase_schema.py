@@ -39,7 +39,8 @@ class SchemaTests(unittest.TestCase):
         body = self.bodies['commands']
         for field in FIELDS:
             self.assertRegex(body, r'\b' + field + r'\s')
-        self.assertIn("('estop','reset','operator')", body)
+        self.assertIn("('estop','reset','operator','map_confirm')", body)
+        self.assertIn("jsonb_array_length(payload->'approved_clearings')<=128",body)
         self.assertIn("payload->'confirmed'='true'::jsonb", body)
         self.assertIn('is true)', body)  # CHECK에서 NULL로 통과하지 않게 명시
         self.assertIn('grant update(status,result,updated_at) on public.commands', self.sql)

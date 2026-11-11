@@ -40,12 +40,13 @@ class ResetContexts:
 
 class Processor:
     def __init__(self, core, store, authorize, lock, *, wall=time.time,
-                 clock=time.monotonic, clock_trusted=lambda:False):
+                 clock=time.monotonic, clock_trusted=lambda:False, map_confirmer=None):
         # authorize(device_id) must use a trusted, current device registry, never row claims.
         self.core, self.store, self.authorize, self.lock = core, store, authorize, lock
         self.wall, self.clock_trusted = wall, clock_trusted
         self.contexts = ResetContexts(core,clock)
         self.waiting = {}
+        self.map_confirmer = map_confirmer
         self.report_failures = 0
 
     def reset_contexts(self):
@@ -126,6 +127,16 @@ class Processor:
                 continue
             self._report(row,'accepted','validated')
             try:
+                if command.kind == 'map_confirm':
+                    # File/SQLite work never holds the robot control lock.
+                    if (self.map_confirmer is None or not self.clock_trusted()
+                            or not command.created_at <= self.wall() < command.expires_at):
+                        raise ValueError('map_confirmation_unavailable')
+                    self.map_confirmer(command)
+                    self._finish(command,'done','map_confirmation_queued')
+                    self._report(row,'done','map_confirmation_queued')
+                    outcomes.append('done')
+                    continue
                 with self.lock:
                     # A journal write may take time: recheck expiry before execution.
                     if not self.clock_trusted() or not command.created_at <= self.wall() < command.expires_at:

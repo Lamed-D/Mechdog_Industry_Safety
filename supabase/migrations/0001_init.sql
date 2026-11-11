@@ -37,7 +37,7 @@ create table public.commands (
   id uuid primary key default gen_random_uuid(), hub_id uuid not null references public.devices(id),
   robot_id text check (robot_id in ('A','B')), device_id uuid not null references public.devices(id),
   created_at timestamptz not null, v integer not null check (v=1),
-  expires_at timestamptz not null, kind text not null check (kind in ('estop','reset','operator')),
+  expires_at timestamptz not null, kind text not null check (kind in ('estop','reset','operator','map_confirm')),
   payload jsonb not null check (jsonb_typeof(payload)='object'),
   status text not null default 'pending' check (status in ('pending','accepted','rejected','expired','done')),
   result jsonb not null default '{}' check(jsonb_typeof(result)='object'), updated_at timestamptz not null default now(),
@@ -48,7 +48,15 @@ create table public.commands (
       and payload-'confirmed'-'reset_context'='{}'::jsonb)
     or (kind='operator' and robot_id is null and jsonb_typeof(payload->'event')='string'
       and payload->>'event' in ('start_patrol','operator_ack','start_guide','retry','resolved','guide_clear')
-      and payload-'event'='{}'::jsonb)) is true),
+      and payload-'event'='{}'::jsonb)
+    or (kind='map_confirm' and robot_id is null
+      and payload->>'base_map_id' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+      and payload->>'proposal_map_id' ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+      and payload->>'base_map_id' <> payload->>'proposal_map_id'
+      and payload->>'base_sha256' ~ '^[a-f0-9]{64}$' and payload->>'proposal_sha256' ~ '^[a-f0-9]{64}$'
+      and jsonb_typeof(payload->'approved_clearings')='array'
+      and jsonb_array_length(payload->'approved_clearings')<=128
+      and payload-'base_map_id'-'proposal_map_id'-'base_sha256'-'proposal_sha256'-'approved_clearings'='{}'::jsonb)) is true),
   unique(hub_id,id)
 );
 alter table public.operator_actions add foreign key(hub_id,command_id) references public.commands(hub_id,id);

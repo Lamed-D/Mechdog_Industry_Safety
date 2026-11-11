@@ -24,7 +24,7 @@ class MapAppTests(unittest.TestCase):
         script = r'''
 import assert from 'node:assert/strict';
 import {grid,review,approved,cellAt,verifiedGrid,objectPath} from './dashboard/app/map-review.mjs';
-import {Cloud} from './dashboard/app/client.mjs';
+import {Cloud,command} from './dashboard/app/client.mjs';
 let input='';for await(const chunk of process.stdin)input+=chunk;
 const g={width:1,height:1,resolution:1,origin:[0,0,0],frame:'map',cells:[0]};
 for(const [before,after,expected] of JSON.parse(input)) {
@@ -50,6 +50,10 @@ const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',raw))].map(v=>
 const id='00000000-0000-4000-8000-000000000001';
 const {cells,...geometry}=g;
 const meta={id,hub_id:id,version:1,state:'draft',object_path:'synthetic/grid.json',sha256:sha,geometry};
+const map={base_map_id:id,proposal_map_id:'00000000-0000-4000-8000-000000000002',base_sha256:sha,proposal_sha256:sha,approved_clearings:[0]};
+const envelope=command({hub:id,device:id},'map_confirm',{map},0,id);
+map.approved_clearings.push(1);assert.deepEqual(envelope.payload.approved_clearings,[0]);
+assert.throws(()=>command({hub:id,device:id},'map_confirm',{map:{...map,approved_clearings:Array(129).fill(0)}}));
 assert.deepEqual(await verifiedGrid(meta,raw),g);
 await assert.rejects(()=>verifiedGrid({...meta,sha256:'0'.repeat(64)},raw));
 await assert.rejects(()=>verifiedGrid({...meta,geometry:{...geometry,width:2}},raw));

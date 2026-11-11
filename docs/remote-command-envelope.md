@@ -12,7 +12,7 @@ Supabase 계정·키·테이블·RLS를 만들거나 접속하지 않았습니�
 | `id` | 소문자 표준 UUID, 중복 전달 식별 |
 | `hub_id`, `device_id` | 목적 Pi·인증된 조작 기기 ID, 영숫자/밑줄/하이픈 1~64자 |
 | `robot_id` | reset은 A 또는 B, 전체 estop/operator는 null |
-| `kind` | estop / reset / operator |
+| `kind` | estop / reset / operator / map_confirm |
 | `created_at`, `expires_at` | UTC `YYYY-MM-DDTHH:MM:SS[.ffffff]Z`, 수명 0초 초과~10초 이하 |
 | `payload` | estop은 빈 객체, reset은 confirmed=true와 reset_context, operator는 별도 허용된 event만 |
 
@@ -25,7 +25,12 @@ A/B는 장비 ID이며 변할 수 있는 주·보조 역할을 조작 대상 ID�
 reset의 confirmed=true만으로 로봇 래치를 풀지 않습니다. 실행 계층은 신선한 TEL·배터리·현장 사람 확인을 다시 검사해야 합니다.
 reset_context는 실행 서비스가 발급한 공개 상태 확인 ID이며 현재 로봇의 새 정지·세션·만료·사용 여부를 실행 직전에 재검사해야 합니다.
 봉투 검사는 이 ID의 형식만 검사합니다. 원격 동기화에는 아직 연결하지 않았습니다.
-현재 지원하지 않는 정찰 조종·지도 확정·루틴 명령은 거절하며 수명 0.5초 조종 구현은 남아 있습니다.
+정찰 조종·루틴 명령은 거절하며 수명 0.5초 조종 구현은 남아 있습니다.
+지도 확정은 `map_confirm`으로 추가했습니다. 대상은 null, payload는 `base_map_id`, `proposal_map_id`(서로 다른 UUID),
+`base_sha256`, `proposal_sha256`(원본 파일 해시), `approved_clearings`(중복 없는 셀 인덱스 최대 128개)만 받습니다.
+128개는 4096바이트 봉투 크기를 지키기 위한 전송 제한이며 물리 안전 값이 아닙니다. 초과 시 작은 제안본으로 다시 검토합니다.
+허브는 다운로드 뒤 만료·현재 권한을 재검사하고 안전 검토한 지도 확정 행만 outbox에 넣습니다.
+`done/map_confirmation_queued`는 확정 행 대기열 접수이며 클라우드 반영·설정 활성화·주행 허가가 아닙니다.
 
 `ReplayWindow`는 단조 시계 기준 10초 동안 처리한 ID를 기억합니다. 가득 차면 기존 기록을 밀어내지 않고 거절합니다.
 전체 정지는 중복이어도 허용합니다. 이 메모리 창은 프로세스 재시작 후 중복 실행을 막는 영속 저널을 대신하지 않습니다.

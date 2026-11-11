@@ -42,7 +42,7 @@ map version은 허브 안에서 고유하며 confirmed 지도는 내용 변경 �
   devices RLS 재귀를 피하는 security definer 함수는 빈 search_path와 스키마 명시를 사용합니다.
   실제 배포에서는 함수 소유자와 기기 등록 권한을 사용자가 따로 검토해야 합니다.
 - 관리자는 자기 허브의 commands만 추가합니다. 상태·지도·구역·루틴을 직접 변경하지 않습니다.
-  허브가 명령을 검증해 실행하고 결과/설정을 반영합니다. 확정 요청·정찰·루틴 편집 종류는 후속 단위에서 봉투/허용 목록을 함께 확장합니다.
+  허브가 명령을 검증해 실행하고 결과/설정을 반영합니다. 지도 확정 요청은 map_confirm으로 추가했으며 정찰·루틴 편집은 후속 단위입니다.
 - 허브는 자기 명령의 status/result/updated_at만 갱신할 수 있습니다. 관리자 원본 봉투는 갱신 권한이 없습니다.
   모든 행의 id/hub_id/created_at 변경도 트리거로 거절합니다.
 - 허브/관리자/읽기 계정은 등록된 자기 허브만 읽습니다. 관리자 권한 키를 브라우저에 넣지 않습니다.
@@ -56,7 +56,9 @@ map version은 허브 안에서 고유하며 confirmed 지도는 내용 변경 �
 commands의 봉투 열은 [기존 v1 계약](remote-command-envelope.md)의 10개 필드 그대로입니다.
 status/result/updated_at은 저장 결과이며 validate_envelope에 전달하기 전에 제외합니다.
 REST가 반환하는 UTC offset 시각은 게이트웨이가 UTC Z 문자열로 정규화해야 합니다.
-현재 kind는 estop/reset/operator이고 수명은 10초 이하입니다. 정지는 만료됐어도 허브가 처리하며 SQL은 만료 행을 숨기지 않습니다.
+현재 kind는 estop/reset/operator/map_confirm이고 수명은 10초 이하입니다. 정지는 만료됐어도 허브가 처리하며 SQL은 만료 행을 숨기지 않습니다.
+map_confirm은 두 지도 UUID·원본 파일 해시·삭제 승인 셀 최대 128개를 받습니다. 정확한 인덱스/파일/기하/현재 권한은 허브가 재검사합니다.
+0001은 미배포 초안이므로 정의를 함께 갱신했습니다. 기존 DB에 적용하는 마이그레이션 절차는 실제 배포 전 별도 검증합니다.
 reset은 confirmed=true와 공개 reset_context가 필요합니다. confirmed JSON 문자열이나 누락 필드는 정상으로 수락하지 않습니다.
 형식 검사·권한·처리 ID 저널·실행 직전 상태/신선도 검사는 SQL만으로 대체하지 않습니다.
 

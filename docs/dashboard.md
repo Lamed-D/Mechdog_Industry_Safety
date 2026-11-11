@@ -186,6 +186,7 @@ RESET·안내 시작·조치 완료는 **합성 사람 조작을 스크립트로
 | HUB-7 | `host/hub/routines.py` | [루틴 스케줄러](hub-routines.md): 수동/매일 UTC/간격·준비 검사·영속 예약·사고 우선 | 실제 경로 실행·원격 루틴 명령·시계/Pi 미검증 |
 | HUB-8a | `dashboard/app/` | [인터넷 앱](dashboard-app.md): 로그인·상태/알림·전체 정지·확인 RESET·명령 결과 | 모듈 모의 검사. 지도/루틴/정찰 화면과 실제 인증·CORS·렌더링 미검증 |
 | HUB-8b | `dashboard/app/map-review.mjs` | 비공개 지도 읽기·해시/기하 검사·초안/제안 겹침·삭제 셀 개별 승인 | 허브와 모든 셀 전이 대조. 확정 전송·실제 Storage/브라우저 미검증 |
+| HUB-8c | `host/hub/map_confirmation.py` | 해시·삭제 승인 결합 확정 명령, 파일 재검사·권한/만료 재대조 후 outbox 접수 | 실제 REST/Storage 서비스 조립·확정 행 반영·설정 활성화는 미검증 |
 
 ## 1. 핵심 상태 (`dashboard/core`)
 
