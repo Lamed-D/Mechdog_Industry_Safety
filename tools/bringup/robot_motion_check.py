@@ -2,6 +2,8 @@
 # 실제 관측 결과는 docs/user-tests/robot-python-checklist.md에 기록합니다.
 
 MIN_BATTERY_MV = 7000  # 실측 전 가정. 본체 경고 기준과 동일
+MOVE_MS_DEFAULT = 300  # 첫 시험값
+MOVE_MS_MAX = 10000  # 관찰용 상한(사용자 지정, 2026-11-10). 보폭·회전값은 바꾸지 않음. 앞쪽 공간 확보
 CASES = {"stop": (0, 0), "forward": (20, 0), "backward": (-20, 0),
          "left": (20, 5), "right": (20, -5), "action": None}
 
@@ -30,10 +32,19 @@ def _wait(api, clock, duration_ms, done=None):
     return done is None
 
 
-def run(case, allow_motion=False, api=None, dog_class=None, clock=None):
-    """대상·주변 안전 확인 뒤 사용자가 한 항목씩 호출합니다. 소프트웨어 완료는 실물 합격이 아닙니다."""
+def _require_methods(target):
+    for name in ("move", "stop_action", "action_run", "action_is_over"):
+        if not callable(getattr(target, name, None)):
+            raise ValueError("required_api_missing")
+
+
+def run(case, allow_motion=False, api=None, dog_class=None, clock=None, move_ms=MOVE_MS_DEFAULT):
+    """대상·주변 안전 확인 뒤 사용자가 한 항목씩 호출합니다. 소프트웨어 완료는 실물 합격이 아닙니다.
+    move_ms: 이동 항목에서 걷는 시간(ms). 관찰이 어려우면 늘리되 MOVE_MS_MAX 를 넘길 수 없습니다."""
     if case not in CASES:
         raise ValueError("unknown motion check")
+    if type(move_ms) is not int or not 0 < move_ms <= MOVE_MS_MAX:
+        raise ValueError("move_ms out of range")
     if allow_motion is not True:
         return {"status": "blocked", "reason": "explicit_motion_approval_required"}
     if api is None:
@@ -46,11 +57,15 @@ def run(case, allow_motion=False, api=None, dog_class=None, clock=None):
     result = {"case": case, "status": "unknown", "observation_required": True}
     try:
         _battery(api)
-        for name in ("move", "stop_action", "action_run", "action_is_over"):
-            if not callable(getattr(dog_class, name, None)):
-                raise ValueError("required_api_missing")
+        # 실물 MechDog 는 객체를 돌려주는 함수라 생성 전에는 메서드를 볼 수 없습니다.
+        # 클래스면 생성 전에, 함수면 생성 직후(다른 호출 전)에 필수 메서드를 확인합니다.
+        if isinstance(dog_class, type):
+            _require_methods(dog_class)
+        elif not callable(dog_class):
+            raise ValueError("required_api_missing")
         stage = "construct"  # 생성 자체의 움직임도 실물 확인 대상
         dog = dog_class()
+        _require_methods(dog)
         stage = "initial_stop"
         dog.stop_action()
         dog.move(0, 0)
@@ -62,7 +77,7 @@ def run(case, allow_motion=False, api=None, dog_class=None, clock=None):
                 raise ValueError("action_completion_timeout")
         else:
             dog.move(*CASES[case])
-            _wait(api, clock, 300)
+            _wait(api, clock, move_ms)
         result["status"] = "calls_completed"
     except Exception as error:
         result.update(stage=stage, error=type(error).__name__)

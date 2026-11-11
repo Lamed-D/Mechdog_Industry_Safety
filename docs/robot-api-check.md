@@ -22,7 +22,7 @@ PC에서는 본체 구현 원본 Python 소스를 아직 찾지 못해 직접 �
 | `Hiwonder.Battery_power()` | 있음 | 있음 | 이번 대조로 보강 | 배터리 mV, 실패는 NA |
 | `Buzzer()`, `playTone(freq,ms,bool)` | 있음 | 있음 | 있음 | 가짜 검사 |
 | `Button(1/2)`, `Clicked(callback)` | 있음 | 있음 | 있음 | 가짜 검사 |
-| `IIC(1)`, `MPU(iic)`, `read_angle()` | 있음 | 있음 | 이번 대조로 보강 | IMU 실패는 NA, 칩·방향 실물 확인 |
+| `IIC(1)`, `MPU()`(실물은 인자 없음, `MPU(iic)`는 TypeError), `read_angle()` | 있음 | 있음 | 이번 대조로 보강 | IMU 실패는 NA, 칩·방향 실물 확인 |
 | `IIC(2)`, `ESP32S3Cam(iic)`, `read_face()` | 있음 | 있음 | 있음 | 얼굴 읽기 우선; 낙상 판단에 쓰지 않음 |
 | `face_recognition()` | 있음 | **찾지 못함** | 있음 | 구형 장치에서만 호환 읽기; 없으면 unknown |
 | `I2CSonar(iic)`, `getDistance()`, `setRGB(n,r,g,b)` | 있음 | 있음 | 있음 | 가짜 검사; 런타임 미사용 |

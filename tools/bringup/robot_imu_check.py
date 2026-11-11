@@ -8,7 +8,9 @@ def run(api=None, clock=None):
         import time as clock
     started = clock.ticks_ms()
     try:
-        imu = api.MPU(api.IIC(1))
+        # 실물 본체(로봇 B)의 Hiwonder_IIC.MPU 는 인자 없는 함수였습니다. MPU(IIC(1))은 TypeError,
+        # MPU()는 read_angle 이 정상으로 각도 두 개를 돌려줬습니다(2026-11-10).
+        imu = api.MPU()
         value = imu.read_angle()
         if not isinstance(value, (list, tuple)) or len(value) < 2:
             raise ValueError("invalid_imu_shape")
