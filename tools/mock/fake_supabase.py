@@ -13,7 +13,12 @@ class FakeSupabase:
     def upload(self, item):
         if self.offline:
             raise ConnectionError('synthetic offline')
-        self.rows[item.table, item.row['id']] = deepcopy(item.row)
+        key = item.table, item.row['id']
+        if item.operation == 'command_result':
+            original = self.rows.get(key) or next((row for row in self.pending if row['id']==item.row['id']), {})
+            self.rows[key] = dict(deepcopy(original),**deepcopy(item.row))
+        else:
+            self.rows[key] = deepcopy(item.row)
         self.uploads.append(item.event_id)
         if self.fail_after_write:
             raise ConnectionError('synthetic lost acknowledgement')
@@ -21,7 +26,8 @@ class FakeSupabase:
     def commands(self, hub_id):
         if self.offline:
             raise ConnectionError('synthetic offline')
-        rows = [deepcopy(row) for row in self.pending if row['hub_id'] == hub_id]
+        rows = [deepcopy(self.rows.get(('commands',row['id']),row)) for row in self.pending if row['hub_id'] == hub_id]
+        rows = [row for row in rows if row.get('status','pending') == 'pending']
         stops = [row for row in rows if row['kind'] == 'estop'][:100]
         normal = [row for row in rows if row['kind'] != 'estop'][:100]
         return stops + normal
