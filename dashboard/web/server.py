@@ -15,6 +15,7 @@ import hmac
 import http.server
 import json
 import pathlib
+import socket
 import threading
 import time
 import uuid
@@ -135,7 +136,17 @@ class DashboardServer:
                     # 본문의 길이·도착·JSON을 기다리기 전에 먼저 멈춥니다.
                     self.close_connection = True
                     code, payload = server.handle_post(self.path, {}, None)
-                    return self._send(code, payload)
+                    self._send(code, payload)
+                    self.wfile.flush()
+                    # Send the response before bounded cleanup. Closing with unread
+                    # request bytes can reset the response connection on Windows.
+                    try:
+                        self.connection.shutdown(socket.SHUT_WR)
+                        self.connection.settimeout(.05)
+                        self.rfile.read1(MAX_BODY)
+                    except OSError:
+                        pass
+                    return
                 if self.headers.get("Transfer-Encoding") or len(self.headers.get_all("Content-Length", [])) > 1:
                     return self._send(400, {"ok": False, "reason": "ambiguous_body"})
                 try:
