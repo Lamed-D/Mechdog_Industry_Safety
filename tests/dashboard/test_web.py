@@ -79,6 +79,13 @@ class WebTests(unittest.TestCase):
                 finally:
                     conn.close()
 
+    def test_repeated_estop_responses_survive_unread_request_bytes(self):
+        for _ in range(30):
+            status, result = self.post('/api/estop', raw=b'{not json')
+            self.assertEqual(status,200)
+            self.assertTrue(result['ok'])
+        self.assertTrue(all(link.latched for link in self.links.values()))
+
     def test_motion_operations_need_token(self):
         self.assertEqual(self.post("/api/operator", {"event": "start_patrol"})[0], 401)
         self.assertEqual(self.post("/api/operator", {"event": "start_patrol"}, token="wrong")[0], 401)
