@@ -58,7 +58,7 @@ AI가 읽을 규칙·설계·도구는 모두 이 폴더(`ai/`)에 둡니다.
 
 비전 모듈 작업 조건:
 
-- 굽기 전 플래시 전체 백업(저장소 밖 `C:\camera-backup\`). 백업 없으면 굽지 않습니다. ERASE·전체 지우기 금지.
+- 굽기 전 플래시 전체 백업(`.private/backup/robot<ID>_cam_full_<날짜>.bin`, gitignore — `C:\` 등 저장소 밖에 쓰지 않음). 백업 없으면 굽지 않습니다. ERASE·전체 지우기 금지.
 - 본체 전원 끄기, IIC 케이블 분리·복원, USB 연결 같은 **물리 조작은 사용자에게 요청**합니다.
 - 포트가 카메라(CH340)인지 `flash-id`(ESP32-S3)로 확인하고, 메인 보드 포트에는 절대 쓰지 않습니다.
 - **Wi-Fi 비밀번호**: 에이전트가 Windows에서 직접 얻어(`netsh wlan show profile name=<SSID> key=clear`, 모바일 핫스팟 설정 등) 시리얼로만 입력합니다.

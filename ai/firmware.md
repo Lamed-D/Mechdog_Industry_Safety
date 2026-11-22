@@ -82,7 +82,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
   - 장치 시작 파일 사본일 뿐, 펌웨어 전체·보정값·카메라 플래시 백업이 아닙니다.
   - **실행·import·자동 업로드 금지.** 원래 main에는 로봇 생성·이동·동작 코드, 문서 범위 밖 인자, 통신 정지 감시 없는 경로가 있습니다. 예제로 재사용하지 않습니다.
   - 복구는 사용자가 대상 보드·버전을 확인한 뒤 확장자를 되돌리는 절차로 따로 검토합니다.
-- 굽기 전(메인 Arduino, 카메라) **현재 플래시 전체 백업**을 esptool로 받아 저장소 밖에 둡니다. 백업 파일에는 장치 고유 정보가 있을 수 있습니다.
+- 굽기 전(메인 Arduino, 카메라) **현재 플래시 전체 백업**을 esptool로 받아 `.private/backup/`(gitignore)에 둡니다. 저장소 밖 다른 드라이브 경로에 쓰지 않습니다. 백업 파일에는 장치 고유 정보가 있을 수 있습니다.
 
 ## 4. 메인 보드 Arduino (`firmware/robot/arduino/`, 예비·유지)
 
@@ -115,7 +115,7 @@ python firmware/builder/build_main_arduino.py  # ID 확인 없이 → build/main
 사용자가 그대로 따라 합니다. 에이전트는 빌드(4.1)까지만 하고 이 순서를 안내합니다.
 
 1. `secrets.example.h` → `secrets.h`(커밋 금지): `MECH_WIFI_SSID`, `MECH_WIFI_PASS`, `MECH_ROBOT_ID` ('A'/'B'). 로봇 간 차이는 ID뿐.
-2. 받침대에 올리고 USB 연결 → `esptool.py --port COM<n> read_flash 0 ALL main_backup.bin` 백업 → Arduino IDE 업로드.
+2. 받침대에 올리고 USB 연결 → `esptool.py --port COM<n> read_flash 0 ALL .private\backup\robot<ID>_main_full_<날짜>.bin` 백업 → Arduino IDE 업로드.
 3. 시리얼 115200: `WiFi OK  id=A  ip=192.168.137.x`. 부팅 후 boot 래치 상태가 정상입니다.
 
 ### 4.3 알려진 제약·확인 필요
@@ -221,7 +221,7 @@ python firmware/builder/build_vision_cam.py --release           # A/B 공통 합
 1. **[사용자]** 본체 전원을 끄고 카메라 IIC 케이블을 뺀 뒤, 데이터용 Type-C로 **카메라만** PC에 연결(역급전 미확인에 따른 우리 안전 권고, 제조사 절차 아님). 장치 관리자 `USB-SERIAL CH340` 포트 확인, 메인 보드 포트와 혼동 금지. 포트를 잡은 프로그램은 닫습니다.
    에이전트는 `flash-id`로 ESP32-S3인지 확인한 뒤 진행합니다. 메인 보드(ESP32 클래식) 포트면 즉시 멈춥니다.
 2. 합본 해시 확인: `Get-FileHash build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256` = `.sha256`.
-3. **백업 먼저:** `esptool --chip esp32s3 --port COMx flash-id` 후 `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin` (저장소 밖, 크기 = 플래시 크기. esptool 4.x는 `read_flash`처럼 밑줄).
+3. **백업 먼저:** `esptool --chip esp32s3 --port COMx flash-id` 후 `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL .private\backup\robot<ID>_cam_full_<날짜>.bin` (저장소 안 `.private/`, gitignore라 커밋되지 않음. 크기 = 플래시 크기. esptool 4.x는 `read_flash`처럼 밑줄).
 4. 굽기: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin`. 0x0 합본은 저장 설정을 지우므로 카메라 ID가 빌드 ID로 시작합니다. 제조사 플래시 도구를 쓰면 ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, **ERASE 누르지 않음**. 쓰는 중 케이블·전원 분리 금지.
    - 업데이트(설정 유지): 같은 맞춤 펌웨어가 있는 카메라는 앱만 `write-flash 0x10000 build\robot_<ID>\vision\compile\vision.ino.bin`(저장된 ID·Wi-Fi 유지). 0x0 합본은 NVS를 지울 수 있으므로 굽고 나서 설정을 다시 입력합니다.
    - Arduino IDE로 올릴 때: `firmware/vision/vision.ino`를 폴더째 열고 Board ESP32S3 Dev Module, PSRAM OPI, Flash Mode DIO 80MHz, Flash Size 4MB, Partition Huge APP, CPU 240MHz, USB CDC On Boot Disabled, Erase All Flash Disabled. 합본 bin을 스케치로 열지 않습니다.
@@ -242,7 +242,7 @@ python firmware/builder/build_vision_cam.py --release           # A/B 공통 합
 6.5절처럼 물리 조작만 사용자에게 요청하고 에이전트가 굽습니다.
 
 
-- 가장 확실: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 C:\camera-backup\robot<ID>_cam_full.bin`.
+- 가장 확실: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 .private\backup\robot<ID>_cam_full_<날짜>.bin`.
 - 또는 제조사 기본 영상 전송 바이너리를 같은 설정(ESP32-S3, 0x0000, 80MHz, DIO, 460800)으로 → AP `HW_ESP32S3CAM` 방식으로 돌아감.
 - 제조사 배포에는 기능별(얼굴·색·라인) 카메라 바이너리가 따로 있습니다. 한 펌웨어에서 영상 전송과 모든 인식이 된다고 가정하지 않고, 다른 확장 모듈·플랫폼용 펌웨어를 올리지 않습니다. 버튼(다운로드 모드) 조합은 추측하지 않습니다.
 - 출력이 없거나 계속 재시작하면 로그 몇 줄(비밀번호 제외)을 남기고 복구합니다.
