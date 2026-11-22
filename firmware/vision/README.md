@@ -6,7 +6,7 @@
 
 자세한 설치·설정·복구·빌드: [ai/firmware.md](../../ai/firmware.md) 6절
 
-저장소 루트에서 `python ai/tools/build_vision_cam.py --release`를 먼저 실행합니다.
+저장소 루트에서 `python firmware/build.py <ID> --only vision` 을 먼저 실행합니다(로봇 ID가 기본값으로 들어간 합본).
 
 ## 설치 (AI 에이전트가 수행)
 
@@ -19,8 +19,8 @@ AI 에이전트가 아래를 직접 합니다. 사람은 **1번 케이블·전�
    (본체 전원 끄기는 공식 절차가 아닌 우리 안전 권고: USB·본체 전원 동시 공급을 피하기 위함)
 2. **현재 플래시 백업** (저장소 밖에 보관):
    `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin`
-3. **굽기**: `build/vision_cam/latest/mechdog_vision_cam_0x0.bin` 을 주소 **0x0** 에
-   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build/vision_cam/latest/mechdog_vision_cam_0x0.bin`
+3. **굽기**: `build/robot_<ID>/vision/latest/mechdog_vision_cam_0x0.bin` 을 주소 **0x0** 에
+   `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build/robot_<ID>/vision/latest/mechdog_vision_cam_0x0.bin`
    (제조사 플래시 도구: ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, ERASE 누르지 않음)
 4. **Wi-Fi 설정**: 시리얼 115200bps, 줄 끝 Newline 으로 연 뒤
    ```text
@@ -52,6 +52,6 @@ AI 에이전트가 아래를 직접 합니다. 사람은 **1번 케이블·전�
 
 ## 직접 빌드
 
-`python ai/tools/build_vision_cam.py` (컴파일만), `--release` (합본 bin 생성, `secrets.h` 있으면 멈춤).
+`python firmware/build.py <ID> --only vision` (로봇 전용 합본). 공통 합본·검사는 `python firmware/builder/build_vision_cam.py [--release] [--verify-release] [--robot <ID>]` (`secrets.h` 있으면 합본 생성 멈춤).
 
 로봇 B 카메라에서 실물 동작 확인(v0.1.8). v0.1.9는 AP 기본 비밀번호만 바뀌었고 실물 미검증입니다. 로봇 A 카메라·장시간 동작은 실물 미검증입니다.

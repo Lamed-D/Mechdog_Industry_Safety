@@ -88,7 +88,7 @@ AI가 읽을 규칙·설계·도구는 모두 이 폴더(`ai/`)에 둡니다.
 | [firmware.md](firmware.md) | 메인 보드(MicroPython·Arduino) 사용자 업로드 가이드, 비전 모듈 펌웨어 빌드·굽기·복구 |
 | [dashboard.md](dashboard.md) | 노트북 대시보드(`dashboard/`), 라이다 USB 확인 |
 | [robot-tests.md](robot-tests.md) | 실물 확인 절차·결과 양식 |
-| [`tools/`](tools/) | 빌드·업로드 파일 생성·에이전트 설정 스크립트 |
+| [`tools/`](tools/) | 에이전트 설정 스크립트 (펌웨어 빌드는 사람과 같은 [`../firmware/build.py`](../firmware/build.py), [firmware.md](firmware.md) 0절) |
 | [lidar-frozen.md](lidar-frozen.md) | 라이다 — **동결**(표시만, 추가 개발 금지) |
 | [scenario.md](scenario.md) | 새 시나리오 (설계 예정) |
 

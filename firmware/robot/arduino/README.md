@@ -39,7 +39,7 @@ ESP32 Arduino 코어는 **3.3.12** 기준입니다.
 ```bash
 # (선택) 벤더 라이브러리 폴더를 알려 줍니다. 안 주면 Arduino 기본 사용자 라이브러리에서 찾습니다.
 set MECHDOG_VENDOR_LIBS=C:\Users\<you>\Documents\Arduino\libraries
-python ai/tools/build_main_arduino.py
+python firmware/build.py A --only arduino   # secrets.h 의 MECH_ROBOT_ID 가 A 인지 확인 → build/robot_A/arduino/
 ```
 
 또는 Arduino IDE 에서 `firmware/robot/arduino/arduino.ino` 를 열어 보드 `ESP32 Dev Module` 로 컴파일합니다.
