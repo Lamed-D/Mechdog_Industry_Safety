@@ -51,6 +51,7 @@ class Robot:
         self.boot_id = None
         self.last_cmd_seq = 0
         self.moving = False
+        self.stop_pending = False
         self.action_until = None      # 동작 그룹·자세 잡기 동안 다른 명령을 받지 않는 기한
         self.action_name = None       # 끝났다고 확인되지 않은 동작 그룹. 확인 전에는 래치 때마다 stop_action
         self.action_started = None
@@ -97,8 +98,10 @@ class Robot:
         return IDLE
 
     def _stop(self):
-        self.moving = False
+        self.stop_pending = True
         self.motion.stop()
+        self.moving = False
+        self.stop_pending = False
 
     def _stop_action(self):
         try:
@@ -170,7 +173,7 @@ class Robot:
             self.urgent = True
             return
         self._accept(cmd.seq)
-        if self.latched:
+        if self.latched or self.stop_pending:
             if name == "RESET":
                 self._reset()
             elif name in ("MOVE", "ACTION", "POSE"):
@@ -220,7 +223,7 @@ class Robot:
     def _reset(self):
         ok = (self.wifi_ok and self.battery_mv is not None
               and self.battery_mv >= self.cfg.LOW_BATT_RESET_MV
-              and not self.busy() and not self._before(self.reset_block_until))
+              and not self.stop_pending and not self.busy() and not self._before(self.reset_block_until))
         if not ok:
             self.events.add("reset_denied")
             return
@@ -292,6 +295,8 @@ class Robot:
         now = self._now()
         self.uptime_ms += max(self._diff(now, self._last_tick), 0)
         self._last_tick = now
+        if self.stop_pending:
+            self._latch("link_lost")
         if self.roles.expire():
             self._latch("link_lost")
         self._check_action(now)

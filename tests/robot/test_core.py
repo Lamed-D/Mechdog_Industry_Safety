@@ -2,6 +2,7 @@
 
 import threading
 import unittest
+from unittest.mock import patch
 
 from tests import fakes
 from tests.fakes.fake_time import TICKS_MAX, FakeClock
@@ -495,6 +496,36 @@ class ActionSafetyTest(CoreTestCase):
         self.send("ESTOP")
         self.assertEqual(self.moves()[-1], (0, 0))
         self.assertEqual(self.robot.latch_reason, "estop")
+
+    def test_failed_stop_is_retried_and_estop_survives(self):
+        self.ready()
+        self.send("MOVE", 40, 0)
+        original_move = self.dog.move
+        stop_attempts = []
+
+        def move(step, angle):
+            if (step, angle) == (0, 0):
+                stop_attempts.append((step, angle))
+                if len(stop_attempts) < 3:
+                    raise OSError("temporary drive error")
+            original_move(step, angle)
+
+        with patch.object(self.dog, "move", side_effect=move):
+            with self.assertRaises(OSError):
+                self.send("ESTOP")
+            self.send("RESET")
+            self.send("MOVE", 60, 0)
+            self.assertEqual(self.dog.last_move, (40, 0))
+            with self.assertRaises(OSError):
+                self.tick()
+            self.send("RESET")
+            self.assertTrue(self.robot.latched)
+            self.tick()
+        self.assertEqual(len(stop_attempts), 3)
+        self.assertEqual(self.dog.last_move, (0, 0))
+        self.assertEqual(self.robot.latch_reason, "estop")
+        self.send("RESET")
+        self.assertFalse(self.robot.latched)
 
 
 class TiltValidationTest(CoreTestCase):
