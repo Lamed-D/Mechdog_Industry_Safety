@@ -1,41 +1,70 @@
-# 메인 ESP32 Arduino 예비 판 — 컴파일 골격
+# 메인 ESP32 Arduino 펌웨어
 
-현재 주 펌웨어는 순정 MicroPython + robot Python 코드입니다.
-이 폴더는 **Python 판 실물 검증 후 이식할 설계·컴파일 골격**이며 장치에 굽는 펌웨어가 아닙니다.
-Wi-Fi·라이다 수신·공식 MechDog 구동 백엔드가 없고 부팅 상태만 유지합니다.
-이 골격을 올리면 순정 MicroPython이 사라지므로 배포/굽기 명령을 제공하지 않습니다.
+로봇 메인 보드(ESP32 클래식)에 올리는 **Arduino(C++) 펌웨어**입니다. `robot/` 의 MicroPython 판(app·core·comm·
+lidar_bridge 등)을 제조사 공식 MechDog Arduino 라이브러리로 **그대로 이식**한 것으로, 같은 통신 규약·안전 동작을
+지킵니다([docs/protocol.md](../../docs/protocol.md), [docs/firmware-strategy.md](../../docs/firmware-strategy.md)).
+세팅·업로드는 [로봇 Arduino 펌웨어 세팅 가이드](../../docs/robot-arduino-setup.md)를 따릅니다.
 
-## 컴파일
+> **업로드(굽기)는 사용자만** 합니다(firmware-strategy 1.4절). 이 .ino 를 올리면 메인 보드의 순정 MicroPython 이
+> 지워집니다. 굽기 전 현재 플래시 전체를 백업하고, 되돌리려면 순정 펌웨어를 다시 굽고 `main.py` 를 올립니다.
 
-저장소 루트에서 `python tools/build_main_arduino.py`를 실행합니다.
-ESP32 Arduino 코어 3.3.12, 컴파일용 FQBN `esp32:esp32:esp32`를 사용합니다.
-이는 클래식 ESP32 대상으로 문법·링크를 확인하는 설정이며 실제 보드의 플래시·핀·파티션을 확인한 배포 설정이 아닙니다.
-산출물은 `build/main_arduino/compile/`에만 둡니다. 합본·업로드 기능은 없습니다.
-카메라 ESP32-S3 펌웨어와 빌드 폴더를 공유하지 않습니다.
+## 파일 구성
 
-## 이식 대응표
+**이식성 코어 — 벤더·Arduino 비의존(안전 로직). 표준 C++ 로 컴파일·테스트됨:**
 
-| Python 동작 | 제조사 Arduino 인터페이스에서 확인한 사실 | 이식 전 확인 |
+| 파일 | Python 원본 | 내용 |
 | --- | --- | --- |
-| move(step,angle) | move는 float 인자 2개를 받음 | speed_x/angle_rate와 Python 단위·범위가 같은지 미확인, 변환을 지어내지 않음 |
-| action_run(name) | const char* 이름 인자 | 동작 파일·실행 시간과 허용 목록 |
-| set_default_pose() | pose 포인터 선택 인자와 duration 기본 1000 | 완료 시점·대기·취소 가능성 |
-| set_pose(xyz,abc,ms) | mech_pose_t와 duration | 구조체 좌표·회전 단위·축 대응 |
-| homeostasis(bool) | bool 인자 | 실제 모드와 안전 정지 간 상호작용 |
-| stop_action(), action_is_over() | 대조한 Arduino 클래스 선언에서 같은 이름을 찾지 못함 | **차단 항목**: 동작 중단·완료의 근거 있는 대응 없이는 구동 백엔드 활성화 금지 |
-| Battery_power(), MPU.read_angle() | Python과 모듈 경계가 다름 | 제조사 Arduino 센서 API·반환 단위·실물 값을 대조 |
+| `mech_config.h` | `robot/config.py` | 포트·임계값·동작 시간 |
+| `mech_proto.{h,cpp}` | `robot/proto.py` | 명령 메시지 해석(파싱·범위 자르기) |
+| `mech_roles.{h,cpp}` | `robot/roles.py` | 임대 역할 |
+| `mech_core.{h,cpp}` | `robot/core.py` | 명령 처리·감시·래치·저전압·텔레메트리 상태기계 |
+| `mech_clock.h`, `mech_backend.h` | (주입 경계) | 시계·모션·센서 추상 인터페이스 |
 
-근거는 제조사 Arduino 인터페이스 선언입니다. 외부 코드를 복사하거나 자체 PWM·역기구학·서보 드라이버를 만들지 않습니다.
-공식 API 대응을 찾지 못한 기능을 raw I2C/UART로 우회하지 않습니다.
+**Arduino 글루 — ESP32·벤더 의존(컴파일 검증만):**
 
-## 동일하게 유지할 계약
+| 파일 | Python 원본 | 내용 |
+| --- | --- | --- |
+| `main_arduino.ino` | `robot/app.py`·`main.py` | 세 태스크(수신·감시·라이다) + 뮤텍스로 직렬화 |
+| `motion_mechdog.{h,cpp}` | `robot/motion.py` + 하드웨어 | 공식 MechDog API 백엔드, 배터리·IMU 읽기 |
+| `net_link.{h,cpp}` | `robot/comm.py` | Wi-Fi STA + 명령·텔레메트리 UDP |
+| `lidar_relay.{h,cpp}` | `custom_sensors/lidar_bridge.py` | 라이다 UART ↔ TCP 원시 중계 |
+| `arduino_clock.h` | — | `millis()` 기반 시계 |
+| `secrets.example.h` | `robot/secrets.example.py` | Wi-Fi·ROBOT_ID (실제 값은 `secrets.h`, 커밋 금지) |
 
-- CMD/TEL·ROLE 규약, A/B 장치 ID와 별개인 주·보조 역할, 임대·세대·세션 확인.
-- UDP 9100/9101, UART1 IO32/33·115200, TCP 20108 원시 중계.
-- 600ms 명령 감시, ESTOP 우선·동작 중단+이동 정지, 저전압·예외·Wi-Fi 단절 래치.
-- 사람 RESET과 이후 TEL 해제 확인. 역할 배정·재연결·재부팅만으로 이동하지 않음.
-- 같은 가짜 장애 시나리오와 실제 정지 지연 확인을 통과하기 전 Python을 대체하지 않음.
+## 빌드(컴파일만)
 
-추후 사용자가 전환할 때는 본체 전체 플래시와 main.py·설정을 먼저 백업하고,
-문제 시 해당 보드 전체 플래시 백업 또는 순정 MicroPython과 저장한 Python 파일을 복구합니다.
-현재는 그 전환 단계에 도달하지 않았습니다.
+벤더 라이브러리(HW_MechDog 등)는 저장소에 넣지 않습니다. 제조사 ESP32 개발 패키지로 Arduino 에 설치해야 컴파일됩니다.
+ESP32 Arduino 코어는 **3.3.12** 기준입니다.
+
+```bash
+# (선택) 벤더 라이브러리 폴더를 알려 줍니다. 안 주면 Arduino 기본 사용자 라이브러리에서 찾습니다.
+set MECHDOG_VENDOR_LIBS=C:\Users\<you>\Documents\Arduino\libraries
+python tools/build_main_arduino.py
+```
+
+또는 Arduino IDE 에서 `firmware/main_arduino/main_arduino.ino` 를 열어 보드 `ESP32 Dev Module` 로 컴파일합니다.
+빌드 산출물은 Git 에서 제외되는 `build/` 에만 생깁니다. 합본·업로드 기능은 이 도구에 없습니다.
+
+## 설정
+
+1. `secrets.example.h` 를 `secrets.h` 로 복사하고 핫스팟 SSID·비밀번호, `MECH_ROBOT_ID`('A'/'B')를 채웁니다. `secrets.h` 는 커밋하지 않습니다.
+2. 로봇 A·B 는 `MECH_ROBOT_ID` 만 다릅니다. 임계값은 `mech_config.h`(= `robot/config.py` 와 같은 값)에서 바꿉니다.
+
+## 검증 상태
+
+| 대상 | 방법 | 결과 |
+| --- | --- | --- |
+| 이식성 코어(안전 로직) | `python tools/test_main_arduino.py` (호스트 g++ 또는 gcc Docker) | 행위 테스트 35개 통과(= `robot/` 시나리오) |
+| 코어 + net_link + lidar_relay | arduino-cli 컴파일(ESP32, `-Wall`) | 통과(오류·경고 없음) |
+| motion_mechdog + .ino(벤더 의존) | 사용자 Arduino IDE 컴파일 | **미확인 — 벤더 라이브러리 필요** |
+| 실제 로봇 동작 | 사용자 업로드·관찰 | **실물 미검증** |
+
+## 알려진 제약 · 실물 확인 필요 항목
+
+- **동작 그룹은 실행 중 멈출 수 없습니다.** 벤더 `action_run()` 은 끝까지 블로킹이고 중단 API(`stop_action`)가 없습니다.
+  전용 워커 태스크에서 돌려 수신·감시를 막지는 않지만, 동작 그룹 중 `ESTOP` 은 그룹이 끝난 뒤에야 실제로 멈춥니다
+  (규약 3.3절: 래치해도 최대 시간 전 RESET 금지). 현장 기능에는 동작 그룹을 쓰지 않습니다(허용 목록은 대기·신호용).
+- **배터리 단위 [확인 필요]:** `readBattery()` 값을 mV 로 가정합니다. 실물에서 전압과 대조해 `mech_config.h` 임계값을 맞춥니다.
+- **IMU 기본 꺼짐:** 초기화·축 대응을 확인하기 전에는 기울기를 `imu_unknown`(안전)으로 보냅니다.
+  실물 확인 후 `motion_mechdog.cpp` 의 `MECH_ENABLE_IMU` 로 켭니다.
+- **라이다 UART 방향·`rxbuf` [확인 필요]**, **Wi-Fi 절전 끄기(PM_NONE) 지원 여부**(안 되면 `warn=pm_on`).

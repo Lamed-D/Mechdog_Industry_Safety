@@ -34,7 +34,13 @@ PC(Windows) 브라우저에서 **비전 모듈 Wi-Fi**를 통해 로봇 한 대�
 - 영상은 **한 화면에만** 나옵니다(두 번째 접속은 대기). 조종 화면은 한 탭에서만 엽니다.
 - 비밀번호가 없는 Wi-Fi라 근처 누구나 영상을 볼 수 있습니다. 시험할 때만 켭니다.
 
-### 2. 로봇 메인 보드: Python Editor로 파일 올리기 (사용자)
+### 2. 로봇 메인 보드: 펌웨어 올리기 (사용자)
+
+로봇 메인 보드 펌웨어는 두 가지입니다. 콘솔은 **같은 통신 규약**([docs/protocol.md](../../docs/protocol.md))을 쓰므로 어느 쪽이든 그대로 조종됩니다.
+
+- **Arduino 판(기본):** [firmware/main_arduino](../../firmware/main_arduino/README.md) 를 Arduino IDE 로 올립니다. 핫스팟·세팅은 [로봇 Arduino 펌웨어 세팅 가이드](../../docs/robot-arduino-setup.md).
+- **MicroPython 판(되돌림·비교용):** 아래 Python Editor 방식.
+
 ```powershell
 python -m test_PC.robot_console.make_robot_files B
 ```
