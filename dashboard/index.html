@@ -34,6 +34,10 @@
   .row input { flex:1; } .row output { width:40px; text-align:right; }
   #scan-ranges { display:flex; gap:6px; flex:1; } #scan-ranges button { flex:1; padding:6px 0; } #scan-range-v { width:56px; }
   #scan { max-width:100%; height:auto; cursor:zoom-in; }
+  #sonar-ranges { display:flex; gap:6px; flex:1; } #sonar-ranges button { flex:1; padding:6px 0; }
+  #sonar { width:100%; max-width:440px; height:auto; display:block; background:var(--bg); border-radius:6px; }
+  #led-controls { flex-wrap:wrap; } #led-controls #led-color { flex:0 0 56px; height:34px; padding:0; }
+  #led-controls button { padding:6px 10px; }
   dl { display:grid; grid-template-columns:110px 1fr; gap:4px 10px; margin:0; font-size:14px; }
   dt { color:var(--dim); } dd { margin:0; }
   .hint { color:var(--dim); font-size:13px; margin-top:10px; }
@@ -79,6 +83,18 @@
         <dt>경고</dt><dd id="s-warn">-</dd>
         <dt>링크 문제</dt><dd id="s-fault">-</dd>
       </dl>
+      <h2 style="margin-top:16px">초음파 거리 (로봇 정면)</h2>
+      <div class="row" role="group" aria-label="초음파 표시 범위">
+        <label>범위</label>
+        <span id="sonar-ranges">
+          <button type="button" data-sonar-range="0.5">50 cm</button>
+          <button type="button" data-sonar-range="1">1 m</button>
+          <button type="button" data-sonar-range="2">2 m</button>
+          <button type="button" data-sonar-range="4">4 m</button>
+        </span>
+      </div>
+      <canvas id="sonar" width="440" height="260" aria-label="초음파 거리 격자 표시"></canvas>
+      <div class="hint" id="sonar-status">-</div>
       <h2 style="margin-top:16px">초음파 LED 색</h2>
       <div class="row" id="led-controls">
         <input id="led-color" type="color" value="#00ff00" aria-label="LED 색 고르기">
@@ -263,6 +279,77 @@ function startUsbCamera() {
   }
   pollFrame();
 }
+// 초음파 격자: 위 = 로봇 정면, 가로·세로 같은 축척(정사각 격자). 빔 폭 ±15°는 일반 초음파 기준 [가정].
+const SONAR_HALF_DEG = 15;
+let sonarRange = 1, lastSonar = { mm: null, has: false, fresh: false };
+try { const saved = +localStorage.getItem("sonarRange"); if ([0.5, 1, 2, 4].includes(saved)) sonarRange = saved; } catch {}
+function setSonarRange(m) {
+  sonarRange = m;
+  try { localStorage.setItem("sonarRange", m); } catch {}
+  document.querySelectorAll("[data-sonar-range]").forEach(b => b.classList.toggle("held", +b.dataset.sonarRange === m));
+  drawSonar(lastSonar);
+}
+document.querySelectorAll("[data-sonar-range]").forEach(b => b.onclick = () => setSonarRange(+b.dataset.sonarRange));
+function drawSonar(v) {
+  lastSonar = v;
+  const c = $("sonar"), ctx = c.getContext("2d"), W = c.width, H = c.height;
+  const left = 46, right = W - 10, top = 14, base = H - 46;           // base = 센서 위치(거리 0)
+  const scale = (base - top) / sonarRange, cx = (left + right) / 2;    // px / m
+  const step = sonarRange <= 0.5 ? 0.05 : sonarRange <= 1 ? 0.1 : sonarRange <= 2 ? 0.25 : 0.5;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = "11px system-ui"; ctx.lineWidth = 1;
+  // 격자: 거리(가로줄)와 좌우(세로줄)를 같은 간격으로
+  for (let i = 0; i * step <= sonarRange + 1e-9; i++) {
+    const y = base - i * step * scale, major = i % 2 === 0;
+    ctx.strokeStyle = major ? "#3b4452" : "#272d36";
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+    if (major) { ctx.fillStyle = "#8a93a0"; ctx.textAlign = "right"; ctx.fillText(Math.round(i * step * 100) + " cm", left - 4, y + 4); }
+  }
+  for (let i = 0; cx + i * step * scale <= right + 1e-6; i++) {
+    for (const x of i ? [cx + i * step * scale, cx - i * step * scale] : [cx]) {
+      ctx.strokeStyle = i === 0 ? "#3b4452" : (i % 2 === 0 ? "#3b4452" : "#272d36");
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, base); ctx.stroke();
+    }
+  }
+  // 빔 부채꼴
+  const reach = sonarRange * 1.05 * scale, a = SONAR_HALF_DEG * Math.PI / 180;
+  ctx.fillStyle = "rgba(122,162,255,0.10)"; ctx.strokeStyle = "rgba(122,162,255,0.45)";
+  ctx.save(); ctx.beginPath(); ctx.rect(left, top, right - left, base - top); ctx.clip();
+  ctx.beginPath(); ctx.moveTo(cx, base);
+  ctx.arc(cx, base, reach, -Math.PI / 2 - a, -Math.PI / 2 + a); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // 측정 거리
+  const d = v.mm == null ? null : v.mm / 1000;
+  let text;
+  if (!v.has) text = "초음파 지원 펌웨어 연결 전";
+  else if (!v.fresh) text = "로봇 응답 없음 — 최신 값 아님";
+  else if (d == null) text = "측정 없음 (실패·범위 밖) — 장애물 없음이 아님";
+  if (v.has && d != null) {
+    const color = !v.fresh ? "#8a93a0" : d < 0.3 ? "#f85149" : d < 0.6 ? "#d29922" : "#42dfae";
+    if (d <= sonarRange) {
+      const y = base - d * scale, half = Math.tan(a) * d * scale;
+      ctx.strokeStyle = color; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke(); ctx.lineWidth = 1;
+      ctx.fillStyle = color; ctx.textAlign = "left";
+      ctx.fillText((v.mm / 10).toFixed(1) + " cm", Math.min(cx + half + 6, right - 60), y - 5);
+    } else {
+      ctx.fillStyle = color; ctx.textAlign = "center";
+      ctx.fillText("▲ 범위 밖 " + (v.mm / 10).toFixed(0) + " cm", cx, top + 12);
+    }
+  }
+  ctx.restore();
+  // 로봇(아래)과 센서
+  ctx.fillStyle = "#2b323d"; ctx.strokeStyle = "#525d6d";
+  ctx.fillRect(cx - 34, base + 6, 68, 32); ctx.strokeRect(cx - 34, base + 6, 68, 32);
+  ctx.fillStyle = "#7aa2ff"; ctx.fillRect(cx - 10, base, 20, 6);
+  ctx.fillStyle = "#aab5c6"; ctx.textAlign = "center"; ctx.fillText("로봇", cx, base + 26);
+  if (text) { ctx.fillStyle = "#8a93a0"; ctx.textAlign = "center"; ctx.fillText(text, cx, top + (base - top) / 2); }
+  ctx.textAlign = "left";
+  $("sonar-status").textContent = !v.has ? "-" : d == null ? "측정 없음 (NA)"
+    : `정면 ${(v.mm / 10).toFixed(1)} cm` + (v.fresh ? "" : " (오래된 값)") + " · 표시용, 정지 판단에 쓰지 않음";
+}
+setSonarRange(sonarRange);
+
 function sendLed(hex) {
   const n = parseInt(hex.slice(1), 16), rgb = { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
   $("led-color").value = hex;
@@ -300,7 +387,8 @@ async function poll() {
       $("s-warn").textContent = t.warnings.length ? t.warnings.join(", ") : "없음";
       $("s-sonar").textContent = !t.has_sonar ? "지원 안 함(펌웨어)" : t.sonar_mm == null ? "모름 (측정 실패·범위 밖)"
         : (t.sonar_mm / 10).toFixed(1) + " cm";
-    } else { pill($("lock"), "잠금 ?", ""); $("s-sonar").textContent = "-"; }
+      drawSonar({ mm: t.sonar_mm, has: t.has_sonar, fresh: s.fresh });
+    } else { pill($("lock"), "잠금 ?", ""); $("s-sonar").textContent = "-"; drawSonar({ mm: null, has: false, fresh: false }); }
     const ledOk = !!(t && t.has_sonar && s.fresh);
     document.querySelectorAll("#led-controls button").forEach(b => b.disabled = !ledOk);
     if (!ledOk) $("led-status").textContent = "로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)";
