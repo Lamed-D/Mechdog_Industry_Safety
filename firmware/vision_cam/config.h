@@ -67,7 +67,7 @@
 #endif
 // 센서에 JPEG 압축기가 없으면(GC2145 등) RGB565 로 받아 칩에서 JPEG 로 바꿉니다.
 // 소프트웨어 압축 품질은 1~100(클수록 좋음)이라 센서 품질(0~63, 작을수록 좋음)과 척도가 다릅니다.
-// 80 은 시작값: 로봇 B 실물 VGA 한 장 약 31KB(docs/vision-cam-firmware.md 13절).
+// 80 은 시작값: 로봇 B 실물 VGA 한 장 약 31KB(docs/ai/firmware.md 13절).
 #define CAM_SOFT_JPEG_QUALITY 80
 // 촬영 작업이 매 주기 최소로 쉬는 시간(ms). 같은 코어의 loop 가 워치독을 갱신할 틈을 줍니다(loop 는 delay(20) 포함).
 #define CAM_MIN_YIELD_MS 30

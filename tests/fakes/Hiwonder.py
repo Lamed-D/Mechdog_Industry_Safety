@@ -33,7 +33,7 @@ def startMain(func):
 
 
 def Battery_power():
-    # 제조사 예제 기준 mV 정수 (docs/protocol.md 5.4절)
+    # 제조사 예제 기준 mV 정수 (docs/ai/protocol.md 5.4절)
     calls.append(("Battery_power", ()))
     return outcome(_battery[0])
 

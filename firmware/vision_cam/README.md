@@ -1,10 +1,10 @@
 # 비전 모듈 맞춤 펌웨어 (`vision_cam`)
 
 로봇 앞쪽 ESP32-S3 카메라용입니다. **MechDog 메인 보드에 올리지 않습니다.**
-각 카메라는 공통 로봇 Wi-Fi에서 담당 Windows 노트북에 영상을 제공합니다. [Windows 카메라 연결 안내](../../test_PC/camera-setup.md)를 참조하세요.
+각 카메라는 공통 로봇 Wi-Fi에서 담당 Windows 노트북에 영상을 제공합니다. [Windows 카메라 연결 안내](../../docs/ai/dashboard.md)를 참조하세요.
 아래 빌드 명령으로 현재 소스의 합본을 만듭니다. 이전 배포 이미지는 제거했고 산출물은 build에만 둡니다.
 
-자세한 설치·설정·복구·빌드: [docs/vision-cam-firmware.md](../../docs/vision-cam-firmware.md)
+자세한 설치·설정·복구·빌드: [docs/ai/firmware.md](../../docs/ai/firmware.md)
 
 저장소 루트에서 `python tools/build_vision_cam.py --release`를 먼저 실행합니다.
 

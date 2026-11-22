@@ -3,7 +3,7 @@
 void NetLink::begin() {
   WiFi.mode(WIFI_STA);
   WiFi.persistent(false);
-  // 절전 끄기(지연 줄이기). 끄지 못하면 pm_on=true 로 알림(docs/protocol.md 6.1절).
+  // 절전 끄기(지연 줄이기). 끄지 못하면 pm_on=true 로 알림(docs/ai/protocol.md 6.1절).
   pm_on_ = !WiFi.setSleep(false);
   try_connect();
 }

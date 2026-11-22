@@ -1,4 +1,4 @@
-// 로봇 설정값 (docs/protocol.md 8절). robot/config.py 의 Arduino 이식.
+// 로봇 설정값 (docs/ai/protocol.md 8절). robot/config.py 의 Arduino 이식.
 // [가정] 값은 실측 전 초기값이며 Python 판과 같은 수를 씁니다. 두 펌웨어는 같은 규약·안전 동작을 지켜야 합니다.
 // 이 헤더는 벤더·Arduino 에 의존하지 않습니다(안전 로직을 그 둘과 분리해 검토·시험하기 위함).
 #ifndef MECH_CONFIG_H
@@ -32,7 +32,7 @@ struct Config {
   uint32_t DEFAULT_POSE_SETTLE_MS = 600;  // [가정]
   uint32_t ACTION_MIN_MS = 200;           // 동작 시작 뒤 이 시간이 지나야 완료 확인을 믿음 [가정]
 
-  // 라이다 원시 중계 (docs/protocol.md 7절)
+  // 라이다 원시 중계 (docs/ai/protocol.md 7절)
   int LIDAR_UART_ID = 1;
   int LIDAR_RX_PIN = 32;
   int LIDAR_TX_PIN = 33;
@@ -40,7 +40,7 @@ struct Config {
   int LIDAR_RXBUF = 4096;            // [가정]
   uint32_t LIDAR_PENDING_WARN_MS = 100;  // [가정] TCP 로 보내지 못한 묶음의 나이
 
-  // 동작 그룹 소요 시간 [가정]. 허용 목록(docs/protocol.md 3.3절)에 있는 이름만.
+  // 동작 그룹 소요 시간 [가정]. 허용 목록(docs/ai/protocol.md 3.3절)에 있는 이름만.
   // 최대 시간이며, 실제로는 완료 확인(run_status)이 먼저 끝낼 수 있습니다.
   uint32_t action_duration_ms(const char* name) const {
     if (strcmp(name, "stand_four_legs") == 0) return 2000;

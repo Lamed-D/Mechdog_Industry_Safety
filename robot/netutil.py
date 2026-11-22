@@ -1,4 +1,4 @@
-# 비차단 소켓 공용 도구 (통신 전용 예외, docs/dev/mechdog-api.md 9절).
+# 비차단 소켓 공용 도구 (통신 전용 예외, docs/ai/mechdog-api.md 9절).
 
 import errno
 

@@ -1,4 +1,4 @@
-"""Wi-Fi·UDP 링크, 라이다 중계, 전체 조립 (docs/protocol.md 1·5·6·7절)."""
+"""Wi-Fi·UDP 링크, 라이다 중계, 전체 조립 (docs/ai/protocol.md 1·5·6·7절)."""
 
 import ast
 import errno

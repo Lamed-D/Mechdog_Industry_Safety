@@ -53,7 +53,7 @@ class VisionTests(unittest.TestCase):
 
 
 class VisionResultShapeTests(unittest.TestCase):
-    """docs/protocol.md 11절: 맞춤 카메라 펌웨어의 '결과 없음'을 결과로 오인하지 않습니다."""
+    """docs/ai/protocol.md 11절: 맞춤 카메라 펌웨어의 '결과 없음'을 결과로 오인하지 않습니다."""
 
     def setUp(self):
         fakes.install()

@@ -1,9 +1,9 @@
 // 메인 ESP32 Arduino 펌웨어 — robot/ MicroPython 판(app.py·main.py)의 이식.
 // 판단은 Windows 노트북, 동작·정지는 로봇. 명령을 공식 MechDog API 로 실행하고, 끊기면 스스로 멈춥니다.
 // 세 태스크(수신·감시·라이다)를 따로 돌리고 뮤텍스로 상태 변경을 직렬화합니다. 감시가 수신과 다른 태스크라
-// 수신이 멈춰도 600 ms 뒤 정지합니다(docs/protocol.md 5.1절).
+// 수신이 멈춰도 600 ms 뒤 정지합니다(docs/ai/protocol.md 5.1절).
 //
-// 업로드(굽기)는 사용자만 합니다(docs/firmware-strategy.md 1.4절). 이 .ino 를 올리면 순정 MicroPython 이 지워집니다.
+// 업로드(굽기)는 사용자만 합니다(docs/ai/firmware.md 1.4절). 이 .ino 를 올리면 순정 MicroPython 이 지워집니다.
 // 벤더 라이브러리(HW_MechDog 등)는 저장소에 없으므로 제조사 패키지로 설치해야 컴파일됩니다(README.md).
 #include <Arduino.h>
 #include "mech_config.h"
@@ -59,7 +59,7 @@ static void comm_task(void*) {
 
     if (due && L && dip) {
       net.send(line, L, dip, cfg.TEL_PORT);
-      if (RL) net.send(role, RL, dip, cfg.TEL_PORT);  // 역할 상태(docs/robot-redundancy.md)
+      if (RL) net.send(role, RL, dip, cfg.TEL_PORT);  // 역할 상태(docs/ai/protocol.md)
     }
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -76,7 +76,7 @@ static void watchdog_task(void*) {
   }
 }
 
-// 라이다 원시 중계. 라이다 문제로 로봇을 멈추지 않음(docs/protocol.md 7절).
+// 라이다 원시 중계. 라이다 문제로 로봇을 멈추지 않음(docs/ai/protocol.md 7절).
 static void lidar_task(void*) {
   for (;;) {
     lidar.service(net.connected());

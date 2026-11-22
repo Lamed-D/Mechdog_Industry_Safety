@@ -6,7 +6,7 @@
 
 namespace mech {
 
-// 로봇을 움직이는 호출은 모두 여기로 모읍니다. 공식 MechDog API 만 씁니다(docs/dev/mechdog-api.md 3절).
+// 로봇을 움직이는 호출은 모두 여기로 모읍니다. 공식 MechDog API 만 씁니다(docs/ai/mechdog-api.md 3절).
 class MotionBackend {
  public:
   virtual ~MotionBackend() {}

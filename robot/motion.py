@@ -1,4 +1,4 @@
-# 로봇을 움직이는 호출은 모두 여기 모읍니다. 공식 MechDog API만 씁니다(docs/dev/mechdog-api.md 3절).
+# 로봇을 움직이는 호출은 모두 여기 모읍니다. 공식 MechDog API만 씁니다(docs/ai/mechdog-api.md 3절).
 
 STEP_MIN, STEP_MAX = -100, 100
 ANGLE_MIN, ANGLE_MAX = -30, 30

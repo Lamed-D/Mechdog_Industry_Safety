@@ -1,6 +1,6 @@
 #pragma once
 // 카메라 연결 핀. 제조사 비전 모듈 예제가 모두 고른 보드 정의(ESP32-S3-EYE 배치)와 같고,
-// 제조사 기본 영상 펌웨어에도 같은 카메라 모듈 이름이 들어 있습니다(docs/vision-cam-firmware.md 3절).
+// 제조사 기본 영상 펌웨어에도 같은 카메라 모듈 이름이 들어 있습니다(docs/ai/firmware.md 3절).
 #define CAM_PIN_PWDN -1
 #define CAM_PIN_RESET -1
 #define CAM_PIN_XCLK 15

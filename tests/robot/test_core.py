@@ -1,4 +1,4 @@
-"""명령 처리·감시·래치·저전압·텔레메트리 (docs/protocol.md 4·5·6절)."""
+"""명령 처리·감시·래치·저전압·텔레메트리 (docs/ai/protocol.md 4·5·6절)."""
 
 import threading
 import unittest

@@ -1,6 +1,6 @@
-# RPLIDAR A1M8-R6 원시 중계: J5 UART <-> TCP (docs/protocol.md 7절, docs/lidar-integration.md 6.2절 A안).
+# RPLIDAR A1M8-R6 원시 중계: J5 UART <-> TCP (docs/ai/protocol.md 7절, docs/ai/lidar-frozen.md 2절).
 # 라이다 바이트를 해석·가공하지 않고 같은 순서로 넘깁니다. 로봇을 움직이지 않으며 안전 래치와 무관합니다.
-# machine.UART 직접 사용은 추가 센서 예외(docs/dev/mechdog-api.md 6절): 공식 UART 는 텍스트 명령용이라 바이너리를 못 다룸.
+# machine.UART 직접 사용은 추가 센서 예외(docs/ai/mechdog-api.md 6절): 공식 UART 는 텍스트 명령용이라 바이너리를 못 다룸.
 # 통신 값(115200 bps 8N1, 3.3 V TTL)은 공개 데이터시트 기준. J5: IO32 = 로봇 RX, IO33 = 로봇 TX (방향 [확인 필요]).
 
 import errno

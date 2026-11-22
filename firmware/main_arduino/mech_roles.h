@@ -1,5 +1,5 @@
 // 같은 장비의 A/B 식별자와 별개인 임대 역할. robot/roles.py 의 Arduino 이식.
-// 제어 권한·래치 해제를 만들지 않습니다(docs/robot-redundancy.md).
+// 제어 권한·래치 해제를 만들지 않습니다(docs/ai/protocol.md).
 #ifndef MECH_ROLES_H
 #define MECH_ROLES_H
 #include <stdint.h>

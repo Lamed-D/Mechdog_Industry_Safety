@@ -2,23 +2,27 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "build/robot_checks"
+REPO = "https://github.com/Lamed-D/Mechdog_Industry_Safety/blob/main/"
 SCRIPTS = ("mechdog_only.py", "api_candidates.py", "robot_imu_check.py",
            "robot_loop_check.py", "vision_probe.py", "robot_motion_check.py")
 
 
+def _github_link(match):
+    # 인계 폴더 밖에서는 상대 링크가 깨지므로 저장소 주소로 바꿉니다.
+    path = match.group(2) if match.group(1) else "docs/ai/" + match.group(2)
+    return "](" + REPO + path
+
+
 def contents():
     files = {name: (ROOT / "tools/bringup" / name).read_bytes() for name in SCRIPTS}
-    docs = ROOT / "docs/user-tests"
-    files["README.md"] = (docs / "robot-python-handoff.md").read_bytes()
-    checklist = (docs / "robot-python-checklist.md").read_text(encoding="utf-8")
-    checklist = checklist.replace("../robot-upload.md",
-        "https://github.com/Lamed-D/Mechdog_Industry_Safety/blob/main/docs/robot-upload.md")
-    files["robot-python-checklist.md"] = checklist.encode("utf-8")
-    files["results-template.md"] = (docs / "results-template.md").read_bytes()
+    guide = (ROOT / "docs/ai/robot-tests.md").read_text(encoding="utf-8")
+    guide = re.sub(r"\]\((?!https?:)(\.\./\.\./)?([^)#]+)", _github_link, guide)
+    files["README.md"] = guide.encode("utf-8")
     return files
 
 

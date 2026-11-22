@@ -8,7 +8,7 @@
 // 코어가 읽기 요청을 명령 수신보다 먼저 알려 줄 수 있어, 직전 명령 기준으로 답하게 됩니다.
 // 응답이 명령에 따라 다르면 직전 명령의 응답이 "인식됨"으로 읽힐 수 있으므로 하나로 고정합니다.
 // 읽기가 끝나면 코어가 남은 송신 바이트를 비우므로, 요청보다 길게 넣어도 다음 읽기로 넘어가지 않습니다.
-// tests/robot/test_vision_cam_i2c.py 가 이 값을 docs/protocol.md 11.2절의 모든 읽기 형식으로 해석해 검사합니다.
+// tests/robot/test_vision_cam_i2c.py 가 이 값을 docs/ai/protocol.md 11.2절의 모든 읽기 형식으로 해석해 검사합니다.
 
 #define CAM_I2C_REPLY_LEN 7
 

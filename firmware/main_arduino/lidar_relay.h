@@ -1,6 +1,6 @@
-// RPLIDAR 원시 중계: J5 UART <-> TCP (docs/protocol.md 7절, robot/custom_sensors/lidar_bridge.py 이식).
+// RPLIDAR 원시 중계: J5 UART <-> TCP (docs/ai/protocol.md 7절, robot/custom_sensors/lidar_bridge.py 이식).
 // 바이트를 해석·가공하지 않고 같은 순서로 넘깁니다. 로봇을 움직이지 않으며 안전 래치와 무관합니다.
-// machine.UART 직접 사용 예외(docs/dev/mechdog-api.md 6절)에 해당. (Arduino 전용)
+// machine.UART 직접 사용 예외(docs/ai/mechdog-api.md 6절)에 해당. (Arduino 전용)
 #ifndef LIDAR_RELAY_H
 #define LIDAR_RELAY_H
 #include <Arduino.h>

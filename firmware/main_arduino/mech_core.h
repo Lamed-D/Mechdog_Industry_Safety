@@ -1,4 +1,4 @@
-// 명령 처리·감시·래치·저전압 (docs/protocol.md 4·5·6절). robot/core.py 의 Arduino 이식.
+// 명령 처리·감시·래치·저전압 (docs/ai/protocol.md 4·5·6절). robot/core.py 의 Arduino 이식.
 // 벤더·Arduino 비의존: 하드웨어는 MotionBackend·Sensors·Clock 주입으로만 만집니다.
 // 동시 실행(수신·감시·텔레메트리 태스크)은 상위(.ino)에서 뮤텍스로 직렬화합니다.
 #ifndef MECH_CORE_H

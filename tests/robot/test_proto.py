@@ -1,4 +1,4 @@
-"""명령 메시지 해석 (docs/protocol.md 2·3·4.4절)."""
+"""명령 메시지 해석 (docs/ai/protocol.md 2·3·4.4절)."""
 
 import unittest
 

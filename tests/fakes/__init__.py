@@ -4,7 +4,7 @@
 `import machine`, `import network` 로 공식 모듈을 씁니다. PC에는 이 모듈이 없으므로 테스트에서
 `install()`로 같은 이름의 가짜 모듈을 `sys.modules`에 넣고, 끝나면 `uninstall()`로 되돌립니다.
 
-- 이름·인자는 공식 문서(docs/dev/mechdog-api.md)와 제조사 예제에서 확인한 것만 흉내 냅니다.
+- 이름·인자는 공식 문서(docs/ai/mechdog-api.md)와 제조사 예제에서 확인한 것만 흉내 냅니다.
 - 범위 밖 값·없는 동작 이름·`set_servo`는 `FakeHardwareError`(AssertionError)로 테스트를 실패시킵니다.
 - 모든 호출은 `calls`에 (이름, 인자) 로 남습니다.
 - `fake_` 로 시작하는 함수·메서드는 테스트가 상황을 만들 때만 쓰는 도우미입니다(실제 API 아님).

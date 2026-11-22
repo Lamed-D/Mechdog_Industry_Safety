@@ -1,4 +1,4 @@
-# 로봇 설정값 (docs/protocol.md 8절). [가정] 표시 값은 실측 전 초기값.
+# 로봇 설정값 (docs/ai/protocol.md 8절). [가정] 표시 값은 실측 전 초기값.
 # 로봇 B에 올릴 때는 ROBOT_ID 를 "B" 로 바꿉니다.
 # Wi-Fi 이름·비밀번호는 secrets.py (커밋 금지, secrets.example.py 참고).
 

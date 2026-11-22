@@ -6,7 +6,7 @@ from host.lidar.rplidar_protocol import (
     Command, Sample, SampleParser, parse_descriptor, parse_sample, request)
 from host.lidar.scan_assembler import ScanAssembler
 from host.lidar.tcp_client import LidarClient
-from tools.mock.mock_lidar import MockLidar, descriptor, room_sample
+from tests.host.fake_lidar import MockLidar, descriptor, room_sample
 
 
 class ProtocolTests(unittest.TestCase):

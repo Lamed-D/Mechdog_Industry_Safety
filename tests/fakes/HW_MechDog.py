@@ -1,7 +1,7 @@
-"""가짜 `HW_MechDog` 모듈 (docs/dev/mechdog-api.md 3·4절).
+"""가짜 `HW_MechDog` 모듈 (docs/ai/mechdog-api.md 3·4절).
 
 실제 로봇과 다르게 동작 그룹은 시간이 흘러도 저절로 끝나지 않습니다. 테스트가 `fake_finish_action()`으로 끝냅니다.
-`move(0, 0)`이 실행 중인 동작 그룹을 끊는지는 실물 확인 전이므로(docs/protocol.md 3.3절) 끊지 않는 쪽으로 흉내 냅니다.
+`move(0, 0)`이 실행 중인 동작 그룹을 끊는지는 실물 확인 전이므로(docs/ai/protocol.md 3.3절) 끊지 않는 쪽으로 흉내 냅니다.
 """
 
 from tests.fakes._base import FakeHardwareError, check_int_range, check_vec3

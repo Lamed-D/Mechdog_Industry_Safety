@@ -3,7 +3,7 @@
 // - 메인 보드의 공식 ESP32S3Cam I2C 읽기에는 규격대로 "결과 없음"으로 응답합니다(인식은 Pi 5가 함).
 // - 이 펌웨어는 로봇을 움직이지 않습니다. 카메라 모듈 안에서만 동작합니다.
 // - 로봇 ID·Wi-Fi 는 USB 시리얼 명령(help)으로 저장하거나 secrets.h 로 빌드합니다.
-// 빌드·굽기·복구: docs/vision-cam-firmware.md
+// 빌드·굽기·복구: docs/ai/firmware.md
 
 #include "config.h"
 #include "esp_task_wdt.h"

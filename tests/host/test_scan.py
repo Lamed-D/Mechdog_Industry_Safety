@@ -5,7 +5,7 @@ from host.lidar.laser_scan import ranges_metres
 from host.lidar.scan_assembler import Scan
 from host.lidar.rplidar_protocol import parse_sample
 from host.lidar.tcp_client import LidarClient
-from tools.mock.mock_lidar import room_sample
+from tests.host.fake_lidar import room_sample
 from tests.host import test_lidar
 
 
