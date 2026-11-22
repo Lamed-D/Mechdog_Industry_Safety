@@ -64,7 +64,7 @@
         <button data-dir="right">우회전 ▶<br><small>D</small></button>
         <span></span><button data-dir="back">▼ 후진<br><small>S</small></button><span></span>
       </div>
-      <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="20"><output id="stepv">20</output></div>
+      <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><output id="stepv">50</output></div>
       <div class="row"><label>회전 각도</label><input id="angle" type="range" min="1" max="30" value="5"><output id="anglev">5</output></div>
       <button class="estop" id="estop">비상 정지 (Esc)</button>
       <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
@@ -144,8 +144,7 @@ function say(text) { $("msg").textContent = text || ""; }
 
 function motion(dir) {
   const s = +$("step").value, a = +$("angle").value;
-  // 좌·우는 실물에서 시험한 것과 같이 전진하면서 회전: move(20, 5) / move(20, -5)
-  return { fwd:[s,0], back:[-s,0], left:[s,a], right:[s,-a] }[dir];
+  return { fwd:[s,0], back:[-s,0], left:[0,a], right:[0,-a] }[dir];
 }
 function sendMove() {
   const [step, angle] = motion(holding);
