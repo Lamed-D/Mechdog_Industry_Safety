@@ -71,7 +71,7 @@ python -m venv .private\lidar-pc
 | --- | --- |
 | 이동 | **누르고 있는 동안만.** 브라우저가 0.1초마다 `/api/move`를 다시 보내고, 서버 쪽 이동 의도는 0.3초(`HOST_INTENT_MS`) 뒤 사라져 `STOP`. 키보드 W/A/S/D·화살표, Space 정지, Esc 비상 정지 |
 | 이동 값 | 보폭 슬라이더 5~100(기본 20), 회전 1~30(기본 5). 앞 `move(s,0)`, 뒤 `move(-s,0)`, 좌 `move(s,a)`, 우 `move(s,-a)` — 좌·우는 **전진하면서** 회전(실물에서 쓴 값) |
-| 잠금 해제 | `RESET`. 신선한 래치 TEL과 배터리 `LOW_BATT_RESET_MV` 이상일 때만(아니면 400 오류). 해제돼도 움직이지 않음 |
+| 잠금 해제 | 페이지 안의 확인창에서 확인하면 `RESET`. 신선한 래치 TEL과 배터리 `LOW_BATT_RESET_MV` 이상일 때만(아니면 400 오류). 해제돼도 움직이지 않음 |
 | 일어서기 | 잠금 해제 뒤, 신선·비상정지 아님·`idle`·배터리 `LOW_BATT_WARN_MV` 이상·`batt_unknown`/`batt_low`/`lidar_uart`/`lidar_backlog`/`proto` 경고 없음일 때만 `CMD\|POSE\|<id>\|<seq>\|default\|$`(`set_default_pose()`)를 한 번 보냄. 정지·비상 정지·이동·종료·조건 깨짐이 대기 요청을 취소 |
 | 비상 정지 | `ESTOP` 래치(호스트·로봇 양쪽). 이전 이동 의도 복원 없음 |
 | 상태 | 연결(연결됨/응답 지연/로봇 응답 없음/비상 정지 중), 잠김, `state`, 래치 사유, 배터리 V, 기울기, **초음파 거리 cm**(TEL `sonar_mm`, 표시용), `warn`, 호스트 fault. 0.25초마다 `/api/state` |

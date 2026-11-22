@@ -287,7 +287,9 @@ class RobotLink:
         for message in messages:
             try:
                 self.send(message)
-                if b"|HELLO|" not in message and self.ack_wait_since is None:
+                # Discovery STOPs can be sent before anyone has accepted HELLO.
+                if (self.last_seen != -math.inf and b"|HELLO|" not in message
+                        and self.ack_wait_since is None):
                     self.ack_wait_since = now
             except Exception as error:
                 failure = error  # 첫 송신 실패도 다음 정지/핸드셰이크 시도를 막지 않음

@@ -287,7 +287,7 @@ seq는 로봇별로 따로 관리합니다. 로봇은 seq와 상관없이 실행
 | 배터리 `NA` 또는 `LOW_BATT_WARN_MV` 미만, `warn`에 `batt_unknown`·`batt_low`·`lidar_uart`·`lidar_backlog`·`proto`, `state=action` | `MOVE` 대신 `STOP` |
 | 스캔이 `HOST_SCAN_FRESH_MS`(300 ms) 넘게 끊김 (`require_scan=True`일 때. 대시보드는 `False`) | `MOVE` 대신 `STOP`. 센서 유효성·신선도는 호출자가 판정해 `mark_scan`에 전달 |
 | TEL이 `HOST_TEL_FRESH_MS`(400 ms) 넘게 지연 | ESTOP 래치(`telemetry_stale`) |
-| 명령 ACK(`last_cmd_seq`)가 `LINK_TIMEOUT_MS`(600 ms) 동안 진전 없음 | ESTOP 래치(`ack_stalled`) |
+| 현재 세션의 첫 TEL을 받은 뒤 명령 ACK(`last_cmd_seq`)가 `LINK_TIMEOUT_MS`(600 ms) 동안 진전 없음 | ESTOP 래치(`ack_stalled`) |
 | 송신 예외 | ESTOP 래치(`send_failed`), 첫 실패도 이어지는 정지/HELLO 시도를 막지 않음 |
 | TEL `tseq`·`uptime` 역행 | ESTOP 래치(`robot_restarted`) + 새 `boot_id`(2.2절 6항) |
 | 보내지 않은 순번의 ACK, 역행 ACK, 중복·역행 TEL, 다른 `boot_id`의 TEL | 신선도 갱신 안 함 |
