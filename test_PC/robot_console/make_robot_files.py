@@ -4,7 +4,7 @@ robot/ 와 custom_sensors/lidar_bridge.py 를 주석·설명문 없이, 영문(A
 build/robot_files_<ID>/ 에 파일별로 씁니다. 동작 코드는 그대로입니다.
 한 파일로 묶은 큰 main.py(tools/bundle_robot.py)는 편집기 전송이 실패해서 이 방식을 씁니다.
 
-실행: python dashboard/robot_console/make_robot_files.py B
+실행: python -m test_PC.robot_console.make_robot_files B
 """
 import ast
 import io

@@ -1,7 +1,7 @@
 # PC 로봇 조종·모니터링 화면 (`robot_console`)
 
 PC(Windows) 브라우저에서 **비전 모듈 Wi-Fi**를 통해 로봇 한 대를 직접 조종하고 카메라 영상을 보는 시험·조종 도구입니다.
-Supabase·Pi 5를 거치는 관리자 대시보드(`dashboard/app`, `dashboard/web`)와는 별개입니다.
+상태·카메라·LiDAR를 한 화면에서 점검합니다. 두 대의 낙상 알림·안내 시나리오는 [상위 시험 안내](../README.md)를 따릅니다.
 
 ```text
 브라우저 화면(index.html) ⇄ PC 중계(server.py) ⇄ UDP(docs/protocol.md) ⇄ 로봇 메인 보드(robot/)
@@ -12,16 +12,15 @@ Supabase·Pi 5를 거치는 관리자 대시보드(`dashboard/app`, `dashboard/w
 
 ## 화면
 
-| 왼쪽 | 오른쪽 |
-| --- | --- |
-| 카메라 영상, 이동(전진·후진·좌·우·정지), 보폭·회전, 비상 정지, 잠금 해제, 일어서기, 로봇 상태 | LiDAR 스캔 화면(준비 중) |
+- 카메라 영상, 이동, 비상 정지, 잠금 해제, 일어서기와 로봇 상태를 표시합니다.
+- LiDAR는 USB 또는 TCP에서 최신 한 회전을 거리 점으로 그립니다. 빈 각도와 무효 측정은 비워 두고, 1초 동안 새 스캔이 없거나 연결이 끊기면 점을 지웁니다. 센서 원시 각도를 표시하므로 로봇의 정면과 일치하는지는 장착 후 확인합니다.
 
 - 이동은 **누르고 있는 동안만**(0.1초마다 다시 보냄, 0.3초 안에 안 오면 정지). 키보드 W/A/S/D·화살표, Space 정지, Esc 비상 정지.
 - 기본값은 실물에서 시험한 값입니다: 보폭 20, 좌·우는 **전진하면서** ±5 회전(`move(20, 5)` / `move(20, -5)`).
 - 안전 동작은 `host/robot_link.py`를 그대로 씁니다. 로봇은 켜지면 잠겨 있고, 사람이 **잠금 해제**해야 움직입니다.
   통신이 끊기면 로봇이 스스로 멈추고 잠깁니다. 배터리가 낮거나 모르면 이동 명령을 보내지 않습니다.
 - **일어서기**는 잠금 해제 뒤에만 `CMD|POSE|<id>|<seq>|default|$`(= `set_default_pose()`)를 한 번 보냅니다.
-  로봇 프로그램은 켜질 때 일어서지 않습니다(부팅 잠금).
+  배터리와 대기 상태가 확인돼야 하며, 정지·비상 정지·종료가 대기 요청을 취소합니다.
 
 ## 준비
 
@@ -36,7 +35,7 @@ Supabase·Pi 5를 거치는 관리자 대시보드(`dashboard/app`, `dashboard/w
 
 ### 2. 로봇 메인 보드: Python Editor로 파일 올리기 (사용자)
 ```powershell
-python dashboard/robot_console/make_robot_files.py B
+python -m test_PC.robot_console.make_robot_files B
 ```
 `build/robot_files_B/`에 11개 파일이 생깁니다(주석 없는 ASCII, 동작 코드는 `robot/`과 같음).
 한 파일로 묶은 `build/robot_B/main.py`(약 49KB)는 편집기 전송이 `Download fail`로 실패해 나눠 올립니다.
@@ -50,21 +49,47 @@ python dashboard/robot_console/make_robot_files.py B
 PC Wi-Fi를 `HW_ESP32S3CAM`에 연결합니다. 인터넷이 끊기므로 필요하면 유선 랜이나 휴대폰 블루투스·USB 테더링으로 인터넷을 따로 받습니다.
 
 ```powershell
-python dashboard/robot_console/server.py --robot B --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream
+python -m test_PC.robot_console.server --robot B --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream
 ```
 
 브라우저에서 `http://127.0.0.1:8090`을 엽니다. 처음 실행 때 Windows 방화벽 창이 뜨면 개인 네트워크를 허용합니다.
 `--robot-ip auto`는 같은 Wi-Fi에 방송으로 HELLO를 보내고 처음 답한 해당 ID 로봇의 IP로 고정합니다.
 안 찾아지면 REPL에서 `network.WLAN(network.STA_IF).ifconfig()`로 IP를 보고 `--robot-ip 192.168.5.x`로 넣습니다.
 
-## 로봇 없이 시험
+## 로봇 없이 통합 시험
 
-```powershell
-python dashboard/robot_console/fake_robot.py
-python dashboard/robot_console/server.py
+```cmd
+test_PC\run.cmd console
 ```
 
-`fake_robot.py`는 실제 `robot/core.py`를 PC에서 돌리고 MechDog 호출은 화면에 찍기만 합니다.
+다음 네 줄을 저장소 최상위의 CMD 창 네 개에서 각각 실행합니다. A를 시험하려면 로봇·카메라·콘솔의 `--robot B`를 모두 A로 바꿉니다.
+
+```cmd
+python -m test_PC.robot_console.fake_robot --robot B
+python -m tools.mock.mock_camera --robot B --frame test_PC\robot_console\mock_frame.jpg
+python -m tools.mock.mock_lidar
+python -m test_PC.robot_console.server --robot B --cam http://127.0.0.1:8081/stream --lidar-tcp 127.0.0.1
+```
+
+브라우저에서 `http://127.0.0.1:8090`을 엽니다. B와 부팅 잠금, 합성 영상 요청, 정사각형 LiDAR 점이 표시되는지 확인합니다. 가짜 본체의 잠금을 해제하고 이동을 눌렀다 놓아 가짜 MechDog 콘솔 로그에 이동과 정지가 찍히는지 확인합니다. 비상 정지 후 잠금 상태를 확인합니다. 모의 LiDAR를 Ctrl+C로 종료하면 점이 사라져야 합니다. 콘솔을 먼저 Ctrl+C로 종료한 뒤 나머지 모의 프로세스를 종료합니다.
+
+## 사용자 실물 통합 시험
+
+1. USB 직결만 확인할 때는 [상위 안내](../README.md)대로 `pyserial`을 설치한 환경에서 아래 명령을 실행합니다. 확인한 어댑터 포트를 사용하고 USB 진단과 콘솔을 동시에 열지 않습니다.
+
+   ```cmd
+   .private\lidar-pc\Scripts\python.exe -m test_PC.robot_console.server --lidar-usb COM번호
+   ```
+
+2. J5 UART·Wi-Fi 경로는 로봇 주소와 같은 로봇의 카메라 URL을 확인한 뒤 아래 명령을 실행합니다. `%ROBOT_B_IP%`와 `%CAM_B_URL%`은 해당 시험 환경의 값입니다. 카메라 기본 AP 시험에서 TCP 20108을 쓸 수 없으면 우선 USB 직결 화면과 본체 상태를 개별 확인합니다.
+
+   ```cmd
+   python -m test_PC.robot_console.server --robot B --robot-ip %ROBOT_B_IP% --allow-real --cam %CAM_B_URL% --lidar-tcp %ROBOT_B_IP%
+   ```
+
+3. 잠긴 상태에서 본체 ID, 카메라, LiDAR 점을 확인합니다. 사용자 승인 범위에서 로봇을 받침대에 두고 잠금 해제, 정지와 비상 정지부터 시험합니다. Wi-Fi를 끊었을 때 명령 watchdog으로 본체가 정지·래치하는지, LiDAR 점이 지워지는지 확인합니다. 콘솔 종료 후 정지 상태를 확인합니다. A도 주소·카메라·로봇 ID를 바꿔 같은 절차를 반복합니다.
+
+조종 콘솔은 한 번에 본체 한 대를 연결합니다. 두 대의 상태를 함께 확인할 때는 [정지형 대시보드 실행 안내](../../docs/host-setup.md)를 따르고 조종 콘솔을 먼저 종료합니다.
 
 ## 실물 확인 결과 (로봇 B, 사용자 실행, 2026-11-21)
 

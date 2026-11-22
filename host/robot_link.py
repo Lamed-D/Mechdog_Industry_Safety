@@ -211,6 +211,9 @@ class RobotLink:
         self.next_hello = self.clock() + settings.HOST_HELLO_RETRY_MS / 1000
         return ("CMD|HELLO|%s|%s|%d|$" % (self.robot, self.boot_id, wire.PROTO_VERSION)).encode()
 
+    def _idle_command(self):
+        return self._command("STOP")
+
     def step(self):
         now = self.clock()
         if now < self.next_send:
@@ -246,7 +249,7 @@ class RobotLink:
             payload = self._command("MOVE", *self.intent[:2])
         else:
             self.intent = None
-            payload = self._command("STOP")
+            payload = self._idle_command()
         messages = [payload]
         if self.emergency and not self.fresh() and now >= self.next_hello:
             messages.append(self._hello())  # ESTOP을 먼저 보내고, 래치를 유지하며 TEL 목적지만 확인

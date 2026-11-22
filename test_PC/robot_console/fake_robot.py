@@ -1,7 +1,8 @@
 """가짜 로봇: 실제 로봇 코드(robot/core.py)를 PC에서 돌리고 MechDog 호출은 화면에 찍기만 합니다.
 
-실행: python dashboard/robot_console/fake_robot.py   (127.0.0.1:9100 에서 명령 받음)
+실행: python -m test_PC.robot_console.fake_robot   (127.0.0.1:9100 에서 명령 받음)
 """
+import argparse
 import os
 import secrets as _stdlib_secrets  # noqa: F401  robot/secrets.py 에 가려지지 않게
 import socket
@@ -40,6 +41,9 @@ class PrintDog:
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--robot", choices=("A", "B"), default="A")
+    config.ROBOT_ID = parser.parse_args().robot
     robot = Robot(config, Motion(PrintDog()), Clock(), lambda: 7400, lambda: (0.0, 0.0))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("127.0.0.1", config.CMD_PORT))

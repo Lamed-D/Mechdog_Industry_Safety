@@ -1,11 +1,18 @@
 import socket
 import subprocess
 import sys
+import json
+import threading
 import unittest
+from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-from dashboard.robot_console.make_robot_files import UPLOAD_ORDER, render
-from dashboard.robot_console.server import AutoTransport, ConsoleLink
+from host.lidar.rplidar_protocol import Sample
+from test_PC.robot_console.lidar import LidarFeed
+from test_PC.robot_console.make_robot_files import UPLOAD_ORDER, render
+from test_PC.robot_console.server import AutoTransport, Console, ConsoleLink, make_handler
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -53,6 +60,70 @@ class ConsoleLinkTests(unittest.TestCase):
         self.link.estop()
         self.assertEqual(self.step(), b"CMD|ESTOP|B|1|$")
         self.assertFalse(self.link.pending_pose)
+
+    def test_stop_cancels_pending_stand(self):
+        self.link.observe(tel(0, False, "none", "t1"))
+        self.link.request_stand()
+        self.link.stop()
+        self.assertEqual(self.step(), b"CMD|STOP|B|1|$")
+        self.assertIsNone(self.link.pending_pose)
+
+    def test_close_cancels_pending_stand_even_with_fresh_telemetry(self):
+        self.link.observe(tel(0, False, "none", "t1"))
+        self.link.request_stand()
+        self.link.close()
+        self.assertEqual(self.sent, [b"CMD|STOP|B|1|$"])
+        self.assertIsNone(self.link.pending_pose)
+
+    def test_pose_expiry_and_telemetry_loss(self):
+        self.link.observe(tel(0, False, "none", "t1"))
+        self.link.request_stand()
+        self.clock.now += 0.21
+        self.assertEqual(self.step(), b"CMD|STOP|B|1|$")
+        self.link.observe(tel(1, False, "none", "t1", tseq=2))
+        self.link.request_stand()
+        self.clock.now += 1
+        self.link.step()
+        self.assertIn(b"CMD|ESTOP|B|2|$", self.sent)
+        self.assertIsNone(self.link.pending_pose)
+
+
+class ConsoleHttpTests(unittest.TestCase):
+    def test_scan_endpoint_clears_stale_and_disconnected_points(self):
+        clock = Clock()
+        feed = LidarFeed(tcp="127.0.0.1", clock=clock)
+        for sample in (Sample(True, 0, 3000, 10), Sample(False, 90, 0, 10),
+                       Sample(False, 180, 4000, 0), Sample(True, 0, 3000, 10)):
+            feed.accept(sample)
+        transport = type("Transport", (), {"send": lambda self, payload: None})()
+        console = Console("A", transport, "", feed)
+        with ThreadingHTTPServer(("127.0.0.1", 0), make_handler(console)) as server:
+            worker = threading.Thread(target=server.serve_forever)
+            worker.start()
+            try:
+                base = f"http://127.0.0.1:{server.server_port}"
+                with urlopen(base + "/api/lidar", timeout=2) as response:
+                    scan = json.load(response)
+                self.assertEqual(scan["status"], "ready")
+                self.assertEqual(len(scan["ranges_m"]), 360)
+                self.assertEqual(scan["ranges_m"][0], 3)
+                self.assertIsNone(scan["ranges_m"][90])
+                self.assertIsNone(scan["ranges_m"][180])
+                clock.now += 1
+                with urlopen(base + "/api/lidar", timeout=2) as response:
+                    self.assertEqual(json.load(response)["ranges_m"], [])
+                feed.disconnected(ConnectionError("test EOF"))
+                with urlopen(base + "/api/lidar", timeout=2) as response:
+                    self.assertEqual(json.load(response)["status"], "error")
+                request = Request(base + "/api/stand", b"{}", {
+                    "Content-Type": "application/json", "Origin": "http://example.invalid"})
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(request, timeout=2)
+                self.assertEqual(error.exception.code, 403)
+                error.exception.close()
+            finally:
+                server.shutdown()
+                worker.join(2)
 
 
 class AutoTransportTests(unittest.TestCase):
