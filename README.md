@@ -24,6 +24,13 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
    ```
 
    로봇 ID가 B면 `--robot B`, 라이다를 USB로 꽂았으면 `--lidar-usb COM번호` 를 붙입니다(처음 한 번 `pip install pyserial`).
+
+   로봇과 비전 모듈이 Windows 모바일 핫스팟에 연결된 구성에서는 아래 명령으로 둘 다 자동으로 찾습니다. USB 라이다가 있으면 예시의 포트 번호를 실제 COM 번호로 바꿉니다.
+
+   ```cmd
+   python -m dashboard.server --hotspot --allow-real --lidar-usb COM3
+   ```
+
 3. **잠금 해제** 후 W/A/S/D로 움직입니다. Space = 정지, Esc = 비상 정지.
 
 ## 펌웨어 올리기
