@@ -24,8 +24,10 @@
 1. **Python 먼저 완성:** `robot/`(통신·안전·동작)과 `custom_sensors/`(라이다 중계)를 순정 MicroPython 펌웨어 위에서 만듭니다.
    펌웨어를 다시 굽지 않고 `main.py`만 올리므로 되돌리기 쉽고, 제조사 공식 Python API를 그대로 씁니다([MechDog 제어 API 규칙](dev/mechdog-api.md)).
 2. **실물 검증:** 사용자가 승인한 범위에서 실제 로봇으로 통신·정지·라이다 중계·걸음을 확인합니다.
-3. **Arduino로 리팩토링:** Python 구현이 안정되면, 같은 동작을 제조사 Arduino 라이브러리로 옮겨 `firmware/main_arduino/`에 예비 펌웨어로 둡니다.
-   MicroPython의 성능·메모리 한계(예: 고속 UART 중계, 감시 타이머 지연)가 실측으로 문제가 될 때 바꿔 쓸 수 있게 하는 것이 목적입니다.
+3. **Arduino로 이식:** 같은 동작을 제조사 공식 Arduino 라이브러리로 옮겨 `firmware/main_arduino/`에 둡니다.
+   사용자 지정으로 **이제 Arduino 판을 실제 제어 경로로** 올립니다(Python 판은 유지). 이식성 코어(안전 로직)는
+   `robot/`과 같은 시나리오로 검증하고, 벤더 동작 백엔드·실물 동작은 사용자가 업로드해 확인합니다([세팅 가이드](robot-arduino-setup.md)).
+   MicroPython 판은 되돌림·비교용으로 남겨 둡니다.
 
 ### 1.3 두 펌웨어가 지켜야 할 것
 
@@ -54,4 +56,4 @@
 | --- | --- | --- | --- |
 | 1 | 메인 보드 | MicroPython (`robot/`, `custom_sensors/`) | 진행 중 — 주 펌웨어 |
 | 2 | 비전 모듈 | Arduino (`firmware/vision_cam/`) | v0.1.4 화질·전송 조정, 최신 build 산출물만 유지, 실물 미검증 ([안내](vision-cam-firmware.md)) |
-| 3 | 메인 보드 | Arduino (`firmware/main_arduino/`) | [설계·최소 컴파일 골격](../firmware/main_arduino/README.md)만 준비. 구동 API 중단/완료 대응 미확인, Python 실물 검증 후 이식 |
+| 3 | 메인 보드 | Arduino (`firmware/main_arduino/`) | **전체 이식 완료**([README](../firmware/main_arduino/README.md)). 코어 안전 로직 검증(시나리오 35개)·비벤더 arduino-cli 컴파일 통과. 벤더 백엔드·실물 미검증, 업로드는 사용자([세팅 가이드](robot-arduino-setup.md)) |
