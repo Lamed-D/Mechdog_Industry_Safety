@@ -5,7 +5,7 @@
 
 
 def _has_result(result):
-    """공식 결과의 '인식됨' 여부. 형식은 docs/protocol.md 11절."""
+    """공식 결과의 '인식됨' 여부. 형식은 docs/ai/protocol.md 11절."""
     if isinstance(result, bool):
         return result
     if isinstance(result, int):

@@ -13,12 +13,12 @@ def main():
     parser.add_argument("--robot", choices=("A", "B"), required=True)
     robot = parser.parse_args().robot
     root = Path(__file__).resolve().parents[1]
-    frame = Path("test_PC/robot_console/mock_frame.jpg")
+    frame = Path("dashboard/mock_frame.jpg")
     modules = [
-        ("test_PC.robot_console.fake_robot", "--robot", robot),
+        ("dashboard.fake_robot", "--robot", robot),
         ("tools.mock.mock_camera", "--robot", robot, "--frame", str(frame)),
         ("tools.mock.mock_lidar",),
-        ("test_PC.robot_console.server", "--robot", robot,
+        ("dashboard.server", "--robot", robot,
          "--cam", "http://127.0.0.1:8081/stream", "--lidar-tcp", "127.0.0.1"),
     ]
     flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0

@@ -1,183 +1,59 @@
 # Mechdog Industry Safety
 
-MechDog 사족보행 로봇을 활용한 산업 현장 안전 프로젝트입니다.
+Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로젝트입니다.
+개발은 AI가 하고, 사람은 이 문서만 보면 됩니다. 자세한 내용은 `docs/ai/` 링크에 있습니다.
 
-## 시연 시나리오
+## 장비
 
-로봇 2대가 현장을 지키다가 카메라로 쓰러진 사람을 발견하면 대시보드로 관리자에게 알리고,
-그중 1대가 관리자 위치(사무실 등)로 가서 관리자를 사고 지점까지 안내해 조치하게 합니다.
-→ [docs/demo-scenario.md](docs/demo-scenario.md)
-
-## 실제 제품 시험: 1단계 카메라 펌웨어 → 2단계 로봇 A/B 동작
-
-**실제품 시험 담당자는 1단계 카메라 펌웨어 업로드·영상 확인 후 2단계 로봇 A/B 동작 시험을 합니다.**
-처음 따라 할 문서는 [Arduino IDE 업로드와 실제품 시험 가이드](docs/user-tests/camera-ide-and-robot-test.md)입니다.
-자동 테스트 통과와 기존 기본 펌웨어의 영상 확인 이력은 새 펌웨어의 실물 합격을 뜻하지 않습니다.
-
-1. **카메라 준비·업로드:** 1단계입니다. Arduino IDE에서 앞쪽 ESP32-S3 카메라 소스를 열고 올립니다.
-   대상 로봇 A/B와 카메라 모듈을 구분하고,
-   [카메라 펌웨어 안내](docs/vision-cam-firmware.md)대로 기존 플래시 백업과 복구 파일을 확보합니다.
-   최신 배포물 해시를 확인한 뒤 사용자가 지정한 담당자가 카메라 펌웨어만 업로드합니다.
-   **PC로 카메라 확인:** 같은 1단계의 실제품 확인입니다. [PC 영상 수신 안내](docs/host-vision.md)와 [화질 검사](docs/vision-quality.md)를 따라
-   `/status`, `/capture`, `:81/stream`을 확인합니다. 대상 ID, 영상 표시, 최신 프레임 수신, 끊김 후 재접속을 점검하고
-   화질·지연·실패를 기록합니다. 두 카메라 동시 수신과 실제 비전 모델의 성능은 별도 검증 항목입니다.
-2. **통과 후 로봇 본체 시험:** 2단계입니다. 아래 시험 전달 폴더를 만들고 읽기/API·루프 → 카메라 I2C → 정지 →
-   승인한 짧은 동작 순서로 확인합니다. 본체 코드 백업은 사용자 보고로 완료됐으며 대상별 복구 위치를 확인합니다.
-3. **실패 시 중단·복구:** 카메라 PC 확인이 실패하면 로봇 연동·동작 시험으로 넘어가지 않습니다.
-   카메라는 백업 또는 기본 영상 전송 펌웨어로, 본체는 기존 백업으로 복구하고 결과를 남깁니다.
-
-두 로봇은 같은 장비이므로 위 결과를 A/B별로 따로 기록합니다. 실제 업로드·전원 조작·로봇 구동은 담당자만 수행합니다.
-
-## 본체 테스트 담당자 시작 순서
-
-**본체 코드 백업은 사용자 보고로 완료됐습니다.** 담당자는 기존 백업과 대상 A/B의 대응 및 복구 위치를 확인합니다.
-현재 통합 main 적용 전 동작 시험 단계이며, 실제 A/B 결과는 아직 미실행입니다.
-
-1. PC에서 저장소 루트 기준으로 시험 전달 폴더를 만들고 검사합니다. 이 명령은 장치에 접속하지 않습니다.
-
-   ```powershell
-   python tools/package_robot_checks.py
-   python tools/package_robot_checks.py --verify
-   ```
-
-2. 생성된 `build/robot_checks/`를 업로드 담당자에게 전달합니다. 먼저 그 안의 README를 읽거나
-   [시험 업로드 인계서](docs/user-tests/robot-python-handoff.md)를 확인합니다.
-3. 담당자가 본체의 기존 main 자동 실행을 중단한 뒤, 인계서에 적힌 시험 `.py` 6개만 Hiwonder Python Editor로
-   **Download만** 선택해 원래 이름으로 올립니다. 시험 파일을 main.py로 바꾸거나 공식 라이브러리를 덮어쓰지 않습니다.
-4. 본체 REPL에서 **API·배터리/IMU 읽기 → 4개 루프 → 카메라 I2C → 정지 → 승인한 짧은 동작 1개씩** 실행합니다.
-   실제 움직임은 사용자가 지정한 담당자만 수행합니다. PC의 가짜 모듈을 보드에 올리지 않습니다.
-5. [A/B별 체크리스트](docs/user-tests/robot-python-checklist.md)와 [결과 양식](docs/user-tests/results-template.md)을 채워 전달합니다.
-   `calls_completed`는 실물 합격이 아닙니다. 실패·미실행·측정 불가는 그대로 기록하고, 결과 검토 후 통합 main 적용 여부를 판단합니다.
-
-PC 개발 검증은 `python -m unittest discover -s tests`입니다. 합성/가짜 모듈 테스트이며 실제 로봇 동작을 검증하지 않습니다.
-
-## 지금 시작하는 순서
-
-**카메라 확인 완료(사용자 실측):** 구입 당시 영상 전송 펌웨어에서 휴대폰을 `HW_ESP32S3CAM`에 연결하고
-`http://192.168.5.1/` → **Image**로 실시간 영상 표시를 확인한 이력입니다.
-현재 개발 대상은 [맞춤 카메라 펌웨어](docs/vision-cam-firmware.md)이며 실제 교체는 사용자 백업 후에만 합니다.
-얼굴 IIC API는 오류 19로 미확인 상태이며, 영상 성공이 낙상 감지·두 카메라 동시 수신 검증을 뜻하지는 않습니다.
-카메라만 확인했으며 로봇 모션은 시험하지 않았습니다.
-
-**개발·데모 구성은 운영자 2명, Windows 노트북 2대, MechDog 2대, A1M8 2대입니다. 각 운영자가 한 세트씩 맡습니다.**
-지금은 [본체·카메라 우선 점검](docs/user-tests/current-hardware.md)을 먼저 수행합니다.
-카메라 인식 읽기 오류가 나면 [사용자용 비전 펌웨어 확인·업로드 가이드](docs/vision-firmware.md)를 따릅니다.
-현재 실물 작업은 비전만 허용되어 있으며, 펌웨어 업로드와 전원 조작은 사용자가 직접 수행합니다.
-부품 도착 예정은 약 일주일 뒤이며 확정 수령일은 아닙니다. [단계별 적용 계획](docs/hardware-rollout.md)을 따릅니다.
-
-실제 MechDog는 준비되어 있습니다. 아래 순서로 사용자 확인과 자동 개발을 나눕니다.
-PC 테스트 통과는 장치 검증 완료를 뜻하지 않습니다.
-
-1. **PC에서 자동 테스트:** `python -m unittest discover -s tests`. 실제 로봇 없이 합성 데이터와 가짜 모듈로 실행합니다.
-2. **노트북 준비:** [Windows 호스트 실행 계획](docs/host-setup.md)과 [CMD 테스트](test_PC/README.md)를 따릅니다.
-3. **사용자 실물 확인:** [사용자 테스트 안내](docs/user-tests/README.md)에서 A·B별 체크리스트와 결과 양식을 확인합니다.
-   먼저 읽기 확인·UART·전원·Wi-Fi·카메라부터 수행합니다. 실행 대상과 핀을 모르면 연결하지 않습니다.
-4. **구동 시험:** 읽기 확인 결과를 검토한 뒤, 대상 로봇과 실행 범위를 별도로 승인하고 진행합니다.
-   기존 장치 `main.py`를 보존하고 전원 차단 수단과 지지 장치를 준비합니다.
-
-## 펌웨어 방침
-
-- **메인 보드(ESP32):** MicroPython(Hiwonder 공식 Python API)을 먼저 개발하는 주 펌웨어로 쓰고, 검증 후 같은 동작을 Arduino로 옮겨 예비 펌웨어로 둡니다. Scratch는 쓰지 않습니다.
-- **비전 모듈(ESP32-S3):** Arduino IDE로 개발합니다.
-- 자세한 순서와 규칙: [펌웨어 방침](docs/firmware-strategy.md)
-
-두 로봇은 같은 장비이며 A/B는 고정 ID입니다. 통신으로 주·보조를 배정하고,
-주 역할이 바뀌어도 정지 래치를 자동 해제하거나 이동을 재개하지 않습니다.
-[역할·승계 규약](docs/robot-redundancy.md), [사용자 통합 확인 순서](docs/user-tests/integrated-bringup.md)를 따릅니다.
-
-카메라 최신 배포물은 직접 빌드한 `build/vision_cam/latest/`의 합본·해시·명세입니다.
-`python tools/build_vision_cam.py --verify-release`로 현재 소스와 일치하는지 읽기 검사합니다.
-현재 v0.1.4는 VGA 기본/SVGA 상세 프로필을 제공하며, 실제 화질·노트북 모델 성능은 아직 미검증입니다.
-본체는 [A/B별 단일 main 생성·업로드·복구](docs/robot-upload.md)를 따르고 장치에 맞는 묶음만 사용합니다.
-통합 main 실기 적용 전 [본체 Python 동작 체크리스트](docs/user-tests/robot-python-checklist.md)의 사용자 시험이 필요합니다.
-
-## 파일과 실행 위치
-
-| 경로 | 실행 위치 / 용도 | 사용자 행동 |
+| 장비 | 수량 | 용도 |
 | --- | --- | --- |
-| `host/` | Windows 노트북의 수신·판단 로직 | 장치에 업로드하지 않음 |
-| `ros2/` | 각 노트북의 WSL 2용 ROS 메시지 어댑터 | 해당 설치 안내에 따라 실행 |
-| `robot/` | MechDog 메인 보드의 MicroPython 펌웨어 (주 펌웨어) | 업로드·실행 전 대상별 승인, 기존 main.py 백업 |
-| `firmware/vision_cam/` | 앞쪽 ESP32-S3 비전 모듈용 Arduino 펌웨어(영상 → 노트북) | [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md)대로 사용자가 굽기, 굽기 전 플래시 백업 |
-| `firmware/main_arduino/` | 메인 보드용 비구동 컴파일 골격·이식 대응표 | 설치 대상 아님. Python 실물 검증과 중단 API 근거 확보 후 이식 |
-| `custom_sensors/` | 로봇의 추가 라이다 중계 | robot 단일 main 묶음에 포함, 따로 실행하지 않음 |
-| `tools/bringup/` | 파일별로 노트북 또는 로봇 REPL에서 실행 | [실물 확인 절차](docs/bringup.md)의 실행 위치 확인 |
-| `tools/mock/`, `tests/` | PC에서만 실행하는 합성 서버·가짜 모듈 | 로봇에 업로드하지 않음 |
-| `docs/user-tests/` | 사용자 전용 체크리스트·빈 결과 양식 | 결과를 GitHub 실물 확인 이슈에 기록 |
-| `scenario/`, `dashboard/` | 호스트의 시연 흐름·관리자 화면 | 개발 상태와 모의/실물 연결 모드를 먼저 확인 |
+| MechDog (다리 4개, ESP32 메인 보드) | 1 | 로봇 본체 |
+| ESP32-S3 비전 모듈 (로봇 앞쪽) | 1 | 카메라 영상 → 노트북 |
+| RPLIDAR A1M8 (로봇 등 위) | 1 | 대시보드에 표시만 |
+| Windows 노트북 | 1 | 대시보드·판단 |
 
-`robot/`은 MechDog **메인 보드용**입니다. 앞쪽 ESP32-S3 카메라에 이 펌웨어를 올리지 않습니다.
-Wi-Fi 자격 정보는 장치의 로컬 `secrets.py`에만 작성하고 GitHub에는 올리지 않습니다.
-실제 사람 영상·얼굴·Wi-Fi 비밀번호·장치 식별번호는 결과에 첨부하지 않습니다.
+나중에 같은 세트를 하나 더 두고(A/B) 두 대가 협업하도록 넓힐 예정입니다. → [장비 상세](docs/ai/hardware.md)
 
-MQTT는 기존 CMD/TEL 내용과 안전 감시를 유지하는 선택형 통신 계층으로 검토합니다.
-현재 배포 경로는 UDP 명령·상태와 TCP 라이다 중계입니다. MQTT 사용 여부는 구현·검증 상태를 확인한 뒤 선택합니다.
+## 노트북에서 해 보기 (로봇 없이)
 
-카메라는 `robot/vision.py`에서 **Hiwonder Python `ESP32S3Cam(IIC(2))`**으로 연결하며,
-로봇 앱의 별도 읽기 루프에서 관측합니다. 기본 얼굴 결과는 낙상 감지나 원본 영상 전송 기능이 아닙니다.
-현재 `vision_status`는 로봇 내부 진단 값이며 기존 TEL에 새로운 필드를 임의로 추가하지 않습니다.
+저장소 맨 위 폴더에서 CMD로 실행합니다.
 
-## 하드웨어 구성
-
-```text
-                    공통 2.4 GHz 로봇망
-운영자 A ─ Windows A ⇄ MechDog A + 카메라 A + A1M8 A
-운영자 B ─ Windows B ⇄ MechDog B + 카메라 B + A1M8 B
+```cmd
+test_PC\run.cmd all
+python -m test_PC.mock_station --robot A
 ```
 
-각 노트북은 담당 로봇의 UDP 상태·명령, 카메라 영상과 LiDAR TCP를 처리합니다.
+두 번째 명령 뒤 브라우저에서 `http://127.0.0.1:8090` 을 엽니다(가짜 로봇·카메라·라이다). 끝낼 때 Ctrl+C.
 
+## 실제 로봇과 연결
 
-### 로봇: Hiwonder MechDog × 2
+1. 노트북을 비전 모듈 Wi-Fi(`HW_ESP32S3CAM`)에 연결합니다.
+2. 로봇 전원을 켜고 아래를 실행한 뒤 `http://127.0.0.1:8090` 을 엽니다.
 
-| 항목 | 내용 |
+   ```cmd
+   python -m dashboard.server --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream
+   ```
+
+   로봇에 올린 ID가 B면 `--robot B` 를 붙입니다(기본 A).
+   노트북 핫스팟(맞춤 카메라 펌웨어)으로 연결할 때는 주소가 달라집니다 → [대시보드 상세](docs/ai/dashboard.md).
+3. 화면에서 **잠금 해제** 후 W/A/S/D로 움직입니다. Space = 정지, Esc = 비상 정지.
+
+→ [대시보드 상세·라이다 연결](docs/ai/dashboard.md)
+
+## 펌웨어 올리기 (사람이 직접)
+
+- **올리기 전에 항상 기존 펌웨어를 백업합니다.** 원래 장치 파일은 `backups/device-original/` 에 있습니다.
+- 로봇 본체: Hiwonder Python Editor로 파일을 올립니다. → [본체 올리기](docs/ai/firmware.md)
+- 비전 모듈: Arduino IDE로 `firmware/vision_cam/` 을 올립니다. → [카메라 올리기](docs/ai/firmware.md)
+- 실물 점검 순서와 결과 양식 → [실물 확인](docs/ai/robot-tests.md)
+
+## 폴더
+
+| 폴더 | 내용 |
 | --- | --- |
-| 몸체 | 사족보행 다리 4개 |
-| 메인 보드 | ESP32(클래식, ESP32-S3 아님), 제조사 순정 MicroPython 펌웨어 그대로 사용 |
-| 제어 | **Hiwonder 공식 Python API**(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)만 사용 |
-| 팔·집게·부가 서보 | 없음. 부가 서보 9·10번 미사용 |
-| 추가 센서 | 비공식 센서 장착 예정 — [배선 표](docs/dev/mechdog-api.md#63-배선-기록) |
-
-### 비전 모듈: ESP32-S3 카메라 (로봇 앞쪽)
-
-- 영상을 Wi-Fi로 노트북에 보내고, 노트북가 쓰러진 사람을 감지합니다.
-- 각 로봇의 모듈이 공통 로봇망에 붙어 영상을 보내는 **맞춤 펌웨어**를 준비했습니다(사용자 B 관측 외 실물 미검증):
-  [설치·Wi-Fi 설정 안내](docs/vision-cam-firmware.md), 최신 합본은 `build/vision_cam/latest/`.
-  [화질·두 스트림 성능 측정](docs/vision-quality.md)과 [모델 검증 계획](docs/fall-detection-plan.md)을 함께 확인합니다.
-- 공급기 정격과 모듈 실제 소비전류를 구분합니다. 메인 보드 5V 레일의 여유 전류는 미확인입니다.
-
-### 라이다: [SLAMTEC] 슬램텍 RPLIDAR A1M8-R6 360도 거리측정 라이다 센서 - 12m
-
-로봇마다 1대, 등 위에 테이프로 고정합니다(시연 전 고정 상태와 정면 0° 방향 확인).
-
-| 항목 | 값 (공개 데이터시트 기준) |
-| --- | --- |
-| 측정 | 360° 2D, 거리 0.15~12 m |
-| 측정 속도 | 초당 8000회 이상 |
-| 회전 | 초기 별도 5V에서 확인, 실제 Hz·한 바퀴 점수는 측정. 회전 속도를 위해 임의로 전압을 올리지 않음 |
-| 통신 | UART 3.3V TTL, 115200 bps, 8N1 |
-| 전원 | 측정 코어 5V 동작 300~350 mA(켜질 때 최대 600 mA) + 모터 5V 약 100 mA |
-
-**MechDog 연결** ([라이다 연동 설계](docs/lidar-integration.md) 4절)
-
-| 라이다 | MechDog GPIO 포트 J5 | 비고 |
-| --- | --- | --- |
-| TX | J5-4 IO32 (로봇 RX) | 방향은 제조사 예제로 확인(첫 연결에서 응답으로 재확인) |
-| RX | J5-3 IO33 (로봇 TX) | 직렬 저항 넣지 않음 |
-| GND | J5-2 GND | 별도 전원 GND와 공통 |
-| 전원(코어·모터) | J5-1(5V) 쓰지 않음 | 1단계는 별도 5V 전원, 모터 제어선은 5V에 묶어 항상 회전 |
-
-로봇은 라이다 바이트를 해석하지 않고 Wi-Fi(TCP 20108)로 노트북에 그대로 넘깁니다
-([통신 규약](docs/protocol.md) 7절).
-
-### 처리 컴퓨터 — Windows 노트북 2대
-
-각자 [PC 조종 콘솔](test_PC/robot_console/README.md)에서 자기 로봇의 영상·상태·라이다를 확인합니다.
-각 노트북에서 담당 로봇의 낙상 감지, SLAM·위치 추정과 경로 계획을 실행할 계획입니다.
-공동 시나리오의 사건·안내 상태 교환과 검증 범위는 [호스트 실행 계획](docs/host-setup.md)에 정리했습니다.
-
-
-## 개발 규칙
-
-- [docs/README.md](docs/README.md): 브랜치·이슈·코드 리뷰·AI 작업 규칙
-- AI 에이전트: [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md)
+| `dashboard/` | 노트북 대시보드(영상·조작·라이다) |
+| `robot/`, `custom_sensors/` | 로봇 본체 MicroPython 코드 |
+| `firmware/` | 본체 Arduino 판, 비전 모듈 펌웨어 |
+| `host/`, `ros2/` | 노트북 쪽 통신·카메라·라이다 처리 |
+| `test_PC/`, `tests/`, `tools/` | 시험·빌드 도구 |
+| `docs/ai/` | AI용 규칙·설계 문서 |

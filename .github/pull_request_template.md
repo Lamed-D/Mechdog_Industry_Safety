@@ -1,8 +1,7 @@
 <!-- 제목: feat: ... / fix: ... (squash merge 커밋 메시지가 됩니다) -->
-<!-- 브랜치: feat/<설명> 또는 issue/<번호>-<설명>  — docs/dev/branch-rules.md -->
+<!-- 브랜치: feat/<설명> 또는 issue/<번호>-<설명>. 규칙: docs/ai/rules.md -->
 
-작업자: <!-- claude1 / codex1 / 사람 이름 -->  리뷰어: <!-- 다른 에이전트 -->
-<!-- 제목 앞에 [claude1] 또는 [codex1]. 병합 조건: docs/dev/agents.md 6절 -->
+작업자: <!-- git config --get agent.name, 제목 앞에도 [이름] -->
 
 ## 무엇을 / 왜
 
@@ -14,12 +13,13 @@
 ## 테스트
 
 - [ ] `python -m unittest discover -s tests` 통과
+- [ ] `python tools/check_confidential.py range origin/main..HEAD` 통과
 - [ ] 새 기능·버그 수정에 테스트 추가 (하드웨어 없이, 합성 데이터)
 - [ ] 동작이 바뀌는 변경은 실제 로봇에서 확인 (영상·사진 첨부 시 사람 얼굴 없음)
 
 검증하지 못한 것: <!-- 예: 실제 로봇 동작, 현장 환경 -->
 
-## 리뷰 체크리스트 (docs/dev/code-review.md)
+## 자체 점검 (docs/ai/rules.md)
 
 - [ ] 모든 제어는 공식 MechDog API(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)만 사용, 문서에 없는 호출 없음
 - [ ] 정지는 `mechdog.move(0, 0)`, 예외·종료 경로에서도 호출됨

@@ -1,5 +1,5 @@
-# Wi-Fi 접속과 명령·텔레메트리 UDP (docs/protocol.md 1·6절).
-# 통신 전용 예외(docs/dev/mechdog-api.md 9절): network·socket 은 메시지를 주고받는 데만 쓰고 로봇을 움직이지 않습니다.
+# Wi-Fi 접속과 명령·텔레메트리 UDP (docs/ai/protocol.md 1·6절).
+# 통신 전용 예외(docs/ai/mechdog-api.md 9절): network·socket 은 메시지를 주고받는 데만 쓰고 로봇을 움직이지 않습니다.
 
 import netutil
 

@@ -1,4 +1,4 @@
-// 명령 메시지 해석 (docs/protocol.md 2·3·4.4절). robot/proto.py 의 Arduino 이식.
+// 명령 메시지 해석 (docs/ai/protocol.md 2·3·4.4절). robot/proto.py 의 Arduino 이식.
 // 하드웨어를 만지지 않는 순수 함수만 둡니다. 벤더·Arduino 비의존.
 #ifndef MECH_PROTO_H
 #define MECH_PROTO_H

@@ -2,7 +2,7 @@
 #include <math.h>
 
 // 기울기(IMU) 읽기는 read_angle() + radian*_last 전역을 씁니다. 초기화·축 방향을 실물에서 확인하기 전에는
-// 기본으로 "모름(false)"을 돌려줍니다(docs/protocol.md 6절: imu_unknown 은 안전한 쪽). 확인 후 아래 매크로로 켭니다.
+// 기본으로 "모름(false)"을 돌려줍니다(docs/ai/protocol.md 6절: imu_unknown 은 안전한 쪽). 확인 후 아래 매크로로 켭니다.
 // #define MECH_ENABLE_IMU 1
 
 void MechDogHw::begin() {
@@ -35,7 +35,7 @@ void MechDogHw::worker_loop() {
 }
 
 bool MechDogHw::read_battery(int32_t& mv) {
-  // 벤더 readBattery(). 단위(mV 추정)·실패값은 실물 확인 필요(docs/protocol.md 5.4절 [확인 필요]).
+  // 벤더 readBattery(). 단위(mV 추정)·실패값은 실물 확인 필요(docs/ai/protocol.md 5.4절 [확인 필요]).
   long v = mechdog_.readBattery();
   if (v <= 0) return false;  // 0·음수는 "모름"으로 처리(충분함으로 보지 않음)
   mv = (int32_t)v;

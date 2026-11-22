@@ -1,7 +1,7 @@
 """가짜 `network` 모듈: WLAN(STA_IF) 접속·끊김, 절전 끄기(PM_NONE) 지원 여부.
 
 Wi-Fi는 Pi 5와 통신하는 데만 씁니다(mechdog-api.md 9절). 펌웨어에 따라 `WLAN.PM_NONE`이 없을 수 있어
-(docs/protocol.md 6.1절 `pm_on`) `fake_set_pm_supported(False)`로 그 상황을 만듭니다.
+(docs/ai/protocol.md 6.1절 `pm_on`) `fake_set_pm_supported(False)`로 그 상황을 만듭니다.
 """
 
 STA_IF = 0

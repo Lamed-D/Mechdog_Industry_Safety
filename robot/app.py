@@ -1,6 +1,6 @@
 # 부품 조립과 반복 루프. 하드웨어 모듈은 main.py 가 넘겨 줍니다(PC 테스트에서는 가짜).
 # 루프 셋을 Hiwonder.startMain 으로 따로 돌립니다: 명령·텔레메트리 / 감시 / 라이다 중계.
-# 감시가 수신과 다른 루프라 수신이 멈춰도 600 ms 뒤 정지합니다(docs/protocol.md 5.1절).
+# 감시가 수신과 다른 루프라 수신이 멈춰도 600 ms 뒤 정지합니다(docs/ai/protocol.md 5.1절).
 
 from comm import Link
 from core import Robot

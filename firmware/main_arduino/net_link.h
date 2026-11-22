@@ -1,5 +1,5 @@
-// Wi-Fi STA 접속과 명령·텔레메트리 UDP (docs/protocol.md 1·6절, robot/comm.py 이식).
-// 통신 전용 예외(docs/dev/mechdog-api.md 9절): 메시지 주고받기에만 쓰고 로봇을 움직이지 않습니다. (Arduino 전용)
+// Wi-Fi STA 접속과 명령·텔레메트리 UDP (docs/ai/protocol.md 1·6절, robot/comm.py 이식).
+// 통신 전용 예외(docs/ai/mechdog-api.md 9절): 메시지 주고받기에만 쓰고 로봇을 움직이지 않습니다. (Arduino 전용)
 #ifndef NET_LINK_H
 #define NET_LINK_H
 #include <Arduino.h>

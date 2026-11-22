@@ -26,7 +26,7 @@ SKETCH = ROOT / "firmware" / "vision_cam"
 BUILD = ROOT / "build" / "vision_cam"
 COMPILE = BUILD / "compile"
 RELEASE = BUILD / "latest"
-# 근거: docs/vision-cam-firmware.md 3절(제조사 기본 영상 펌웨어와 같은 DIO·80MHz·4MB, 옥탈 PSRAM)
+# 근거: docs/ai/firmware.md 3절(제조사 기본 영상 펌웨어와 같은 DIO·80MHz·4MB, 옥탈 PSRAM)
 FQBN = ("esp32:esp32:esp32s3:PSRAM=opi,FlashMode=dio,FlashSize=4M,"
         "PartitionScheme=huge_app,CDCOnBoot=default,CPUFreq=240")
 LOCAL = pathlib.Path(os.environ.get("LOCALAPPDATA", ""))

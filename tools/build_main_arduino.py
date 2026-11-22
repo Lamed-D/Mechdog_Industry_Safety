@@ -2,7 +2,7 @@
 
 벤더 라이브러리(HW_MechDog 등)는 저장소에 없습니다. 제조사 ESP32 개발 패키지로 Arduino 에 설치한 뒤,
 그 라이브러리 폴더를 환경변수 MECHDOG_VENDOR_LIBS 로 알려 주면 컴파일합니다(없으면 Arduino 기본 사용자
-라이브러리에서 찾습니다). 굽기는 사용자만, Arduino IDE 에서 합니다(docs/firmware-strategy.md 1.4절).
+라이브러리에서 찾습니다). 굽기는 사용자만, Arduino IDE 에서 합니다(docs/ai/firmware.md 1.4절).
 
 실행: python tools/build_main_arduino.py
   (선택) set MECHDOG_VENDOR_LIBS=C:\\Users\\<you>\\Documents\\Arduino\\libraries

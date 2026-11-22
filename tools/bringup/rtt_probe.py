@@ -2,7 +2,7 @@
 
     python tools/bringup/rtt_probe.py <로봇IP> [--count 300] [--port 9100]
 
-LINK_TIMEOUT_MS(600 ms, docs/protocol.md 5.1절)를 정할 근거가 되는 값을 보여 줍니다.
+LINK_TIMEOUT_MS(600 ms, docs/ai/protocol.md 5.1절)를 정할 근거가 되는 값을 보여 줍니다.
 로봇을 움직이는 명령은 보내지 않습니다(되돌려 보내기 전용 문자열).
 """
 

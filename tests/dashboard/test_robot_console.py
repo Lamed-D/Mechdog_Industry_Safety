@@ -10,10 +10,10 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from host.lidar.rplidar_protocol import Sample
-from test_PC.robot_console.lidar import LidarFeed
-from test_PC.robot_console.make_robot_files import UPLOAD_ORDER, render
-from test_PC.robot_console.server import AutoTransport, Console, ConsoleLink, make_handler
-from test_PC.robot_console.usb_camera import read_frame
+from dashboard.lidar import LidarFeed
+from tools.make_robot_files import UPLOAD_ORDER, render
+from dashboard.server import AutoTransport, Console, ConsoleLink, make_handler
+from dashboard.usb_camera import read_frame
 
 ROOT = Path(__file__).resolve().parents[2]
 

@@ -1,6 +1,6 @@
 """가짜 `machine` 모듈: UART, Pin, unique_id.
 
-`machine` 직접 사용은 추가 센서 읽기와 라이다 중계에만 허용됩니다(mechdog-api.md 6절, docs/protocol.md 7절).
+`machine` 직접 사용은 추가 센서 읽기와 라이다 중계에만 허용됩니다(mechdog-api.md 6절, docs/ai/protocol.md 7절).
 UART는 MicroPython 표준 메서드(read, readinto, write, any)만 흉내 냅니다.
 """
 

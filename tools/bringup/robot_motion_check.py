@@ -1,5 +1,5 @@
 # 사용자 수동 동작 점검. import/Download만으로 실행하지 않으며 main.py로 바꾸지 않습니다.
-# 실제 관측 결과는 docs/user-tests/robot-python-checklist.md에 기록합니다.
+# 실제 관측 결과는 docs/ai/robot-tests.md에 기록합니다.
 
 MIN_BATTERY_MV = 7000  # 실측 전 가정. 본체 경고 기준과 동일
 MOVE_MS_DEFAULT = 300  # 첫 시험값

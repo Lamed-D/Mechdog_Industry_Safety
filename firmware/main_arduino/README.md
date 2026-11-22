@@ -2,8 +2,8 @@
 
 로봇 메인 보드(ESP32 클래식)에 올리는 **Arduino(C++) 펌웨어**입니다. `robot/` 의 MicroPython 판(app·core·comm·
 lidar_bridge 등)을 제조사 공식 MechDog Arduino 라이브러리로 **그대로 이식**한 것으로, 같은 통신 규약·안전 동작을
-지킵니다([docs/protocol.md](../../docs/protocol.md), [docs/firmware-strategy.md](../../docs/firmware-strategy.md)).
-세팅·업로드는 [로봇 Arduino 펌웨어 세팅 가이드](../../docs/robot-arduino-setup.md)를 따릅니다.
+지킵니다([docs/ai/protocol.md](../../docs/ai/protocol.md), [docs/ai/firmware.md](../../docs/ai/firmware.md)).
+세팅·업로드는 [로봇 Arduino 펌웨어 세팅 가이드](../../docs/ai/firmware.md)를 따릅니다.
 
 > **업로드(굽기)는 사용자만** 합니다(firmware-strategy 1.4절). 이 .ino 를 올리면 메인 보드의 순정 MicroPython 이
 > 지워집니다. 굽기 전 현재 플래시 전체를 백업하고, 되돌리려면 순정 펌웨어를 다시 굽고 `main.py` 를 올립니다.

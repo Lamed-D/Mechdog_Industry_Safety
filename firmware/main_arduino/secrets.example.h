@@ -7,7 +7,7 @@
 #define MECH_WIFI_SSID "mechdog-net"
 #define MECH_WIFI_PASS "change-me-please"
 
-// 이 로봇의 ID. 로봇 A 는 'A', 로봇 B 는 'B'. (docs/protocol.md 2.1절)
+// 이 로봇의 ID. 로봇 A 는 'A', 로봇 B 는 'B'. (docs/ai/protocol.md 2.1절)
 #define MECH_ROBOT_ID 'A'
 
 #endif

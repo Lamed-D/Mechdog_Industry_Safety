@@ -1,4 +1,4 @@
-"""firmware/vision_cam/i2c_table.h 의 고정 응답이 docs/protocol.md 11.2절의 모든 읽기 형식에서
+"""firmware/vision_cam/i2c_table.h 의 고정 응답이 docs/ai/protocol.md 11.2절의 모든 읽기 형식에서
 "결과 없음"으로 읽히는지 검사합니다. PC에 C++ 컴파일러가 없어도 돌도록 헤더의 배열 값을 읽습니다.
 
 응답은 명령과 무관하게 같으므로, 반복 시작 읽기에서 직전 명령 기준으로 답해도 결과가 같습니다.
