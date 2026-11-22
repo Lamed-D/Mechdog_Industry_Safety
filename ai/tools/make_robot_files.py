@@ -2,7 +2,6 @@
 
 firmware/robot/python/ 을 주석·설명문 없이, 영문(ASCII)만, 짧은 줄로 바꿔
 build/robot_files_<ID>/ 에 파일별로 씁니다. 동작 코드는 그대로입니다.
-한 파일로 묶은 큰 main.py(ai/tools/bundle_robot.py)는 편집기 전송이 실패해서 이 방식을 씁니다.
 
 실행: python -m ai.tools.make_robot_files B
 """
@@ -15,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from ai.tools.bundle_robot import MODULES  # noqa: E402
+MODULES = ("config", "proto", "roles", "netutil", "motion", "vision", "lidar_bridge", "core", "comm", "app", "main")
 
 UPLOAD_ORDER = ("netutil", "motion", "roles", "config", "proto", "vision", "comm",
                 "lidar_bridge", "core", "app", "main")  # main.py 는 반드시 마지막
