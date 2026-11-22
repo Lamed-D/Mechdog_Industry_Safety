@@ -32,8 +32,7 @@
 
 | 명령 | 결과 | 비고 |
 | --- | --- | --- |
-| `python -m ai.tools.make_robot_files B` | `build/robot_files_B/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | **실제 업로드 방식.** 인자 생략 시 B |
-| `python ai/tools/bundle_robot.py --robot A\|B` | `build/robot_<ID>/main.py` 단일 묶음(약 49 KB) | 편집기 전송이 `Download fail`로 실패한 기록이 있음. 묶음은 `exec`+모듈별 전역 사전, 실제 힙 여유는 실물 확인 필요(MemoryError면 중단·복구) |
+| `python -m ai.tools.make_robot_files B` | `build/robot_files_B/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 인자 생략 시 B |
 
 ### 2.2 업로드 순서 (사람)
 

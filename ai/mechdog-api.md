@@ -33,7 +33,7 @@
 - 메인 보드: **ESP32(클래식)**, 순정 펌웨어 **MicroPython v1.21.0 (ESP-IDF v5.0.2)**, 소스 없는 바이너리. 다시 굽지 않고 `main.py`만 작성.
   `machine.UART` 핀·버퍼 지정, `network.WLAN.PM_NONE` 지원(문자열 확인).
 - 업로드: Hiwonder Python Editor. 로봇은 시작 시 장치의 `main.py`를 실행합니다.
-  한 파일 묶음은 편집기 전송이 실패한 기록이 있어 모듈 파일을 순서대로 나눠 올립니다([firmware.md](firmware.md) 2절). 장치 메모리 여유는 REPL 확인 필요.
+  모듈 파일을 순서대로 나눠 올립니다([firmware.md](firmware.md) 2절). 장치 메모리 여유는 REPL 확인 필요.
 - 메인 보드 주 펌웨어는 MicroPython([`../firmware/robot/python/`](../firmware/robot/python/)), Arduino 판([`../firmware/robot/arduino/`](../firmware/robot/arduino/))은 예비 이식판입니다.
   비전 모듈(ESP32-S3)은 Arduino 맞춤 펌웨어입니다 → [firmware.md](firmware.md).
 - 장치의 기존 `main.py` 덮어쓰기·삭제, 펌웨어 굽기(ERASE 포함)는 **사용자 확인 후에만** 합니다.
