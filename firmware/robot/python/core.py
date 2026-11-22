@@ -226,16 +226,17 @@ class Robot:
         self.link_armed = True
 
     def _reset(self):
+        self.urgent = True
         ok = (self.wifi_ok and self.battery_mv is not None
               and self.battery_mv >= self.cfg.LOW_BATT_RESET_MV
               and not self.stop_pending and not self.busy() and not self._before(self.reset_block_until))
         if not ok:
-            self.events.add("reset_denied")
+            self.conditions.add("reset_denied")
             return
+        self.conditions.discard("reset_denied")
         self.reset_block_until = None
         self.latched = False
         self.latch_reason = "none"
-        self.urgent = True
 
     def _move(self, step, angle):
         step, cut1 = proto.clip(step, -100, 100)

@@ -91,6 +91,7 @@ class RobotLink:
         self.intent = None
         self.emergency = False
         self.pending_reset = False
+        self.reset_retry = None
         self.last_acked = 0
         self.ack_wait_since = None
         self.fault = None
@@ -118,6 +119,7 @@ class RobotLink:
             self.role_ack = None
             self.intent = None
             self.pending_reset = False
+            self.reset_retry = None
             return False
         if self.latest and value.tseq <= self.latest.tseq and value.uptime_ms < self.latest.uptime_ms:
             # 재부팅과 크게 지연된 옛 패킷을 확정 구별할 수 없으면 멈추고 새 세션으로 확인합니다.
@@ -140,6 +142,8 @@ class RobotLink:
         if value.last_seq > self.last_acked:
             self.last_acked = value.last_seq
             self.ack_wait_since = None if value.last_seq == self.seq else now
+        if self.reset_retry is not None and value.last_seq == self.seq:
+            self.reset_retry = None
         self.latest, self.last_seen = value, self.clock()
         self.seq = max(self.seq, value.last_seq)
         return True
@@ -179,11 +183,13 @@ class RobotLink:
         self.emergency = True
         self.intent = None
         self.pending_reset = False
+        self.reset_retry = None
         self.next_send = -math.inf
 
     def stop(self):
         self.intent = None
         self.pending_reset = False
+        self.reset_retry = None
         self.next_send = -math.inf
 
     def request_reset(self):
@@ -192,6 +198,7 @@ class RobotLink:
         self.emergency = False
         self.intent = None
         self.pending_reset = True
+        self.reset_retry = None
         self.next_send = -math.inf
         self.ack_wait_since = None
         self.fault = None
@@ -244,6 +251,7 @@ class RobotLink:
         elif not self.fresh():
             self.intent = None
             self.pending_reset = False
+            self.reset_retry = None
             if now >= self.next_hello:
                 payload = self._hello()
             else:
@@ -251,6 +259,9 @@ class RobotLink:
         elif self.pending_reset:
             self.pending_reset = False
             payload = self._command("RESET")
+            self.reset_retry = payload
+        elif self.reset_retry is not None:
+            payload, self.reset_retry = self.reset_retry, None
         elif self.role_request is not None and now >= self.next_role:
             term, code = self.role_request
             payload = self._command("ROLE", self.boot_id, term, code, settings.ROLE_LEASE_MS)
