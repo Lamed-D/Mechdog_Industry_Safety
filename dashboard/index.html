@@ -58,14 +58,18 @@
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
       <div class="pad">
-        <span></span><button data-dir="fwd">▲ 전진<br><small>W</small></button><span></span>
+        <button data-dir="fwd-left">↖ 전진 좌회전<br><small>Q</small></button>
+        <button data-dir="fwd">▲ 전진<br><small>W</small></button>
+        <button data-dir="fwd-right">↗ 전진 우회전<br><small>E</small></button>
         <button data-dir="left">◀ 좌회전<br><small>A</small></button>
         <button class="stop" id="stop">■ 정지<br><small>Space</small></button>
         <button data-dir="right">우회전 ▶<br><small>D</small></button>
-        <span></span><button data-dir="back">▼ 후진<br><small>S</small></button><span></span>
+        <button data-dir="back-left">↶ 후진 좌회전<br><small>Z</small></button>
+        <button data-dir="back">▼ 후진<br><small>S</small></button>
+        <button data-dir="back-right">↷ 후진 우회전<br><small>C</small></button>
       </div>
       <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><output id="stepv">50</output></div>
-      <div class="row"><label>회전 각도</label><input id="angle" type="range" min="1" max="30" value="5"><output id="anglev">5</output></div>
+      <div class="row"><label for="angle">회전 각도</label><input id="angle" type="range" min="1" max="30" value="15"><output id="anglev">15</output></div>
       <button class="estop" id="estop">비상 정지 (Esc)</button>
       <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
       <dialog id="reset-dialog" aria-labelledby="reset-question">
@@ -144,7 +148,11 @@ function say(text) { $("msg").textContent = text || ""; }
 
 function motion(dir) {
   const s = +$("step").value, a = +$("angle").value;
-  return { fwd:[s,0], back:[-s,0], left:[0,a], right:[0,-a] }[dir];
+  return {
+    "fwd-left": [s, a], fwd: [s, 0], "fwd-right": [s, -a],
+    left: [0, a], right: [0, -a],
+    "back-left": [-s, a], back: [-s, 0], "back-right": [-s, -a],
+  }[dir];
 }
 function sendMove() {
   const [step, angle] = motion(holding.dir);
@@ -192,14 +200,20 @@ $("stand").onclick = () => { stopMove(false);
   post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
 ["step","angle"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
 
-const KEYS = { w:"fwd", ArrowUp:"fwd", s:"back", ArrowDown:"back", a:"left", ArrowLeft:"left", d:"right", ArrowRight:"right" };
+const KEYS = new Map([
+  ["q", "fwd-left"], ["w", "fwd"], ["e", "fwd-right"],
+  ["a", "left"], ["d", "right"],
+  ["z", "back-left"], ["s", "back"], ["c", "back-right"],
+  ["arrowup", "fwd"], ["arrowdown", "back"], ["arrowleft", "left"], ["arrowright", "right"],
+]);
 addEventListener("keydown", e => {
   if (!controlsEnabled) return;
   if (e.key === "Escape") { $("estop").click(); return; }
   if (resetDialog.open) return;
+  if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
   if (e.key === " ") { e.preventDefault(); stopMove(); return; }
   if (e.target.matches?.("input, select, textarea, [contenteditable]")) return;
-  const dir = KEYS[e.key];
+  const dir = KEYS.get(e.key.toLowerCase());
   if (dir && !e.repeat) { e.preventDefault(); start(dir, e.code || e.key); }
 });
 addEventListener("keyup", e => { if (holding?.input === (e.code || e.key)) stopMove(); });
