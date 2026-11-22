@@ -20,6 +20,8 @@
 
 인터넷을 유지하는 시험은 [Windows 모바일 핫스팟 경로](../docs/host-setup.md#인터넷을-유지하는-로봇망)를 사용합니다. 기본 카메라 AP 시험에서 기존 인터넷 Wi‑Fi를 바꾸는 단계는 생략합니다.
 
+Windows 노트북 한 대에서 맞춤 펌웨어 0.1.8을 설치한 카메라 한 대를 2.4 GHz 핫스팟에 연결했습니다. 카메라가 STA 모드로 접속해 640×480 MJPEG를 연속 전송했고, Edge의 센서 전용 대시보드에서 Wi‑Fi 영상과 USB LiDAR를 동시에 표시했습니다. 기존 Wi‑Fi의 HTTPS 연결도 유지됐습니다. 두 번째 노트북과 카메라의 동시 접속은 별도 실물 시험입니다.
+
 1. 사용자 작업으로 카메라 플래시를 백업하고, 카메라용 이미지와 COM 포트를 확인한 뒤 [백업·설치·복구 절차](../docs/vision-cam-firmware.md)를 따릅니다. 카메라와 LiDAR 어댑터, MechDog 본체의 COM 포트는 구분합니다. 장치 관리자 또는 CMD의 `pnputil /enum-devices /class Ports /connected`에서 연결하기 전후를 비교할 수 있습니다.
 2. 카메라 설정 시리얼을 115200bps, Newline으로 열고 `set robot A` 또는 `set robot B`, `set ssid`, `set pass`, `reboot`를 사용합니다. 카메라 ID를 본체 ID에 맞추고 자격 정보는 장치에 입력합니다.
 3. Windows 브라우저에서 카메라별 `http://mechdog-a-cam.local/status`, `http://mechdog-b-cam.local/status`를 확인합니다. `.local` 이름이 해석되지 않으면 시리얼 상태 줄의 IP를 사용합니다. 상태 응답의 로봇 ID와 카메라 초기화 상태를 확인하고, `/capture`에서 한 장, `:81/stream`에서 MJPEG를 확인합니다. 키가 설정된 카메라는 펌웨어 문서의 키 전달 방식을 사용합니다.
