@@ -9,29 +9,29 @@
           --ok:#3fb950; --warn:#d29922; --bad:#f85149; --btn:#2b323d; --btnon:#3b82f6; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 "Malgun Gothic",system-ui,sans-serif; }
-  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  header { position:sticky; top:0; z-index:2; background:var(--bg); display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); }
   header h1 { font-size:17px; margin:0; flex:1; }
   .pill { padding:3px 10px; border-radius:999px; font-size:13px; background:var(--btn); }
   .pill.ok { background:#1f3d27; color:var(--ok); } .pill.warn { background:#3d321a; color:var(--warn); }
   .pill.bad { background:#4a1f1f; color:var(--bad); }
-  main { display:grid; grid-template-columns: 1fr 1fr; gap:14px; padding:14px 16px; align-items:stretch; }
-  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+  main { display:grid; grid-template-columns:minmax(0, 2fr) minmax(290px, 1fr); gap:14px; padding:14px 16px; align-items:start; }
+  @media (max-width: 760px) { main { grid-template-columns:minmax(0, 1fr); } }
   section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
   h2 { font-size:14px; color:var(--dim); margin:0 0 10px; font-weight:600; }
   .cam { aspect-ratio:4/3; background:#000; border-radius:6px; display:flex; align-items:center;
          justify-content:center; color:var(--dim); overflow:hidden; }
   .cam img { width:100%; height:100%; object-fit:contain; }
-  .cam { max-height:48vh; margin:0 auto; }
+  .cam { max-height:60vh; margin:0 auto; }
   canvas { display:block; width:min(100%, 440px); height:auto; margin:auto; background:#14171c; }
   .pad { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; max-width:330px; margin:0 auto; }
-  .pad button { height:72px; font-size:16px; }
+  .pad button { min-height:52px; font-size:14px; }
   button { background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px;
            cursor:pointer; font:inherit; user-select:none; touch-action:none; }
   button.held { background:var(--btnon); }
   button:disabled { opacity:.4; cursor:not-allowed; }
-  .stop { background:#3a2b10; } .estop { background:var(--bad); color:#fff; font-weight:700; height:56px; width:100%; margin-top:12px; font-size:17px; }
+  .stop { background:#3a2b10; } .estop { background:var(--bad); color:#fff; font-weight:700; min-height:40px; padding:4px 12px; }
   .row { display:flex; align-items:center; gap:10px; margin:10px 0; } .row label { width:92px; color:var(--dim); }
-  .row input { flex:1; } .row output { width:40px; text-align:right; }
+  .row input { flex:1; min-width:0; } .row output { width:40px; text-align:right; }
   #scan-ranges { display:flex; gap:6px; flex:1; } #scan-ranges button { flex:1; padding:6px 0; } #scan-range-v { width:56px; }
   #scan { max-width:100%; height:auto; cursor:zoom-in; }
   #sonar-ranges { display:flex; gap:6px; flex:1; } #sonar-ranges button { flex:1; padding:6px 0; }
@@ -49,14 +49,19 @@
   <h1>MechDog 조종 · 모니터링 <span id="robot" class="pill">로봇 ?</span></h1>
   <span id="link" class="pill">연결 확인 중</span>
   <span id="lock" class="pill">잠금 ?</span>
+  <span id="battery" class="pill">배터리 확인 중</span>
+  <button class="estop" id="estop" disabled>비상 정지 (Esc)</button>
 </header>
 <main>
     <section>
       <h2>카메라 (비전 모듈)</h2>
-      <div class="cam" id="cam">카메라 주소 없음 (--cam 으로 지정)</div>
+      <div class="cam" id="cam">카메라 설정 확인 중</div>
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
+      <label><input id="keyboard-enabled" type="checkbox" autocomplete="off"> 방향 단축키 사용</label>
+      <p id="drive-input">입력: 없음</p>
+      <p id="drive-state">로봇 상태: 확인 중</p>
       <div class="pad">
         <button data-dir="fwd-left">↖ 전진 좌회전<br><small>Q</small></button>
         <button data-dir="fwd">▲ 전진<br><small>W</small></button>
@@ -70,7 +75,6 @@
       </div>
       <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><output id="stepv">50</output></div>
       <div class="row"><label for="angle">회전 각도</label><input id="angle" type="range" min="1" max="30" value="15"><output id="anglev">15</output></div>
-      <button class="estop" id="estop">비상 정지 (Esc)</button>
       <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
       <dialog id="reset-dialog" aria-labelledby="reset-question">
         <form method="dialog">
@@ -80,7 +84,7 @@
         </form>
       </dialog>
       <button id="stand" style="width:100%;height:42px;margin-top:8px">일어서기 (기본 자세)</button>
-      <div id="msg"></div>
+      <div id="msg" role="status"></div>
       <div class="hint">보폭 -100~100, 회전 -30~30 (공식 API 범위). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
     </section>
     <section>
@@ -155,14 +159,20 @@ function motion(dir) {
   }[dir];
 }
 function sendMove() {
-  const [step, angle] = motion(holding.dir);
-  post("/api/move", { step, angle }).catch(e => say("이동 거절: " + e.message));
+  const input = holding;
+  const [step, angle] = motion(input.dir);
+  post("/api/move", { step, angle }).catch(e => {
+    if (holding === input) say("이동 요청 실패: " + e.message);
+  });
 }
 function start(dir, input) {
   if (!canMove || $("reset-dialog").open || holding?.input === input) return;
   stopMove(false);
   holding = { dir, input };
-  document.querySelector(`[data-dir="${dir}"]`).classList.add("held");
+  const button = document.querySelector(`[data-dir="${dir}"]`);
+  button.classList.add("held");
+  $("drive-input").textContent = "입력: " + button.firstChild.textContent.trim();
+  say("");
   sendMove();
   timer = setInterval(sendMove, 100);  // 서버 쪽 의도는 0.3초 뒤 사라짐 -> 계속 보내야 움직임
 }
@@ -170,7 +180,8 @@ function stopMove(send = true) {
   clearInterval(timer); timer = null;
   if (holding) document.querySelector(`[data-dir="${holding.dir}"]`).classList.remove("held");
   holding = null;
-  if (send) post("/api/stop").catch(() => {});
+  $("drive-input").textContent = "입력: 없음";
+  if (send && controlsEnabled) post("/api/stop").catch(() => {});
 }
 
 document.querySelectorAll("[data-dir]").forEach(b => {
@@ -185,7 +196,11 @@ document.querySelectorAll("[data-dir]").forEach(b => {
   b.addEventListener("lostpointercapture", release);
 });
 $("stop").onclick = () => stopMove();
-$("estop").onclick = () => { stopMove(false); post("/api/estop").then(() => say("비상 정지 보냄")); };
+$("estop").onclick = () => {
+  stopMove(false);
+  post("/api/estop").then(() => say("비상 정지 보냄"))
+    .catch(e => say("비상 정지 요청 실패: " + e.message));
+};
 const resetDialog = $("reset-dialog");
 $("reset").onclick = () => {
   if (holding) stopMove();
@@ -200,6 +215,11 @@ $("stand").onclick = () => { stopMove(false);
   post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
 ["step","angle"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
 
+const keyboardEnabled = $("keyboard-enabled");
+keyboardEnabled.checked = false;
+keyboardEnabled.onchange = () => {
+  if (!keyboardEnabled.checked && typeof holding?.input === "string") stopMove();
+};
 const KEYS = new Map([
   ["q", "fwd-left"], ["w", "fwd"], ["e", "fwd-right"],
   ["a", "left"], ["d", "right"],
@@ -211,7 +231,8 @@ addEventListener("keydown", e => {
   if (e.key === "Escape") { $("estop").click(); return; }
   if (resetDialog.open) return;
   if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
-  if (e.key === " ") { e.preventDefault(); stopMove(); return; }
+  if (e.key === " ") { if (e.target !== keyboardEnabled) e.preventDefault(); stopMove(); return; }
+  if (!keyboardEnabled.checked) return;
   if (e.target.matches?.("input, select, textarea, [contenteditable]")) return;
   const dir = KEYS.get(e.key.toLowerCase());
   if (dir && !e.repeat) { e.preventDefault(); start(dir, e.code || e.key); }
@@ -400,7 +421,12 @@ async function poll() {
     if (!camSet && s.usb_camera) { camSet = true; startUsbCamera(); }
     if (!camSet && s.cam) { $("cam").innerHTML = ""; const img = new Image(); img.src = s.cam; img.alt = "카메라";
       img.onerror = () => { $("cam").textContent = "카메라 영상 없음: " + s.cam; }; $("cam").appendChild(img); camSet = true; }
+    if (!camSet) $("cam").textContent = "카메라 설정 없음";
     if (s.sensors_only) {
+      controlsEnabled = canMove = false;
+      stopMove(false);
+      $("estop").hidden = true;
+      $("battery").hidden = true;
       $("motion-controls").hidden = true;
       $("lock").hidden = true;
       $("robot").textContent = "센서 전용";
@@ -408,12 +434,18 @@ async function poll() {
       return;
     }
     controlsEnabled = true;
+    $("motion-controls").hidden = $("lock").hidden = $("battery").hidden = $("estop").hidden = false;
+    $("estop").disabled = false;
     const t = s.tel;
     if (s.emergency) pill($("link"), "비상 정지 중", "bad");
     else if (!s.fresh) pill($("link"), s.status === "unknown" ? "로봇 응답 없음" : "응답 지연", "bad");
     else pill($("link"), "연결됨", "ok");
-    if (t) {
-      pill($("lock"), t.latched ? "잠김" : "움직일 수 있음", t.latched ? "warn" : "ok");
+    $("battery").textContent = s.fresh && t?.battery_mv != null
+      ? "배터리 " + (t.battery_mv / 1000).toFixed(2) + " V" : "배터리 확인 불가";
+    const states = { idle:"대기", moving:"이동 중", stopped:"정지", action:"동작 실행 중" };
+    $("drive-state").textContent = "로봇 상태: " + (s.fresh && t ? states[t.state] || t.state : "확인 불가");
+    if (s.fresh && t) {
+      pill($("lock"), t.latched ? "잠김 · " + (REASON[t.reason] || t.reason) : "잠금 해제", t.latched ? "warn" : "ok");
       $("s-state").textContent = t.state;
       $("s-reason").textContent = REASON[t.reason] || t.reason;
       $("s-batt").textContent = t.battery_mv == null ? "모름" : (t.battery_mv / 1000).toFixed(2) + " V";
@@ -422,7 +454,11 @@ async function poll() {
       $("s-sonar").textContent = !t.has_sonar ? "지원 안 함(펌웨어)" : t.sonar_mm == null ? "모름 (측정 실패·범위 밖)"
         : (t.sonar_mm / 10).toFixed(1) + " cm";
       drawSonar({ mm: t.sonar_mm, has: t.has_sonar, fresh: s.fresh });
-    } else { pill($("lock"), "잠금 ?", ""); $("s-sonar").textContent = "-"; drawSonar({ mm: null, has: false, fresh: false }); }
+    } else {
+      pill($("lock"), "잠금 확인 불가", "");
+      for (const id of ["s-state", "s-reason", "s-batt", "s-tilt", "s-warn", "s-sonar"]) $(id).textContent = "-";
+      drawSonar({ mm: t?.sonar_mm, has: !!t?.has_sonar, fresh: false });
+    }
     const ledOk = !!(t && t.has_sonar && s.fresh);
     document.querySelectorAll("#led-controls button").forEach(b => b.disabled = !ledOk);
     if (!ledOk) $("led-status").textContent = "로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)";
@@ -432,7 +468,11 @@ async function poll() {
     if (holding && !canMove) stopMove();
   } catch (e) {
     controlsEnabled = canMove = false;
-    pill($("link"), "서버 꺼짐", "bad");
+    pill($("link"), "대시보드 서버 응답 없음", "bad");
+    pill($("lock"), "잠금 확인 불가", "");
+    $("battery").textContent = "배터리 확인 불가";
+    $("drive-state").textContent = "로봇 상태: 확인 불가";
+    document.querySelectorAll("[data-dir]").forEach(b => b.disabled = true);
     stopMove(false);
   }
 }
