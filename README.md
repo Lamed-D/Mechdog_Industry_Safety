@@ -28,8 +28,6 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 
 ## 펌웨어 올리기
 
-올리기 전에 항상 기존 펌웨어를 백업합니다.
-
 - **로봇 본체 — 사람이 직접.** AI가 업로드 파일을 만들고 순서를 채팅으로 안내합니다. 가이드: [ai/firmware.md](ai/firmware.md) 2.2절(MicroPython), 4.2절(Arduino)
 - **카메라(비전 모듈) — AI 에이전트가 올리고 확인.** 사람은 본체 전원 끄기·케이블 연결만 합니다. 끝나면 AI가 설정 내용을 채팅으로 알려 줍니다(점검용 AP 기본 비밀번호 `password`).
 - 실물 점검 순서 → [ai/robot-tests.md](ai/robot-tests.md)
