@@ -1,9 +1,9 @@
-# 같은 노트북의 WSL 2에서 /scan 실행
+# 각 운영자 노트북의 WSL 2에서 /scan 실행
 
 WSL 2 Ubuntu 24.04와 ROS 2 Jazzy 실제 실행은 미검증입니다. 지금은 PC 합성 테스트만 실행합니다. ROS는 핵심 로직과 별개인 선택 의존성입니다.
 Jazzy 환경은 [호스트 설치](../docs/host-setup.md)를 따르고 `ros-jazzy-sensor-msgs`가 설치됐는지 확인합니다.
 
-저장소 최상위에서 각 명령을 별도 터미널에 실행합니다. 아래 기본값은 루프백 합성 서버입니다.
+운영자마다 본인의 로봇 ID에 해당하는 노드를 실행합니다. 아래는 단일 PC의 두 ID 합성 시험이며 각 명령을 별도 터미널에 실행합니다. 아래 기본값은 루프백 합성 서버입니다.
 
 ```bash
 python -m tools.mock.mock_lidar --port 20108

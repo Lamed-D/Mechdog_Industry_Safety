@@ -1,6 +1,7 @@
 @echo off
 setlocal
 pushd "%~dp0.." || exit /b 1
+if /i "%~1"=="camera-firmware" goto camera_firmware
 set "suite="
 if /i "%~1"=="robot" set "suite=tests.test_robot"
 if /i "%~1"=="dashboard" set "suite=tests.test_dashboard"
@@ -9,11 +10,18 @@ if /i "%~1"=="lidar" set "suite=tests.host.test_lidar tests.host.test_scan"
 if /i "%~1"=="integration" set "suite=tests.dashboard.test_demo tests.robot.test_role_integration tests.host.test_hub_cloud_demo"
 if /i "%~1"=="all" set "suite=discover -s tests"
 if not defined suite (
-    echo Usage: test_PC\run.cmd robot^|dashboard^|console^|lidar^|integration^|all
+    echo Usage: test_PC\run.cmd robot^|dashboard^|console^|lidar^|integration^|all^|camera-firmware
     popd
     exit /b 2
 )
 python -m unittest %suite%
+set "result=%errorlevel%"
+popd
+exit /b %result%
+
+:camera_firmware
+python tools\build_vision_cam.py --profile balanced --release
+if not errorlevel 1 python tools\build_vision_cam.py --verify-release
 set "result=%errorlevel%"
 popd
 exit /b %result%

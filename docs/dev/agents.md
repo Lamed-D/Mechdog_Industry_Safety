@@ -28,8 +28,8 @@
 | 영역 | 담당 | 폴더 |
 | --- | --- | --- |
 | 로봇(MechDog ESP32, MicroPython) 쪽 코드 — Hiwonder 공식 Python 기반 | **claude1** | `robot/`, `custom_sensors/`, `tests/fakes/`, `tools/bringup/` |
-| 로봇 ↔ Pi 5 통신 규약 문서 | **claude1** (codex1은 PR 리뷰·protocol 이슈로 의견) | `docs/protocol.md` |
-| Pi 5(호스트) 쪽 코드: 라이다 수신, ROS 2, 로봇 명령, 카메라 | **codex1** | `host/`, `ros2/`, `tools/mock/` |
+| 로봇 ↔ 담당 Windows 노트북 통신 규약 문서 | **claude1** (codex1은 PR 리뷰·protocol 이슈로 의견) | `docs/protocol.md` |
+| Windows 노트북(호스트) 쪽 코드: 라이다 수신, ROS 2, 로봇 명령, 카메라 | **codex1** | `host/`, `ros2/`, `tools/mock/` |
 | 관리자 대시보드, 시연 시나리오 상태기계 | **claude2** | `dashboard/`, `scenario/`, `tests/dashboard/`, `tests/scenario/` |
 | 공용 규칙 문서 | 대리 승인(9절) 후 한 에이전트만 | `docs/dev/*`, `AGENTS.md`, `CLAUDE.md`, `.github/*`, `.claude/`, `.codex/` |
 

@@ -1,6 +1,6 @@
 # Mechdog Industry Safety — AI agent instructions
 
-AI agents work here: **claude1** (Claude Code, robot side), **codex1** (Codex CLI, Pi 5 host side), **claude2** (another person's
+AI agents work here: **claude1** (Claude Code, robot side), **codex1** (Codex CLI, Windows host side), **claude2** (another person's
 Claude Code, dashboard and scenario). **Your name is `git config --get agent.name`** (set once by `python tools/setup_agent.py <name>`);
 if it is empty, ask the user. Prefix issue/PR titles, comments and reports with `[<name>]`; talk through GitHub issues (labels from:/to:/agent:*),
 and treat `to:<name>` + `agent:request` issues as work assigned to you.
@@ -8,7 +8,7 @@ Codex reads this file; Claude reads CLAUDE.md. Coordinate only through GitHub (b
 
 Read these before changing code (Korean):
 
-- docs/dev/agents.md — identity, separate workspaces, ownership (claude1 = robot side, Hiwonder official Python based; codex1 = Pi 5 host side), cross-review and self-merge rules
+- docs/dev/agents.md — identity, separate workspaces, ownership (claude1 = robot side, Hiwonder official Python based; codex1 = Windows host side), cross-review and self-merge rules
 - docs/dev/confidentiality.md — never record referenced external repos/materials or personal data in commits/PRs/docs
 - docs/dev/mechdog-api.md — all robot control must use the official Hiwonder MechDog Python API
 - docs/dev/ai-guide.md — project summary, mandatory rules, workflow
@@ -22,9 +22,9 @@ robot goes to the manager's location and guides them to the person.
 
 Each robot (both identical): **4 legs, a vision module (ESP32-S3 camera) on the front, no arm/gripper, nothing on
 auxiliary servos 9/10** — do not use `set_servo` or write code for absent parts. An RPLIDAR A1M8 is taped on the
-back and wired to the main board's GPIO port J5 (IO32/IO33 UART). A stationary Raspberry Pi 5 16GB (fallback: Jetson
-Orin Nano Super) does SLAM, planning and fallen-person detection, and sends high-level commands over Wi-Fi; robots
-stop on their own if commands stop.
+back and wired to the main board's GPIO port J5 (IO32/IO33 UART). Two operators each use one Windows laptop, one MechDog and one LiDAR. Each laptop owns its robot’s command link
+and handles its camera and LiDAR input. SLAM, planning and fallen-person detection run on the assigned laptops as
+those features are integrated. Robots stop on their own if commands stop.
 
 All joint, motion, posture, sensor and output control goes through `HW_MechDog.MechDog`, `Hiwonder` and
 `Hiwonder_IIC` only (https://docs.hiwonder.com/projects/MechDog/en/latest/docs/4.Python_Programming_Projects.html).

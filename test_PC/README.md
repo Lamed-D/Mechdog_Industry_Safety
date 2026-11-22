@@ -1,6 +1,7 @@
 # Windows 노트북 시험
 
 저장소 최상위에서 CMD로 실행합니다. 합성 시험은 Python 표준 라이브러리를 사용하며 실제 장비에 명령을 보내지 않습니다.
+운영자 A와 B는 각각 Windows 노트북·MechDog·A1M8 한 세트를 사용합니다.
 
 ```cmd
 test_PC\run.cmd robot
@@ -14,6 +15,14 @@ python tools\check_confidential.py range origin/main..HEAD
 
 카메라·조작·LiDAR 그래프를 함께 검증하는 모의 및 실물 절차는 [PC 조종 콘솔](robot_console/README.md)에 있습니다.
 기본 영상 Wi‑Fi와 두 대 공통 로봇망 연결은 [ESP32-S3 카메라 연결 안내](camera-setup.md)를 따릅니다.
+인터넷 Wi‑Fi를 유지하면서 카메라와 라이다 USB 실물 데이터를 보는 절차도 같은 안내에 있습니다.
+
+```cmd
+python -m test_PC.mock_station --robot A
+python -m test_PC.mock_station --robot B
+```
+
+A 명령은 노트북 A에서, B 명령은 노트북 B에서 실행합니다. 두 화면 모두 각 노트북의 `http://127.0.0.1:8090`입니다. 한 노트북으로 재현할 때는 첫 실행을 Ctrl+C로 닫은 뒤 다른 ID로 실행합니다.
 
 통합 시험은 A/B를 번갈아 발견 로봇으로 사용해 합성 낙상 이벤트, 대시보드 알림, 반대쪽 로봇의 관리자 호출·사고 지점 안내, 링크 손실 시 정지와 자동 재개 방지를 확인합니다. 본체 watchdog과 역할 인수 테스트는 별도로 가짜 본체의 정지 래치를 확인합니다.
 

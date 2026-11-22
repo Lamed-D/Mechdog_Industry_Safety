@@ -49,7 +49,7 @@
       <h2>카메라 (비전 모듈)</h2>
       <div class="cam" id="cam">카메라 주소 없음 (--cam 으로 지정)</div>
     </section>
-    <section>
+    <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
       <div class="pad">
         <span></span><button data-dir="fwd">▲ 전진<br><small>W</small></button><span></span>
@@ -87,7 +87,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
-let holding = null, timer = null, camSet = false;
+let holding = null, timer = null, camSet = false, controlsEnabled = false;
 
 function post(path, body) {
   return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) })
@@ -105,7 +105,7 @@ function sendMove() {
   post("/api/move", { step, angle }).catch(e => say("이동 거절: " + e.message));
 }
 function start(dir) {
-  if (holding === dir) return;
+  if (!controlsEnabled || holding === dir) return;
   stopMove(false);
   holding = dir;
   document.querySelector(`[data-dir="${dir}"]`).classList.add("held");
@@ -137,6 +137,7 @@ $("stand").onclick = () => { stopMove(false);
 
 const KEYS = { w:"fwd", ArrowUp:"fwd", s:"back", ArrowDown:"back", a:"left", ArrowLeft:"left", d:"right", ArrowRight:"right" };
 addEventListener("keydown", e => {
+  if (!controlsEnabled) return;
   if (e.key === "Escape") { $("estop").click(); return; }
   if (e.key === " ") { e.preventDefault(); stopMove(); return; }
   const dir = KEYS[e.key]; if (dir && !e.repeat) { e.preventDefault(); start(dir); }
@@ -186,12 +187,44 @@ async function pollScan() {
     setTimeout(pollScan, 250);
   }
 }
+function startUsbCamera() {
+  const img = new Image(), status = document.createElement("span");
+  img.alt = "USB 카메라";
+  $("cam").replaceChildren(status);
+  let currentUrl;
+  async function pollFrame() {
+    try {
+      const response = await fetch("/api/camera");
+      if (!response.ok) throw new Error((await response.json()).error);
+      const url = URL.createObjectURL(await response.blob());
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      currentUrl = url;
+      img.src = url;
+      $("cam").replaceChildren(img);
+    } catch (error) {
+      status.textContent = error.message;
+      $("cam").replaceChildren(status);
+    } finally {
+      setTimeout(pollFrame, 750);
+    }
+  }
+  pollFrame();
+}
 async function poll() {
   try {
     const s = await (await fetch("/api/state")).json();
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
+    if (!camSet && s.usb_camera) { camSet = true; startUsbCamera(); }
     if (!camSet && s.cam) { $("cam").innerHTML = ""; const img = new Image(); img.src = s.cam; img.alt = "카메라";
       img.onerror = () => { $("cam").textContent = "카메라 영상 없음: " + s.cam; }; $("cam").appendChild(img); camSet = true; }
+    if (s.sensors_only) {
+      $("motion-controls").hidden = true;
+      $("lock").hidden = true;
+      $("robot").textContent = "센서 전용";
+      pill($("link"), "본체 제어 꺼짐", "");
+      return;
+    }
+    controlsEnabled = true;
     const t = s.tel;
     if (s.emergency) pill($("link"), "비상 정지 중", "bad");
     else if (!s.fresh) pill($("link"), s.status === "unknown" ? "로봇 응답 없음" : "응답 지연", "bad");
@@ -207,7 +240,7 @@ async function poll() {
     $("s-fault").textContent = s.error || s.fault || "없음";
     document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !t || t.latched || !s.fresh || s.emergency);
     if (holding && (!t || t.latched || !s.fresh)) stopMove();
-  } catch (e) { pill($("link"), "서버 꺼짐", "bad"); stopMove(false); }
+  } catch (e) { controlsEnabled = false; pill($("link"), "서버 꺼짐", "bad"); stopMove(false); }
 }
 setInterval(poll, 250); poll(); pollScan();
 </script>

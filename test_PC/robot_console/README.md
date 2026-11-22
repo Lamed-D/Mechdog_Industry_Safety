@@ -63,16 +63,13 @@ python -m test_PC.robot_console.server --robot B --robot-ip auto --allow-real --
 test_PC\run.cmd console
 ```
 
-다음 네 줄을 저장소 최상위의 CMD 창 네 개에서 각각 실행합니다. A를 시험하려면 로봇·카메라·콘솔의 `--robot B`를 모두 A로 바꿉니다.
+각자 담당 ID로 실행합니다. 한 명령이 가짜 본체·합성 카메라·LiDAR·콘솔을 시작합니다.
 
 ```cmd
-python -m test_PC.robot_console.fake_robot --robot B
-python -m tools.mock.mock_camera --robot B --frame test_PC\robot_console\mock_frame.jpg
-python -m tools.mock.mock_lidar
-python -m test_PC.robot_console.server --robot B --cam http://127.0.0.1:8081/stream --lidar-tcp 127.0.0.1
+python -m test_PC.mock_station --robot B
 ```
 
-브라우저에서 `http://127.0.0.1:8090`을 엽니다. B와 부팅 잠금, 합성 영상 요청, 정사각형 LiDAR 점이 표시되는지 확인합니다. 가짜 본체의 잠금을 해제하고 이동을 눌렀다 놓아 가짜 MechDog 콘솔 로그에 이동과 정지가 찍히는지 확인합니다. 비상 정지 후 잠금 상태를 확인합니다. 모의 LiDAR를 Ctrl+C로 종료하면 점이 사라져야 합니다. 콘솔을 먼저 Ctrl+C로 종료한 뒤 나머지 모의 프로세스를 종료합니다.
+브라우저에서 `http://127.0.0.1:8090`을 엽니다. B와 부팅 잠금, 합성 영상, 정사각형 LiDAR 점이 표시되는지 확인합니다. 가짜 본체의 잠금을 해제하고 이동을 눌렀다 놓아 가짜 MechDog 콘솔 로그에 이동과 정지가 찍히는지 확인합니다. 비상 정지 후 잠금 상태를 확인합니다. CMD에서 Ctrl+C를 누르면 모의 프로세스가 함께 종료됩니다. 개별 장치 단절은 `test_PC\run.cmd console`로도 확인합니다.
 
 ## 사용자 실물 통합 시험
 
@@ -85,12 +82,12 @@ python -m test_PC.robot_console.server --robot B --cam http://127.0.0.1:8081/str
 2. J5 UART·Wi-Fi 경로는 로봇 주소와 같은 로봇의 카메라 URL을 확인한 뒤 아래 명령을 실행합니다. `%ROBOT_B_IP%`와 `%CAM_B_URL%`은 해당 시험 환경의 값입니다. 카메라 기본 AP 시험에서 TCP 20108을 쓸 수 없으면 우선 USB 직결 화면과 본체 상태를 개별 확인합니다.
 
    ```cmd
-   python -m test_PC.robot_console.server --robot B --robot-ip %ROBOT_B_IP% --allow-real --cam %CAM_B_URL% --lidar-tcp %ROBOT_B_IP%
+   python -m test_PC.robot_console.server --robot B --robot-ip %ROBOT_B_IP% --allow-real --cam %CAM_B_URL% --relay-lidar
    ```
 
 3. 잠긴 상태에서 본체 ID, 카메라, LiDAR 점을 확인합니다. 사용자 승인 범위에서 로봇을 받침대에 두고 잠금 해제, 정지와 비상 정지부터 시험합니다. Wi-Fi를 끊었을 때 명령 watchdog으로 본체가 정지·래치하는지, LiDAR 점이 지워지는지 확인합니다. 콘솔 종료 후 정지 상태를 확인합니다. A도 주소·카메라·로봇 ID를 바꿔 같은 절차를 반복합니다.
 
-조종 콘솔은 한 번에 본체 한 대를 연결합니다. 두 대의 상태를 함께 확인할 때는 [정지형 대시보드 실행 안내](../../docs/host-setup.md)를 따르고 조종 콘솔을 먼저 종료합니다.
+운영자마다 자기 노트북과 콘솔에서 자기 본체 하나만 연결합니다. 기존 두 본체용 정지형 진단 어댑터를 별도로 시험하려면 두 담당 콘솔을 모두 종료하고 장비 확인 범위에서 진행합니다. 각 콘솔에서 LiDAR TCP를 쓸 때는 같은 장치에 별도 진단이나 ROS 노드를 연결하지 않습니다.
 
 ## 실물 확인 결과 (로봇 B, 사용자 실행, 2026-11-21)
 
