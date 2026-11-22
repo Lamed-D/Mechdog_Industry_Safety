@@ -25,9 +25,10 @@
    펌웨어를 다시 굽지 않고 `main.py`만 올리므로 되돌리기 쉽고, 제조사 공식 Python API를 그대로 씁니다([MechDog 제어 API 규칙](dev/mechdog-api.md)).
 2. **실물 검증:** 사용자가 승인한 범위에서 실제 로봇으로 통신·정지·라이다 중계·걸음을 확인합니다.
 3. **Arduino로 이식:** 같은 동작을 제조사 공식 Arduino 라이브러리로 옮겨 `firmware/main_arduino/`에 둡니다.
-   사용자 지정으로 **이제 Arduino 판을 실제 제어 경로로** 올립니다(Python 판은 유지). 이식성 코어(안전 로직)는
-   `robot/`과 같은 시나리오로 검증하고, 벤더 동작 백엔드·실물 동작은 사용자가 업로드해 확인합니다([세팅 가이드](robot-arduino-setup.md)).
-   MicroPython 판은 되돌림·비교용으로 남겨 둡니다.
+   사용자 지정으로 Arduino 판을 완성해 둡니다(Python 판 유지). 이식성 코어(안전 로직)는 `robot/`과 같은 시나리오로
+   검증하고, 벤더 동작 백엔드·실물 동작은 사용자가 업로드해 확인합니다([세팅 가이드](robot-arduino-setup.md)).
+   실물 업로드 방식(Arduino 굽기 vs 순정 MicroPython 에 `main.py` 올리기)은 사용자가 정합니다. 현 시점 업로드는
+   MicroPython 단일 `main.py` 번들(`python tools/bundle_robot.py --robot A|B` → `build/robot_<ID>/main.py`)로도 할 수 있습니다.
 
 ### 1.3 두 펌웨어가 지켜야 할 것
 
