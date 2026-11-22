@@ -12,7 +12,7 @@ Mechdog Industry Safety는 Hiwonder MechDog 사족보행 로봇으로 산업 현
 부가 서보(9·10번)에 연결된 장치도 없습니다. 로봇은 ESP32 + MicroPython으로 동작하며, **모든 제어는 Hiwonder 공식 MechDog
 Python API**(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)로 합니다 → [MechDog 제어 API 규칙](mechdog-api.md).
 
-이 저장소는 **claude1(로봇 쪽)과 codex1(Pi 5 호스트 쪽) 두 에이전트**가 각자 다른 작업 폴더에서 함께 작업합니다
+이 저장소는 **claude1(로봇 쪽)과 codex1(Windows 호스트 쪽) 두 에이전트**가 각자 다른 작업 폴더에서 함께 작업합니다
 → [에이전트 협업 규칙](agents.md). 참고 자료는 기밀입니다 → [비공개 자료 규칙](confidentiality.md).
 
 ## 2. 구조
@@ -20,11 +20,11 @@ Python API**(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)로 합니다 → [MechDog
 ```text
 (코드가 들어오면 실제 구조에 맞게 고칩니다. 괄호는 담당 에이전트)
 docs/                  설계·개발 규칙 문서 (docs/protocol.md 는 claude1)
-firmware/vision_cam/   앞쪽 ESP32-S3 비전 모듈 맞춤 펌웨어(Arduino). 영상 → Pi 5, 메인 보드 I2C 호환
+firmware/vision_cam/   앞쪽 ESP32-S3 비전 모듈 맞춤 펌웨어(Arduino). 영상 → 담당 Windows 노트북, 메인 보드 I2C 호환
 robot/                 MechDog 메인 ESP32에 올리는 MicroPython 코드, Hiwonder 공식 Python 기반 (claude1)
 custom_sensors/        추가(비공식) 센서 읽기 드라이버. 센서 하나에 파일 하나 (claude1)
 tools/bringup/         실물 확인용 REPL 스크립트 (claude1)
-host/                  Raspberry Pi 5 쪽 Python: 라이다 수신, 로봇 명령, 카메라, 대시보드 (codex1)
+host/                  Windows 호스트 쪽 Python: 라이다 수신, 로봇 명령, 카메라, 대시보드 (codex1)
 ros2/                  ROS 2 실행 설정·노드 (codex1)
 dashboard/             관리자 대시보드 (claude2)
 scenario/              시연 시나리오 상태기계 (claude2)

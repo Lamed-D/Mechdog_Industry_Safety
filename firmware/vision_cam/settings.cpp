@@ -2,8 +2,11 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <esp_heap_caps.h>
+#include <esp_task_wdt.h>
 
 #include "config.h"
+#include "frame_store.h"
 
 // NVS 이름공간과 키. 값은 카메라 모듈 플래시의 NVS 영역에만 저장됩니다.
 #define NS "camcfg"
@@ -67,6 +70,7 @@ static void show() {
 static void help() {
   Serial.println("[cfg] 명령 (줄 끝 Enter, 115200bps):");
   Serial.println("  show                    현재 설정 보기(비밀값은 가림)");
+  Serial.println("  frame                   USB 진단용 최신 JPEG 한 장");
   Serial.println("  set robot A|B           로봇 ID");
   Serial.println("  set ssid <이름>         공유기 SSID(공백 포함 가능)");
   Serial.println("  set pass <비밀번호>     공유기 비밀번호");
@@ -76,11 +80,33 @@ static void help() {
   Serial.println("  reboot                  다시 시작(설정은 재시작 뒤 적용)");
 }
 
+static void send_frame() {
+  constexpr size_t capacity = 128 * 1024;
+  auto *jpeg = static_cast<uint8_t *>(heap_caps_malloc(capacity, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  size_t length = 0;
+  if (jpeg) {
+    uint32_t seq = frame_store_seq();
+    frame_store_demand();
+    length = frame_store_copy(jpeg, capacity, seq, CAM_CAPTURE_WAIT_MS, nullptr, nullptr, nullptr);
+  }
+  Serial.printf("MECHDOG_JPEG %u\n", (unsigned)length);
+  for (size_t sent = 0; sent < length;) {
+    size_t remaining = length - sent;
+    size_t count = Serial.write(jpeg + sent, remaining > 512 ? 512 : remaining);
+    if (count == 0) break;
+    sent += count;
+    esp_task_wdt_reset();
+  }
+  Serial.flush();
+  free(jpeg);
+}
+
 static void handle(char *line) {
   while (*line == ' ') line++;
   if (*line == '\0') return;
   if (strcmp(line, "help") == 0) return help();
   if (strcmp(line, "show") == 0) return show();
+  if (strcmp(line, "frame") == 0) return send_frame();
   if (strcmp(line, "reboot") == 0) {
     Serial.println("[cfg] 다시 시작합니다");
     delay(100);

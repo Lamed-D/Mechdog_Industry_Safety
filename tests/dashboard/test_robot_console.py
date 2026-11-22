@@ -13,6 +13,7 @@ from host.lidar.rplidar_protocol import Sample
 from test_PC.robot_console.lidar import LidarFeed
 from test_PC.robot_console.make_robot_files import UPLOAD_ORDER, render
 from test_PC.robot_console.server import AutoTransport, Console, ConsoleLink, make_handler
+from test_PC.robot_console.usb_camera import read_frame
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -124,6 +125,27 @@ class ConsoleHttpTests(unittest.TestCase):
             finally:
                 server.shutdown()
                 worker.join(2)
+
+    def test_sensor_preview_has_no_command_transport(self):
+        console = Console("B", None, "")
+        self.assertTrue(console.state()["sensors_only"])
+        with self.assertRaisesRegex(ValueError, "sensor-only"):
+            console.command("/api/move", {"step": 20, "angle": 0})
+        console.close()
+
+
+class UsbCameraTests(unittest.TestCase):
+    def test_serial_header_and_fragmented_jpeg(self):
+        from unittest.mock import Mock
+        jpeg = b"\xff\xd8fixture\xff\xd9"
+        port = Mock()
+        port.read_until.side_effect = [b"[cam] boot\n", b"MECHDOG_JPEG %d\n" % len(jpeg)]
+        port.read.side_effect = [jpeg[:4], jpeg[4:]]
+        self.assertEqual(read_frame(port, threading.Event()), jpeg)
+        port.write.assert_called_once_with(b"frame\n")
+        port.read_until.side_effect = [b"MECHDOG_JPEG 999999\n"]
+        with self.assertRaises(ValueError):
+            read_frame(port, threading.Event())
 
 
 class AutoTransportTests(unittest.TestCase):
