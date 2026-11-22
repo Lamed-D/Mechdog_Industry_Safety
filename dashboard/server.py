@@ -109,6 +109,8 @@ class ConsoleLink(RobotLink):
 
     def move(self, step, angle):
         self.pending_pose = None
+        if not self.fresh() or self.emergency or self.latest.latched:
+            raise ValueError("로봇 연결과 잠금 상태를 확인하세요")
         super().move(step, angle)
 
     def observe(self, data):

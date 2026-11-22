@@ -134,7 +134,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
-let holding = null, timer = null, camSet = false, controlsEnabled = false;
+let holding = null, timer = null, camSet = false, controlsEnabled = false, canMove = false;
 
 function post(path, body) {
   return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) })
@@ -147,34 +147,40 @@ function motion(dir) {
   return { fwd:[s,0], back:[-s,0], left:[0,a], right:[0,-a] }[dir];
 }
 function sendMove() {
-  const [step, angle] = motion(holding);
+  const [step, angle] = motion(holding.dir);
   post("/api/move", { step, angle }).catch(e => say("이동 거절: " + e.message));
 }
-function start(dir) {
-  if (!controlsEnabled || holding === dir) return;
+function start(dir, input) {
+  if (!canMove || $("reset-dialog").open || holding?.input === input) return;
   stopMove(false);
-  holding = dir;
+  holding = { dir, input };
   document.querySelector(`[data-dir="${dir}"]`).classList.add("held");
   sendMove();
   timer = setInterval(sendMove, 100);  // 서버 쪽 의도는 0.3초 뒤 사라짐 -> 계속 보내야 움직임
 }
 function stopMove(send = true) {
   clearInterval(timer); timer = null;
-  if (holding) document.querySelector(`[data-dir="${holding}"]`).classList.remove("held");
+  if (holding) document.querySelector(`[data-dir="${holding.dir}"]`).classList.remove("held");
   holding = null;
   if (send) post("/api/stop").catch(() => {});
 }
 
 document.querySelectorAll("[data-dir]").forEach(b => {
-  b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); start(b.dataset.dir); });
-  b.addEventListener("pointerup", () => stopMove());
-  b.addEventListener("pointercancel", () => stopMove());
-  b.addEventListener("lostpointercapture", () => { if (holding === b.dataset.dir) stopMove(); });
+  b.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    b.setPointerCapture(e.pointerId);
+    start(b.dataset.dir, e.pointerId);
+  });
+  const release = e => { if (holding?.input === e.pointerId) stopMove(); };
+  b.addEventListener("pointerup", release);
+  b.addEventListener("pointercancel", release);
+  b.addEventListener("lostpointercapture", release);
 });
 $("stop").onclick = () => stopMove();
 $("estop").onclick = () => { stopMove(false); post("/api/estop").then(() => say("비상 정지 보냄")); };
 const resetDialog = $("reset-dialog");
 $("reset").onclick = () => {
+  if (holding) stopMove();
   resetDialog.returnValue = "";
   resetDialog.showModal();
 };
@@ -192,9 +198,11 @@ addEventListener("keydown", e => {
   if (e.key === "Escape") { $("estop").click(); return; }
   if (resetDialog.open) return;
   if (e.key === " ") { e.preventDefault(); stopMove(); return; }
-  const dir = KEYS[e.key]; if (dir && !e.repeat) { e.preventDefault(); start(dir); }
+  if (e.target.matches?.("input, select, textarea, [contenteditable]")) return;
+  const dir = KEYS[e.key];
+  if (dir && !e.repeat) { e.preventDefault(); start(dir, e.code || e.key); }
 });
-addEventListener("keyup", e => { if (KEYS[e.key] === holding) stopMove(); });
+addEventListener("keyup", e => { if (holding?.input === (e.code || e.key)) stopMove(); });
 addEventListener("blur", () => stopMove());
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopMove(); });
 
@@ -405,9 +413,14 @@ async function poll() {
     document.querySelectorAll("#led-controls button").forEach(b => b.disabled = !ledOk);
     if (!ledOk) $("led-status").textContent = "로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)";
     $("s-fault").textContent = s.error || s.fault || "없음";
-    document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !t || t.latched || !s.fresh || s.emergency);
-    if (holding && (!t || t.latched || !s.fresh)) stopMove();
-  } catch (e) { controlsEnabled = false; pill($("link"), "서버 꺼짐", "bad"); stopMove(false); }
+    canMove = !!(t && !t.latched && s.fresh && !s.emergency);
+    document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !canMove);
+    if (holding && !canMove) stopMove();
+  } catch (e) {
+    controlsEnabled = canMove = false;
+    pill($("link"), "서버 꺼짐", "bad");
+    stopMove(false);
+  }
 }
 setInterval(poll, 250); poll(); pollScan();
 </script>
