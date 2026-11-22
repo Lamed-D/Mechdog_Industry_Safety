@@ -75,6 +75,8 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 
 실물 확인 순서는 [robot-tests.md](robot-tests.md).
 
+잠금 해제가 거부되면 MicroPython 본체가 즉시 TEL을 보내고, 다음 해제 성공 또는 재부팅까지 `reset_denied`를 표시합니다. 기존 배터리·통신·동작 종료 조건은 그대로 적용됩니다.
+
 **스레드 구성(실물 근거, 2026-11-22 로봇 A):** 예전처럼 `startMain` 루프 4개를 띄우면 순정 펌웨어 + Wi-Fi 뒤 시스템 메모리가 모자라 두 번째부터 `OSError: can't create thread`(직후 `free heap: 52 bytes`)였습니다. 그래서 **감시 스레드 하나만** `startMain`으로 Wi-Fi보다 먼저 띄우고, 명령·텔레메트리·비전 읽기는 `main.py`의 시작 스레드에서 `app.run()` 한 루프로 돕니다. 라이다 J5 중계는 `config.LIDAR_RELAY_ENABLED = False`(기본)로 만들지 않습니다.
 같은 부팅 로그에 `QMI8658 init.`이 보여 로봇 A IMU 칩은 QMI8658로 보입니다(순정 펌웨어 출력).
 - `main.py`가 이제 돌아오지 않으므로 REPL은 Ctrl+C로 들어갑니다(감시 스레드는 계속 돌며 정지·래치 유지).

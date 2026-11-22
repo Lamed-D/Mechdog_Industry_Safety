@@ -246,6 +246,7 @@ seq와 상관없이 실행한 늦은 `STOP`·`ESTOP`은 `last_cmd_seq`를 낮추
 ### 5.3 래치 해제 (`RESET`)
 
 - 노트북은 **사람이 화면에서 잠금 해제를 누를 때만** `RESET`을 보냅니다. 자동으로 보내지 않습니다.
+- 첫 전송 다음 주기까지 ACK가 없고 TEL이 신선하면 같은 순번으로 한 번만 재전송합니다. STOP, ESTOP 또는 세션 단절 시 재전송을 취소합니다. 본체가 이미 처리한 순번은 다시 실행하지 않습니다.
   호스트는 신선한 래치 TEL과 배터리 조건을 먼저 확인합니다.
 - 로봇은 아래를 모두 만족할 때만 래치를 풉니다. 하나라도 아니면 래치를 유지하고 `warn=reset_denied`.
   1. Wi-Fi 연결됨
@@ -344,7 +345,7 @@ TEL|A|5131|3390|stopped|1|link_lost|7610|0.8|-0.2|513141|6f3a91|none|$
 | `busy` | 동작 그룹 중이라 명령을 실행하지 않음 |
 | `latched` | 래치 중이라 명령을 실행하지 않음 |
 | `move_stale` | `MOVE`가 끊겨 걷기를 멈춤(5.1절) |
-| `reset_denied` | `RESET` 조건 불충족 |
+| `reset_denied` | `RESET` 조건 불충족. MicroPython은 거부 직후 TEL을 보내고 성공한 RESET 또는 재부팅까지 표시 |
 | `garbage` | 누구 것인지 모를 메시지를 버림 |
 | `proto` | 지원하지 않는 규약 버전의 `HELLO` |
 | `batt_low` | `LOW_BATT_WARN_MV` 미만 |
