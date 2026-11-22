@@ -2,7 +2,7 @@
 
 > **동결: 대시보드 표시 시연 수준으로 유지. 코드 수정·추가 개발 금지(버그로 테스트가 깨질 때만 최소 수정). 지도는 앞으로 VSLAM.**
 >
-> 대상 코드: `custom_sensors/lidar_bridge.py`, `host/lidar/`, `ros2/`, `host/map_review.py`, `dashboard/lidar.py`, `test_PC/lidar_probe.py`, `tools/mock/mock_lidar.py`.
+> 대상 코드: `custom_sensors/lidar_bridge.py`, `host/lidar/`, `ros2/`, `host/map_review.py`, `dashboard/lidar.py`, `test_PC/lidar_probe.py`.
 > 이 문서는 현재 상태를 기록할 뿐 계획이 아닙니다. 아래 "계획·후보"로 적힌 것(SLAM, 지도 편집, 순찰)은 진행하지 않습니다.
 
 관련: [hardware.md](hardware.md)(배선·전원·부품), [protocol.md](protocol.md) 7절(TCP 20108 원시 중계), [dashboard.md](dashboard.md)(LiDAR 점 표시)
@@ -55,21 +55,14 @@
 - 회전 약 5.5 Hz(5V 모터, 명목값, 실측 전).
 - 명령·디스크립터·샘플 배치는 제조사 공개 SDK(BSD 2-Clause)로 비트 배치만 확인해 독립 구현했습니다. SDK 코드를 복사하거나 의존성으로 넣지 않았습니다.
 
-## 4. 모의 서버 (`tools/mock/mock_lidar.py`)
-
-- 루프백에만 바인딩, 합성 정사각형 방, 360점/회전(1° 간격), 약 1980점/초, 20점씩 전송(밀린 데이터를 몰아 보내지 않음). 표준 SCAN만 지원.
-- 옵션: `--port`(20108), `--noise-mm`, `--corrupt-every`(의도적 불량 패킷), `--invalid-every`, `--disconnect-after`. 거리는 잡음 후 150~12000 mm로 제한.
-- 예: `python -m tools.mock.mock_lidar --noise-mm 5 --corrupt-every 31 --disconnect-after 1000`
-
-## 5. ROS 2 (`ros2/`, 합성 시험만)
+## 4. ROS 2 (`ros2/`, 합성 시험만)
 
 WSL 2 Ubuntu 24.04 + ROS 2 Jazzy 실제 실행은 **미검증**입니다. ROS는 선택 의존성(`ros-jazzy-sensor-msgs`)입니다.
 
 ```bash
-python -m tools.mock.mock_lidar --port 20108
 source /opt/ros/jazzy/setup.bash
 export ROS_DOMAIN_ID=42 ROS_LOCALHOST_ONLY=1
-python -m ros2.scan_node --robot A --host 127.0.0.1 --port 20108
+python -m ros2.scan_node --robot A --host <로봇 IP> --port 20108
 ros2 topic hz /robot_a/scan
 ```
 
@@ -79,7 +72,7 @@ ros2 topic hz /robot_a/scan
   TF·odometry·SLAM은 만들지 않습니다.
 - `map_grid.py`: `from_occupancy_grid(message)`가 ROS OccupancyGrid를 `host/map_review.py`의 Grid로 변환(순수 함수, 구독 없음).
 
-## 6. 지도 편집 검사 (`host/map_review.py`, 순수 함수)
+## 5. 지도 편집 검사 (`host/map_review.py`, 순수 함수)
 
 동결 전 "LiDAR SLAM 초안 → 사람 검토·확정 → 구역 지정 → 순찰"을 위해 만든 검사 함수입니다. 어떤 실행 경로에도 연결돼 있지 않습니다.
 
@@ -90,18 +83,17 @@ ros2 topic hz /robot_a/scan
 - 해시는 무결성 대조값이지 인증이 아닙니다. 통과해도 계단·지도 밖 위험·위치 추정·제동 여유는 검증되지 않습니다.
 - ROS 입력 제한: 평면 전용. 원점 z, 쿼터니언 x/y, norm²−1에 1e-6 허용오차를 넘으면 거절(자동 보정 없음). -1은 유지.
 
-## 7. 검증 상태
+## 6. 검증 상태
 
 | 경로 | 상태 |
 | --- | --- |
 | A1M8 → USB → Windows (`test_PC.lidar_probe --usb`, 대시보드 `--lidar-usb`) | 장치 응답, 상태 0, 연속 스캔 3회, STOP·포트 닫기 확인. 대시보드 점 표시 확인. 모터 정지 육안·거리 정확도는 미확인 |
-| 합성 TCP(모의 서버 ↔ 클라이언트·대시보드) | 테스트 통과 |
 | A1M8 → J5 UART → Wi-Fi → Windows | **실물 미검증**(J5 루프백, GET_INFO 응답, 무선 부하, 보행 중 걸음 품질 포함) |
 | ROS 2 `/scan`, SLAM, TF, 오도메트리 | 미검증(SLAM은 진행하지 않음) |
 
 남은 하드웨어 확인 항목(보드 회로도 버전, J5 1번 핀·커넥터 형번, 라이다 커넥터 핀 방향, 5V 레일 여유, 실측 전류)은 [hardware.md](hardware.md)에서 관리합니다.
 
-## 8. 진행하지 않는 것 (VSLAM으로 대체)
+## 7. 진행하지 않는 것 (VSLAM으로 대체)
 
 동결 전 계획이던 아래 항목은 **진행하지 않습니다.** 지도·위치 추정은 앞으로 VSLAM으로 새로 설계합니다([scenario.md](scenario.md)).
 

@@ -14,16 +14,14 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 
 나중에 같은 세트를 하나 더 두고(A/B) 두 대가 협업하도록 넓힐 예정입니다. → [장비 상세](docs/ai/hardware.md)
 
-## 노트북에서 해 보기 (로봇 없이)
+## 노트북 준비
 
-저장소 맨 위 폴더에서 CMD로 실행합니다.
+저장소 맨 위 폴더에서 CMD로 코드 검사를 한 번 돌립니다(장비에 접속하지 않음).
 
 ```cmd
-test_PC\run.cmd all
-python -m test_PC.mock_station --robot A
+test_PC
+un.cmd all
 ```
-
-두 번째 명령 뒤 브라우저에서 `http://127.0.0.1:8090` 을 엽니다(가짜 로봇·카메라·라이다). 끝낼 때 Ctrl+C.
 
 ## 실제 로봇과 연결
 

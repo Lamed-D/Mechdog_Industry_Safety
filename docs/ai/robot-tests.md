@@ -40,7 +40,7 @@
 
 | # | 단계 | 정상 결과 | 실패 시 |
 | --- | --- | --- | --- |
-| 1 | PC: `python -m unittest discover -s tests`, 가짜 본체 `python -m dashboard.fake_robot` + `python -m dashboard.server` | 통과, 화면에 boot 잠금·합성 영상 | 코드·환경. 실물 연결 안 함 |
+| 1 | PC: `python -m unittest discover -s tests` | 통과 | 코드·환경. 실물 연결 안 함 |
 | 2 | 외관·고정·배선·배터리, 라이다 고정·0° 방향 (전원 OFF) | 손상·느슨함 없음 | 고정 후 재확인 |
 | 3 | 백업 확인: 메인 `main.py`·설정, 카메라 플래시 전체 | 대상별 백업·해시 | 백업 없으면 중단 |
 | 4 | 카메라 펌웨어 굽기·설정·영상 확인 ([firmware.md](firmware.md) 6.5) | `/status` ID·`camera.ok`·STA, `/capture`, `:81/stream`, 창 닫고 다시 열어도 새 영상 | 다음 단계로 가지 않고 백업으로 복구 |

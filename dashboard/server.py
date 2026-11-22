@@ -6,9 +6,7 @@
 - 로봇은 부팅 시 잠겨 있고, 사람이 '잠금 해제'를 눌러야 움직임
 - 화면이 닫히거나 서버가 끝나면 STOP
 
-실행 (가짜 로봇):  python -m dashboard.fake_robot
-                  python -m dashboard.server
-실물 로봇(비전 모듈 Wi-Fi):
+실행(비전 모듈 Wi-Fi):
   python -m dashboard.server --robot B --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream
 """
 import argparse
@@ -308,7 +306,7 @@ def main():
     p.add_argument("--port", type=int, default=8090)
     lidar_source = p.add_mutually_exclusive_group()
     lidar_source.add_argument("--lidar-usb", metavar="COM_PORT", help="확인된 A1M8 어댑터")
-    lidar_source.add_argument("--lidar-tcp", metavar="HOST", help="라이다 중계 또는 모의 서버 주소")
+    lidar_source.add_argument("--lidar-tcp", metavar="HOST", help="라이다 중계 주소")
     lidar_source.add_argument("--relay-lidar", action="store_true", help="--robot-ip와 같은 본체의 중계 사용")
     p.add_argument("--lidar-port", type=int, default=settings.LIDAR_TCP_PORT)
     a = p.parse_args()

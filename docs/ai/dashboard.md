@@ -11,7 +11,7 @@ Windows 노트북 브라우저에서 로봇 **한 대**를 조종하고 카메�
 ```text
 브라우저(index.html) ⇄ HTTP 127.0.0.1:8090 ⇄ dashboard/server.py ⇄ UDP 9100/9101 ⇄ 로봇 메인 보드
                       ⇠ 카메라 MJPEG(브라우저가 --cam URL을 직접 표시)  ⇠ 비전 모듈
-                      ⇠ /api/lidar ⇠ dashboard/lidar.py ⇠ USB(A1M8 어댑터) 또는 TCP 20108(로봇 중계·모의 서버)
+                      ⇠ /api/lidar ⇠ dashboard/lidar.py ⇠ USB(A1M8 어댑터) 또는 TCP 20108(로봇 중계)
                       ⇠ /api/camera ⇠ dashboard/usb_camera.py ⇠ 비전 모듈 USB 시리얼(진단용)
 ```
 
@@ -21,8 +21,6 @@ Windows 노트북 브라우저에서 로봇 **한 대**를 조종하고 카메�
 | [`dashboard/index.html`](../../dashboard/index.html) | 화면. 요청마다 파일을 다시 읽으므로 수정은 새로고침만으로 반영 |
 | [`dashboard/lidar.py`](../../dashboard/lidar.py) | `LidarFeed`: 최신 한 회전만 보관(`host/lidar/`, `test_PC/lidar_probe.py` 사용) |
 | [`dashboard/usb_camera.py`](../../dashboard/usb_camera.py) | `UsbCamera`: 비전 모듈 USB에서 JPEG 한 장씩 요청(115200 bps, `frame` 명령, 최대 128 KB, 제한 16초) |
-| [`dashboard/fake_robot.py`](../../dashboard/fake_robot.py) | 가짜 로봇: 실제 `robot/core.py`를 PC에서 돌리고 MechDog 호출은 콘솔에 찍기만 함(가짜 `HW_MechDog`, 배터리 7400 mV 고정, 127.0.0.1:9100) |
-| `dashboard/mock_frame.jpg` | 모의 카메라용 합성 프레임 |
 
 브라우저는 UDP를 못 보내므로 `server.py`가 규약대로 HELLO/MOVE/STOP/ESTOP/RESET/POSE를 보냅니다. 서버는 `127.0.0.1`에만 엽니다.
 명령 루프는 20 ms마다 TEL을 받고 `link.step()`을 부릅니다(송신 주기 100 ms는 `RobotLink`가 지킴).
@@ -33,16 +31,12 @@ Windows 노트북 브라우저에서 로봇 **한 대**를 조종하고 카메�
 
 | 목적 | 명령 |
 | --- | --- |
-| 로봇 없이 통합(가짜 로봇 + 모의 카메라 + 모의 LiDAR + 대시보드 한 번에) | `python -m test_PC.mock_station --robot A` |
-| 가짜 로봇만 따로 | `python -m dashboard.fake_robot --robot A` 후 `python -m dashboard.server --robot A` |
 | 실물, 제조사 기본 영상 펌웨어 AP | `python -m dashboard.server --robot A --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream` |
 | 실물, IP 지정 + LiDAR 로봇 중계 | `python -m dashboard.server --robot A --robot-ip %ROBOT_IP% --allow-real --cam %CAM_URL% --relay-lidar` |
 | 실물 LiDAR만 USB로 | `.private\lidar-pc\Scripts\python.exe -m dashboard.server --lidar-usb COM번호` (로봇 IP 기본 루프백이라 실물 명령 없음) |
 | 센서 전용(인터넷 Wi-Fi 유지, 로봇 UDP 소켓 없음) | `.private\lidar-pc\Scripts\python.exe -m dashboard.server --sensors-only --cam-usb COM카메라 --lidar-usb COM라이다 --port 8091` |
 
-`mock_station`은 `dashboard.fake_robot`, `tools.mock.mock_camera`(8080/8081, `mock_frame.jpg`), `tools.mock.mock_lidar`(20108),
-`dashboard.server --cam http://127.0.0.1:8081/stream --lidar-tcp 127.0.0.1`을 띄우고, 하나가 죽으면 전체를 끝냅니다. Ctrl+C로 함께 종료.
-확인 순서: 부팅 잠금 표시 → 합성 영상 → 정사각형 LiDAR 점 → 잠금 해제 → 이동 버튼을 눌렀다 놓아 가짜 MechDog 로그에 이동·정지 → 비상 정지 후 잠김.
+확인 순서: 부팅 잠금 표시 → 영상 → LiDAR 점 → 잠금 해제 → 이동 버튼을 눌렀다 놓아 이동·정지 → 비상 정지 후 잠김.
 
 USB 장치(LiDAR·카메라)를 쓰려면 `pyserial`이 있는 로컬 환경이 필요합니다(커밋되지 않는 폴더):
 
@@ -144,7 +138,7 @@ python -m tools.make_robot_files A
 
 ## 7. PC 시험 (`test_PC/`)
 
-`test_PC/`에는 `run.cmd`, `lidar_probe.py`, `mock_station.py`만 있습니다. 합성 시험은 표준 라이브러리만 쓰고 실제 장비에 명령을 보내지 않습니다.
+`test_PC/`에는 `run.cmd`(자동 테스트 실행)와 `lidar_probe.py`(실물 A1M8 확인)만 있습니다.
 
 | 명령 | 내용 |
 | --- | --- |
@@ -154,7 +148,6 @@ python -m tools.make_robot_files A
 | `test_PC\run.cmd all` | `python -m unittest discover -s tests` |
 | `test_PC\run.cmd camera-firmware` | 비전 모듈 펌웨어 균형 프로필 릴리스 빌드 + 검증(`build\vision_cam\latest\`, Git 제외) |
 | `python -m test_PC.lidar_probe --usb COM번호` / `--tcp HOST [--port 20108] [--scans 3]` | A1M8 장치 정보·상태·회전별 샘플 수 확인 후 STOP. USB는 라이다 모터를 구동함 |
-| `python -m tools.mock.mock_lidar` 후 `python -m test_PC.lidar_probe --tcp 127.0.0.1` | TCP 스캔 모의 왕복 |
 
 ## 8. 영상 판단 (`host/vision/`, 대시보드 미연결)
 

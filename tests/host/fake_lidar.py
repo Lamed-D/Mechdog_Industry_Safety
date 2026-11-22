@@ -1,9 +1,5 @@
-"""Local RPLIDAR emulator. Run: python -m tools.mock.mock_lidar.
+"""테스트 전용 합성 RPLIDAR TCP 서버. 실행 도구 아님."""
 
-Synthetic square room only. Never connects to a robot.
-"""
-
-import argparse
 import math
 import random
 import socket
@@ -118,25 +114,3 @@ class MockLidar(socketserver.ThreadingTCPServer):
     def server_close(self):
         self.stopping.set()
         super().server_close()
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=20108)
-    parser.add_argument("--noise-mm", type=float, default=0)
-    parser.add_argument("--corrupt-every", type=int, default=0)
-    parser.add_argument("--invalid-every", type=int, default=0)
-    parser.add_argument("--disconnect-after", type=int, default=0)
-    args = parser.parse_args()
-    with MockLidar(port_address := ("127.0.0.1", args.port),
-                   noise_mm=args.noise_mm, corrupt_every=args.corrupt_every,
-                   disconnect_after=args.disconnect_after, invalid_every=args.invalid_every) as server:
-        print("Mock lidar listening on", port_address)
-        try:
-            server.serve_forever(poll_interval=0.1)
-        except KeyboardInterrupt:
-            pass
-
-
-if __name__ == "__main__":
-    main()

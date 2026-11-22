@@ -4,7 +4,7 @@ import unittest
 
 from host.vision.camera_client import (CameraClient, CameraEndpoint, LatestFrameReceiver, is_jpeg,
                                        parse_status, read_mjpeg)
-from tools.mock import mock_camera
+from tests.host import fake_camera as mock_camera
 
 
 def part(seq, jpeg=None, length=None, lead=b"\r\n", age=5):

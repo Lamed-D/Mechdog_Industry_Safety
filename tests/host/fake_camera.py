@@ -1,9 +1,4 @@
-"""Fake vision-camera server with the same endpoints as firmware/vision_cam.
-
-Run: python -m tools.mock.mock_camera --robot A --port 8080 --stream-port 8081
-Serves synthetic JPEG-shaped bytes only (no real images, no people). Never touches a robot.
-"""
-import argparse
+"""테스트 전용 합성 카메라(HTTP /status, /capture, MJPEG). 실행 도구 아님."""
 import http.server
 import json
 import threading
@@ -114,26 +109,3 @@ def serve(state, host="127.0.0.1", port=0):
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--robot", default="A", choices=("A", "B"))
-    parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--stream-port", type=int, default=8081)
-    parser.add_argument("--key")
-    parser.add_argument("--frame", type=Path, help="synthetic JPEG fixture for browser display")
-    args = parser.parse_args()
-    state = CameraState(args.robot, args.key, frame=args.frame.read_bytes() if args.frame else None)
-    serve(state, "127.0.0.1", args.port)
-    serve(state, "127.0.0.1", args.stream_port)
-    print("mock camera %s: http://127.0.0.1:%d/status  stream :%d/stream" % (args.robot, args.port, args.stream_port))
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        pass
-
-
-if __name__ == "__main__":
-    main()
