@@ -13,6 +13,14 @@
 #define CAM_FW_VERSION "0.1.9"
 
 // ── 로봇 ID: "A" 또는 "B". mDNS 이름은 mechdog-<소문자 ID>-cam ──
+// 빌드 도구 --robot 이 넘기는 값(CAM_BUILD_ROBOT_A/B)이 secrets.h 보다 우선합니다.
+#if defined(CAM_BUILD_ROBOT_A)
+#undef CAM_ROBOT_ID
+#define CAM_ROBOT_ID "A"
+#elif defined(CAM_BUILD_ROBOT_B)
+#undef CAM_ROBOT_ID
+#define CAM_ROBOT_ID "B"
+#endif
 #ifndef CAM_ROBOT_ID
 #define CAM_ROBOT_ID "A"
 #endif

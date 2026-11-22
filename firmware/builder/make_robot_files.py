@@ -1,9 +1,10 @@
 """로봇 메인 보드에 Python Editor로 올릴 작은 파일들을 만듭니다(장치에 접속하지 않음).
 
 firmware/robot/python/ 을 주석·설명문 없이, 영문(ASCII)만, 짧은 줄로 바꿔
-build/robot_files_<ID>/ 에 파일별로 씁니다. 동작 코드는 그대로입니다.
+build/robot_<ID>/python/ 에 파일별로 씁니다. 동작 코드는 그대로입니다.
 
-실행: python -m ai.tools.make_robot_files B
+실행: python firmware/builder/make_robot_files.py B
+(펌웨어 전체를 로봇별로 한 번에: python firmware/build.py <A|B>)
 """
 import ast
 import io
@@ -57,15 +58,24 @@ def render(robot):
     return files
 
 
-def main():
-    robot = sys.argv[1] if len(sys.argv) > 1 else "B"
-    out = ROOT / "build" / ("robot_files_" + robot)
-    out.mkdir(parents=True, exist_ok=True)
+def output_dir(robot):
+    return ROOT / "build" / ("robot_" + robot) / "python"
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    robot = argv[0].upper() if argv else "B"
     files = render(robot)
+    out = output_dir(robot)
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob("*.py"):  # 이전 빌드에만 있던 파일이 섞여 올라가지 않게
+        if old.name not in files:
+            old.unlink()
     for name, text in files.items():
         (out / name).write_text(text, encoding="ascii", newline="\n")
     print("만듦:", out)
     print("올리는 순서:", " -> ".join(n + ".py" for n in UPLOAD_ORDER), "(secrets.py 는 따로)")
+    return out
 
 
 if __name__ == "__main__":

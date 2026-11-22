@@ -1,4 +1,4 @@
-# MechDog 시작 파일. 업로드 파일은 python -m ai.tools.make_robot_files <A|B> 로 만듭니다.
+# MechDog 시작 파일. 업로드 파일은 python firmware/build.py <A|B> 로 만듭니다.
 # 업로드·실행은 사용자 확인 후에만 합니다. boot 래치로 명령 대기하며 생성자의 자세 변화는 실물 미확인입니다.
 
 import machine

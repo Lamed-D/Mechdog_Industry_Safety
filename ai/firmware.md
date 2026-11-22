@@ -11,6 +11,30 @@
 | 메인 보드 ESP32 | 몸통 | Arduino(C++), 예비·유지 | [`firmware/robot/arduino/`](../firmware/robot/arduino/) | 전체 이식 완료. 벤더 백엔드·실물 미검증 |
 | 비전 모듈 ESP32-S3 | 앞쪽 카메라 | Arduino(C++) 맞춤 영상 펌웨어 | [`firmware/vision/`](../firmware/vision/) | v0.1.9(AP 기본 비밀번호만 변경). v0.1.8은 로봇 B 카메라에서 실물 동작 확인 |
 
+## 0. 빌드 — 사람·AI 공통 도구 `firmware/build.py`
+
+빌드 도구는 사람이 쓰는 것과 같은 것을 씁니다. 진입점은 [`firmware/build.py`](../firmware/build.py) 하나이며, 내부 모듈은 [`firmware/builder/`](../firmware/builder/)에 있습니다.
+AI는 따로 스크립트를 만들지 않고 이 명령을 실행합니다. 결과는 로봇별로 `build/robot_<ID>/`에 모입니다(`build/`는 gitignore).
+
+```powershell
+python firmware/build.py A                           # 기본: python + vision
+python firmware/build.py B --only python             # 본체 Python 파일만
+python firmware/build.py A --only vision --profile detail
+python firmware/build.py A --only arduino            # Arduino 판(예비) 컴파일 확인
+```
+
+| 대상 | 결과 폴더 | A/B 구분 | 다음에 누가 |
+| --- | --- | --- | --- |
+| `python` | `build/robot_<ID>/python/` (11개 .py) | `config.py`의 `ROBOT_ID` 치환 | **사용자**가 2.2절 순서로 업로드 |
+| `vision` | `build/robot_<ID>/vision/latest/` 합본·`.sha256`·`manifest.json`(`robot` 기록) | 빌드 플래그 `CAM_BUILD_ROBOT_<ID>`가 카메라 기본 ID가 됨 | **AI**가 6.5절로 굽기 |
+| `arduino` | `build/robot_<ID>/arduino/` | ID는 `secrets.h`의 `MECH_ROBOT_ID`(Wi-Fi와 같은 파일). 다르면 빌드가 멈춤 | **사용자**가 4.2절로 Arduino IDE 업로드 |
+
+- 끝에 대상별 `[성공]/[실패]`와 다음 단계가 나옵니다. 하나라도 실패하면 종료 코드 1.
+- `arduino-cli` 위치가 기본과 다르면 `ARDUINO_CLI`, esptool은 `ESPTOOL_PATH`. 이 PC: `C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`.
+- 에이전트의 Git Bash 샌드박스에서는 `build/`가 실제 폴더와 다르게 보일 수 있으니 빌드·확인은 PowerShell로 합니다.
+- 개별 도구도 그대로 쓸 수 있습니다: `firmware/builder/make_robot_files.py <ID>`, `build_vision_cam.py [--robot <ID>] [--release] [--verify-release]`, `build_main_arduino.py [--robot <ID>]`. `--robot` 없이 만든 카메라 합본은 A/B 공통(`build/vision_cam/latest/`, ID는 시리얼로 설정).
+- 사람에게 안내할 때는 [README](../README.md) "펌웨어 빌드" 절과 같은 명령을 알려 줍니다.
+
 제조사 Scratch 방식은 쓰지 않습니다. 제어 API 규칙은 [mechdog-api.md](mechdog-api.md), 메시지 형식은 [protocol.md](protocol.md), 배선·전원은 [hardware.md](hardware.md), 실물 확인 순서는 [robot-tests.md](robot-tests.md).
 
 ## 1. 두 메인 보드 펌웨어가 지킬 것
@@ -22,7 +46,7 @@
 
 | 설정 | 값 | 위치 |
 | --- | --- | --- |
-| 로봇 ID | `A` / `B` (현재 장비는 1대, 코드는 ID 유지) | Python: `make_robot_files <ID>`가 `ROBOT_ID` 치환 / Arduino: `secrets.h`의 `MECH_ROBOT_ID` / 카메라: 빌드 공통, 시리얼 `set robot <ID>` (사용자 설명은 README "로봇 A/B 구분") |
+| 로봇 ID | `A` / `B` (현재 장비는 1대, 코드는 ID 유지) | `python firmware/build.py <ID>` (0절). Python: `ROBOT_ID` 치환 / 카메라: 빌드 기본값(시리얼 `set robot`이 우선) / Arduino: `secrets.h`의 `MECH_ROBOT_ID` |
 | 통신 끊김·이동 유효시간 | 600 ms [가정] | `config.py` / `mech_config.h` |
 | 저전압 경고/래치/해제 | 7000 / 6600 / 6800 mV [가정, 단위 mV 확인 필요] | 〃 |
 
@@ -35,12 +59,13 @@
 
 | 명령 | 결과 | 비고 |
 | --- | --- | --- |
-| `python -m ai.tools.make_robot_files B` | `build/robot_files_B/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 인자 생략 시 B |
+| `python firmware/build.py B --only python` | `build/robot_B/python/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 이전 빌드의 남은 .py는 지움 |
 
 ### 2.2 업로드 순서 (사용자 가이드)
 
 사용자가 그대로 따라 합니다. 에이전트는 이 절을 최신으로 유지하고, 업로드가 필요할 때 채팅으로 이 순서를 안내합니다.
 
+0. 빌드: `python firmware/build.py <ID> --only python` → `build/robot_<ID>/python/`의 파일을 올립니다.
 
 1. 로봇을 받침대에 올리고 다리 주변을 비웁니다. 편집기로 메인 보드에 연결, Ctrl+C로 자동 실행 중단. 본체와 카메라 COM 포트를 구분합니다.
 2. 기존 `main.py`·설정 백업과 복구 위치를 확인합니다(3절). 백업은 저장소에 새로 추가하지 않습니다.
@@ -72,7 +97,8 @@
 
 ```bash
 set MECHDOG_VENDOR_LIBS=C:\Users\<you>\Documents\Arduino\libraries
-python ai/tools/build_main_arduino.py  # arduino-cli 컴파일만, 산출물은 build/
+python firmware/build.py A --only arduino   # arduino-cli 컴파일만 → build/robot_A/arduino/
+python firmware/builder/build_main_arduino.py  # ID 확인 없이 → build/main_arduino/compile/
 ```
 
 | 대상 | 결과 |
@@ -87,7 +113,6 @@ python ai/tools/build_main_arduino.py  # arduino-cli 컴파일만, 산출물은 
 ### 4.2 설정·업로드 (사용자 가이드)
 
 사용자가 그대로 따라 합니다. 에이전트는 빌드(4.1)까지만 하고 이 순서를 안내합니다.
-
 
 1. `secrets.example.h` → `secrets.h`(커밋 금지): `MECH_WIFI_SSID`, `MECH_WIFI_PASS`, `MECH_ROBOT_ID` ('A'/'B'). 로봇 간 차이는 ID뿐.
 2. 받침대에 올리고 USB 연결 → `esptool.py --port COM<n> read_flash 0 ALL main_backup.bin` 백업 → Arduino IDE 업로드.
@@ -178,10 +203,9 @@ XCLK 15 MHz는 속도를 위해 올리지 않습니다. 원시 RGB/YUV 전송은
 ### 6.4 빌드
 
 ```powershell
-python ai/tools/build_vision_cam.py                   # 컴파일만 → build/vision_cam/compile/
-python ai/tools/build_vision_cam.py --release         # + build/vision_cam/latest/ 합본·.sha256·manifest.json
-python ai/tools/build_vision_cam.py --release --profile detail
-python ai/tools/build_vision_cam.py --verify-release  # 장치·컴파일러 없이 합본·해시·명세·소스 일치 확인
+python firmware/build.py A --only vision                        # 로봇 A 전용 합본 → build/robot_A/vision/latest/
+python firmware/builder/build_vision_cam.py --robot A --verify-release  # 장치·컴파일러 없이 합본·해시·명세·소스·ID 일치 확인
+python firmware/builder/build_vision_cam.py --release           # A/B 공통 합본 → build/vision_cam/latest/ (ID는 시리얼)
 ```
 
 - 도구: Arduino IDE의 `arduino-cli`, ESP32 Arduino 코어 **3.3.12**(ESP-IDF 5.5.x), 같은 패키지 esptool. 다른 위치면 `ARDUINO_CLI`, `ESPTOOL_PATH`.
@@ -196,10 +220,10 @@ python ai/tools/build_vision_cam.py --verify-release  # 장치·컴파일러 없
 
 1. **[사용자]** 본체 전원을 끄고 카메라 IIC 케이블을 뺀 뒤, 데이터용 Type-C로 **카메라만** PC에 연결(역급전 미확인에 따른 우리 안전 권고, 제조사 절차 아님). 장치 관리자 `USB-SERIAL CH340` 포트 확인, 메인 보드 포트와 혼동 금지. 포트를 잡은 프로그램은 닫습니다.
    에이전트는 `flash-id`로 ESP32-S3인지 확인한 뒤 진행합니다. 메인 보드(ESP32 클래식) 포트면 즉시 멈춥니다.
-2. 합본 해시 확인: `Get-FileHash build\vision_cam\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256` = `.sha256`.
+2. 합본 해시 확인: `Get-FileHash build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256` = `.sha256`.
 3. **백업 먼저:** `esptool --chip esp32s3 --port COMx flash-id` 후 `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin` (저장소 밖, 크기 = 플래시 크기. esptool 4.x는 `read_flash`처럼 밑줄).
-4. 굽기: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build\vision_cam\latest\mechdog_vision_cam_0x0.bin`. 제조사 플래시 도구를 쓰면 ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, **ERASE 누르지 않음**. 쓰는 중 케이블·전원 분리 금지.
-   - 업데이트(설정 유지): 같은 맞춤 펌웨어가 있는 카메라는 앱만 `write-flash 0x10000 build\vision_cam\compile\vision.ino.bin`. 0x0 합본은 NVS를 지울 수 있으므로 굽고 나서 설정을 다시 입력합니다.
+4. 굽기: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin`. 0x0 합본은 저장 설정을 지우므로 카메라 ID가 빌드 ID로 시작합니다. 제조사 플래시 도구를 쓰면 ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, **ERASE 누르지 않음**. 쓰는 중 케이블·전원 분리 금지.
+   - 업데이트(설정 유지): 같은 맞춤 펌웨어가 있는 카메라는 앱만 `write-flash 0x10000 build\robot_<ID>\vision\compile\vision.ino.bin`(저장된 ID·Wi-Fi 유지). 0x0 합본은 NVS를 지울 수 있으므로 굽고 나서 설정을 다시 입력합니다.
    - Arduino IDE로 올릴 때: `firmware/vision/vision.ino`를 폴더째 열고 Board ESP32S3 Dev Module, PSRAM OPI, Flash Mode DIO 80MHz, Flash Size 4MB, Partition Huge APP, CPU 240MHz, USB CDC On Boot Disabled, Erase All Flash Disabled. 합본 bin을 스케치로 열지 않습니다.
 5. 설정: 시리얼 115200, 줄 끝 Newline. `set robot <ID>`, `set ssid <SSID>`, `set pass <비밀번호>`, (선택) `set ap_pass <8자 이상>`, `set key <키>`, `show`, `reboot`.
    - Wi-Fi 비밀번호는 에이전트가 Windows(`netsh wlan show profile name=<SSID> key=clear`, 모바일 핫스팟 설정)에서 얻어 시리얼로만 보냅니다. 출력·로그·파일·커밋에 남기지 않습니다([rules.md](rules.md) 4.1절).

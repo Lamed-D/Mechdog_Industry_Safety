@@ -1,7 +1,11 @@
 """비전 모듈 맞춤 펌웨어 빌드·배포 이미지 만들기 (PC에서 실행, 장치에 쓰지 않음).
 
-    python ai/tools/build_vision_cam.py            # 컴파일만 (build/vision_cam)
-    python ai/tools/build_vision_cam.py --release  # + build/vision_cam/latest에 최신 합본·해시·설정 기록
+    python firmware/builder/build_vision_cam.py            # 컴파일만 (build/vision_cam)
+    python firmware/builder/build_vision_cam.py --release  # + build/vision_cam/latest에 최신 합본·해시·설정 기록
+    python firmware/builder/build_vision_cam.py --release --robot A  # 로봇 A 전용 → build/robot_A/vision/latest
+
+--robot 을 주면 그 ID 가 펌웨어 기본값이 됩니다(0x0 합본을 구우면 설정 없이 mechdog-a-cam).
+USB 시리얼 set robot 으로 저장한 값이 있으면 그 값이 우선입니다(앱만 굽는 업데이트는 저장값 유지).
 
 --release 는 firmware/vision/secrets.h 가 있으면 멈춥니다. 배포하는 bin 에
 Wi-Fi 비밀번호가 들어가지 않게 하기 위해서입니다(설정은 장치에서 USB 시리얼 명령으로 합니다).
@@ -26,6 +30,16 @@ SKETCH = ROOT / "firmware" / "vision"
 BUILD = ROOT / "build" / "vision_cam"
 COMPILE = BUILD / "compile"
 RELEASE = BUILD / "latest"
+ROBOT = None  # None = A/B 공통(ID 는 시리얼로 설정), "A"/"B" = 그 로봇 기본값
+
+
+def use_robot(robot):
+    """빌드 폴더를 build/robot_<ID>/vision 으로 바꿉니다."""
+    global BUILD, COMPILE, RELEASE, ROBOT
+    ROBOT = robot
+    BUILD = ROOT / "build" / ("robot_" + robot) / "vision"
+    COMPILE = BUILD / "compile"
+    RELEASE = BUILD / "latest"
 # 근거: ai/firmware.md 3절(제조사 기본 영상 펌웨어와 같은 DIO·80MHz·4MB, 옥탈 PSRAM)
 FQBN = ("esp32:esp32:esp32s3:PSRAM=opi,FlashMode=dio,FlashSize=4M,"
         "PartitionScheme=huge_app,CDCOnBoot=default,CPUFreq=240")
@@ -39,7 +53,7 @@ def source_manifest():
     if (SKETCH / "secrets.h").exists():
         sys.exit("secrets.h 가 있어 배포 소스 검사를 중단합니다.")
     paths = [path for path in SKETCH.rglob("*") if path.suffix in (".ino", ".h", ".c", ".cpp")]
-    paths += [ROOT / "ai/tools/build_vision_cam.py", ROOT / "ai/tools/arduino_workspace.py"]
+    paths += [ROOT / "firmware/builder/build_vision_cam.py", ROOT / "firmware/builder/arduino_workspace.py"]
     files = {path.relative_to(ROOT).as_posix(): hashlib.sha256(
         path.read_text(encoding="utf-8").encode("utf-8")).hexdigest() for path in sorted(paths)}
     encoded = json.dumps(files, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -67,6 +81,7 @@ def verify_release():
     if (any(manifest.get(key) != value for key, value in sources.items())
             or manifest.get("version") != version() or manifest.get("fqbn") != FQBN
             or manifest.get("core_version") != REQUIRED_CORE
+            or manifest.get("robot") != ROBOT
             or manifest.get("profile") not in ("balanced", "detail")
             or manifest.get("merged_bytes") != len(data)
             or manifest.get("sha256") != binary_sha
@@ -121,12 +136,15 @@ def version():
     return re.search(r'#define CAM_FW_VERSION "([0-9.]+)"', text).group(1)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--release", action="store_true")
     parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced")
+    parser.add_argument("--robot", type=str.upper, choices=("A", "B"), help="로봇 전용 기본 ID(생략하면 A/B 공통)")
     parser.add_argument("--verify-release", action="store_true", help="최신 합본·소스·설정만 읽어 검사")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.robot:
+        use_robot(args.robot)
     if args.verify_release:
         manifest = verify_release()
         print("verified release %s %s; hardware remains unverified" % (manifest["version"], manifest["profile"]))
@@ -142,6 +160,8 @@ def main():
     # 이미지 안의 소스 경로(__FILE__)에서 이 PC의 사용자 폴더를 지웁니다.
     remap = "-fmacro-prefix-map=%s=/arduino15 -fmacro-prefix-map=%s=/src" % (LOCAL / "Arduino15", ROOT)
     remap += " -DCAM_VIDEO_PROFILE=%d" % (1 if args.profile == "balanced" else 2)
+    if ROBOT:
+        remap += " -DCAM_BUILD_ROBOT_" + ROBOT
     props = ["--build-property", "compiler.c.extra_flags=" + remap,
              "--build-property", "compiler.cpp.extra_flags=" + remap]
     subprocess.run([str(cli), "--config-file", str(tool_config), "compile", "--fqbn", FQBN, "--build-path", str(COMPILE),
@@ -149,7 +169,7 @@ def main():
     app = COMPILE / "vision.ino.bin"
     print("app %s: %d bytes" % (app.name, app.stat().st_size))
     if not args.release:
-        return
+        return COMPILE
     core_version = compiled_core_version()
     if sources != source_manifest():
         sys.exit("컴파일 중 소스가 바뀌어 배포를 중단합니다.")
@@ -176,11 +196,12 @@ def main():
     (out.with_suffix(".sha256")).write_text("%s  %s\n" % (digest, out.name), encoding="ascii")
     (staging / "manifest.json").write_text(json.dumps({"version": version(), "fqbn": FQBN,
         "app_bytes": app.stat().st_size, "merged_bytes": len(data), "sha256": digest,
-        "profile": args.profile, "core_version": core_version, **sources,
+        "profile": args.profile, "robot": ROBOT, "core_version": core_version, **sources,
         "hardware_verified": False}, indent=2) + "\n", encoding="utf-8")
     # 성공한 합본만 교체하며, 새 폴더 설치 실패 시 이전 배포를 되돌립니다.
     publish(staging)
     print("release %s: %d bytes, sha256 %s" % (out.name, len(data), digest))
+    return RELEASE
 
 
 if __name__ == "__main__":
