@@ -6,7 +6,7 @@ lidar_bridge 등)을 제조사 공식 MechDog Arduino 라이브러리로 **그�
 세팅·업로드는 [ai/firmware.md](../../../ai/firmware.md) 4절을 따릅니다.
 
 > **업로드(굽기)는 사용자만** 합니다([ai/firmware.md](../../../ai/firmware.md) 4.2절). 이 .ino 를 올리면 메인 보드의 순정 MicroPython 이
-> 지워집니다. 굽기 전 현재 플래시 전체를 백업하고, 되돌리려면 순정 펌웨어를 다시 굽고 `main.py` 를 올립니다.
+> 지워집니다. 되돌리려면 순정 펌웨어를 다시 굽고 `main.py` 를 올립니다.
 
 ## 파일 구성
 

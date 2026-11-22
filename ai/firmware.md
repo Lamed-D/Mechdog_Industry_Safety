@@ -3,7 +3,7 @@
 로봇에는 프로그램이 올라가는 칩이 두 개 있습니다. 역할은 [rules.md](rules.md) 4.1절.
 
 - **메인 보드(본체):** 업로드·굽기·구동은 **사용자만**. 에이전트는 업로드 파일·빌드를 만들고 2.2·4.2절 **사용자 가이드**를 고친 뒤 채팅으로 순서를 안내합니다.
-- **비전 모듈(카메라):** 에이전트가 백업·굽기·설정·확인까지 직접 합니다(6.5절). 전원·케이블 같은 물리 조작만 사용자에게 요청합니다.
+- **비전 모듈(카메라):** 에이전트가 굽기·설정·확인까지 직접 합니다(6.5절, 백업 없음). 전원·케이블 같은 물리 조작만 사용자에게 요청합니다.
 
 | 칩 | 위치 | 방식 | 폴더 | 상태 |
 | --- | --- | --- | --- | --- |
@@ -68,21 +68,20 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 0. 빌드: `python firmware/build.py <ID> --only python` → `build/robot_<ID>/python/`의 파일을 올립니다.
 
 1. 로봇을 받침대에 올리고 다리 주변을 비웁니다. 편집기로 메인 보드에 연결, Ctrl+C로 자동 실행 중단. 본체와 카메라 COM 포트를 구분합니다.
-2. 기존 `main.py`·설정 백업과 복구 위치를 확인합니다(3절). 백업은 저장소에 새로 추가하지 않습니다.
-3. `secrets.py`를 올립니다.
-4. 순서대로 Download: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, **마지막에 `main.py`**. 실행은 `import main` 또는 재부팅.
-5. 첫 확인: 예외·MemoryError 없음, Wi-Fi 연결, 텔레메트리의 ID·boot 래치·배터리·경고. 처음에는 RESET·MOVE를 보내지 않습니다. MechDog 초기화 자체의 움직임은 실물 미검증입니다.
-6. 문제 시 자동 실행을 멈추고 기존 `main.py`·설정을 되돌린 뒤 재시작. REPL 접근이 안 되면 반복 재부팅하지 말고 제조사 복구 절차로 순정 MicroPython을 복원합니다.
+2. `secrets.py`를 올립니다.
+3. 순서대로 Download: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, **마지막에 `main.py`**. 실행은 `import main` 또는 재부팅.
+4. 첫 확인: 예외·MemoryError 없음, Wi-Fi 연결, 텔레메트리의 ID·boot 래치·배터리·경고. 처음에는 RESET·MOVE를 보내지 않습니다. MechDog 초기화 자체의 움직임은 실물 미검증입니다.
+5. 문제 시 자동 실행을 멈추고 기존 `main.py`·설정을 되돌린 뒤 재시작. REPL 접근이 안 되면 반복 재부팅하지 말고 제조사 복구 절차로 순정 MicroPython을 복원합니다.
 
 실물 확인 순서는 [robot-tests.md](robot-tests.md). `Hiwonder.startMain` 4개 루프 동시 실행을 포함해 통합 main 실물 결과는 아직 없습니다.
 
-## 3. 백업·복구
+## 3. 원래 시작 파일·복구
 
 - [`firmware/robot/python/device-original/`](../firmware/robot/python/device-original/): 사용자가 제공한 메인 보드 원래 `boot.py`·`main.py`를 `.txt`로 보관(SHA-256·크기는 `manifest.json`).
   - 장치 시작 파일 사본일 뿐, 펌웨어 전체·보정값·카메라 플래시 백업이 아닙니다.
   - **실행·import·자동 업로드 금지.** 원래 main에는 로봇 생성·이동·동작 코드, 문서 범위 밖 인자, 통신 정지 감시 없는 경로가 있습니다. 예제로 재사용하지 않습니다.
   - 복구는 사용자가 대상 보드·버전을 확인한 뒤 확장자를 되돌리는 절차로 따로 검토합니다.
-- 굽기 전(메인 Arduino, 카메라) **현재 플래시 전체 백업**을 esptool로 받아 `.private/backup/`(gitignore)에 둡니다. 저장소 밖 다른 드라이브 경로에 쓰지 않습니다. 백업 파일에는 장치 고유 정보가 있을 수 있습니다.
+- 굽기·업로드 전 플래시 백업은 하지 않습니다(사용자 결정). 되돌릴 때는 순정·제조사 펌웨어를 다시 굽거나 우리 빌드를 다시 굽습니다.
 
 ## 4. 메인 보드 Arduino (`firmware/robot/arduino/`, 예비·유지)
 
@@ -115,7 +114,7 @@ python firmware/builder/build_main_arduino.py  # ID 확인 없이 → build/main
 사용자가 그대로 따라 합니다. 에이전트는 빌드(4.1)까지만 하고 이 순서를 안내합니다.
 
 1. `secrets.example.h` → `secrets.h`(커밋 금지): `MECH_WIFI_SSID`, `MECH_WIFI_PASS`, `MECH_ROBOT_ID` ('A'/'B'). 로봇 간 차이는 ID뿐.
-2. 받침대에 올리고 USB 연결 → `esptool.py --port COM<n> read_flash 0 ALL .private\backup\robot<ID>_main_full_<날짜>.bin` 백업 → Arduino IDE 업로드.
+2. 받침대에 올리고 USB 연결 → Arduino IDE 업로드.
 3. 시리얼 115200: `WiFi OK  id=A  ip=192.168.137.x`. 부팅 후 boot 래치 상태가 정상입니다.
 
 ### 4.3 알려진 제약·확인 필요
@@ -154,7 +153,7 @@ HTTP 머리글·I2C 명령표는 [protocol.md](protocol.md).
 | 플래시 | 4 MB 설정, DIO, 80 MHz, 합본을 `0x0` | 제조사 기본 펌웨어 이미지 머리글, 제조사 플래시 안내 |
 | PSRAM | 옥탈(OPI) | 제조사 펌웨어 빌드 설정 |
 | 카메라 핀 | ESP32-S3-EYE 배치(XCLK 15, SIOD 4, SIOC 5, D0~D7 = 11·9·8·10·12·18·17·16, VSYNC 6, HREF 7, PCLK 13, PWDN·RESET 없음), XCLK 15 MHz | 제조사 예제 |
-| 센서 | 2 MP. **로봇 B 실물은 GC2145**(PID 0x2145, JPEG 압축기 없음). 로봇 A 카메라 센서는 미확인 | 실물 시리얼·`/status` |
+| 센서 | 2 MP. **로봇 A·B 실물 모두 GC2145**(PID 0x2145, JPEG 압축기 없음). 로봇 A: v0.1.9 앱 업데이트 후 I2C 0x53 ok, 핫스팟 STA 접속, `/status`·`/capture` 확인(2026-11-22) | 실물 시리얼·`/status` |
 | I2C(메인 쪽) | 슬레이브 SDA IO47, SCL IO48, 100 kHz, 주소 **0x53**(구세대 레지스터형, 기본) / 0x52(신세대 명령형) | 제조사 예제. 로봇 B 실물에서 0x53으로 공식 읽기 `observed`, `read_ms: 2`, errno 19 없음 |
 | USB | CH340 USB-시리얼(내장 CDC 아님) | 제조사 안내 |
 | 전원 | 5 V 2 A 이상(부족하면 영상 깨짐) | 제조사 안내 |
@@ -221,7 +220,7 @@ python firmware/builder/build_vision_cam.py --release           # A/B 공통 합
 1. **[사용자]** 본체 전원을 끄고 카메라 IIC 케이블을 뺀 뒤, 데이터용 Type-C로 **카메라만** PC에 연결(역급전 미확인에 따른 우리 안전 권고, 제조사 절차 아님). 장치 관리자 `USB-SERIAL CH340` 포트 확인, 메인 보드 포트와 혼동 금지. 포트를 잡은 프로그램은 닫습니다.
    에이전트는 `flash-id`로 ESP32-S3인지 확인한 뒤 진행합니다. 메인 보드(ESP32 클래식) 포트면 즉시 멈춥니다.
 2. 합본 해시 확인: `Get-FileHash build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256` = `.sha256`.
-3. **백업 먼저:** `esptool --chip esp32s3 --port COMx flash-id` 후 `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL .private\backup\robot<ID>_cam_full_<날짜>.bin` (저장소 안 `.private/`, gitignore라 커밋되지 않음. 크기 = 플래시 크기. esptool 4.x는 `read_flash`처럼 밑줄).
+3. 칩 확인: `esptool --chip esp32s3 --port COMx flash-id` (백업은 하지 않음. esptool 4.x는 `flash_id`처럼 밑줄). 시리얼 `show`로 기존 ID·SSID가 있는지 봅니다.
 4. 굽기: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build\robot_<ID>\vision\latest\mechdog_vision_cam_0x0.bin`. 0x0 합본은 저장 설정을 지우므로 카메라 ID가 빌드 ID로 시작합니다. 제조사 플래시 도구를 쓰면 ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, **ERASE 누르지 않음**. 쓰는 중 케이블·전원 분리 금지.
    - 업데이트(설정 유지): 같은 맞춤 펌웨어가 있는 카메라는 앱만 `write-flash 0x10000 build\robot_<ID>\vision\compile\vision.ino.bin`(저장된 ID·Wi-Fi 유지). 0x0 합본은 NVS를 지울 수 있으므로 굽고 나서 설정을 다시 입력합니다.
    - Arduino IDE로 올릴 때: `firmware/vision/vision.ino`를 폴더째 열고 Board ESP32S3 Dev Module, PSRAM OPI, Flash Mode DIO 80MHz, Flash Size 4MB, Partition Huge APP, CPU 240MHz, USB CDC On Boot Disabled, Erase All Flash Disabled. 합본 bin을 스케치로 열지 않습니다.
@@ -241,12 +240,11 @@ python firmware/builder/build_vision_cam.py --release           # A/B 공통 합
 
 6.5절처럼 물리 조작만 사용자에게 요청하고 에이전트가 굽습니다.
 
-
-- 가장 확실: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 .private\backup\robot<ID>_cam_full_<날짜>.bin`.
+- 우리 합본을 0x0에 다시 굽고 6.5절 5번 설정을 다시 합니다.
 - 또는 제조사 기본 영상 전송 바이너리를 같은 설정(ESP32-S3, 0x0000, 80MHz, DIO, 460800)으로 → AP `HW_ESP32S3CAM` 방식으로 돌아감.
 - 제조사 배포에는 기능별(얼굴·색·라인) 카메라 바이너리가 따로 있습니다. 한 펌웨어에서 영상 전송과 모든 인식이 된다고 가정하지 않고, 다른 확장 모듈·플랫폼용 펌웨어를 올리지 않습니다. 버튼(다운로드 모드) 조합은 추측하지 않습니다.
 - 출력이 없거나 계속 재시작하면 로그 몇 줄(비밀번호 제외)을 남기고 복구합니다.
 
 ### 6.7 확인하지 못한 것
 
-로봇 A 카메라 전체(센서·I2C 주소), 장시간 동작·발열·메모리, 본체 전원으로 카메라+Wi-Fi 동시 구동 시 전원 여유, 카메라 두 대 동시 전송, Wire 슬레이브 실제 타이밍, 코어 2.0.x 빌드.
+장시간 동작·발열·메모리, 본체 전원으로 카메라+Wi-Fi 동시 구동 시 전원 여유, 카메라 두 대 동시 전송, Wire 슬레이브 실제 타이밍, 코어 2.0.x 빌드.
