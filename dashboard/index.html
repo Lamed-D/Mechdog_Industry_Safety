@@ -18,9 +18,11 @@
   @media (max-width: 760px) { main { grid-template-columns:minmax(0, 1fr); } }
   section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
   h2 { font-size:14px; color:var(--dim); margin:0 0 10px; font-weight:600; }
-  .cam { aspect-ratio:4/3; background:#000; border-radius:6px; display:flex; align-items:center;
+  .cam { position:relative; aspect-ratio:4/3; background:#000; border-radius:6px; display:flex; align-items:center;
          justify-content:center; color:var(--dim); overflow:hidden; }
   .cam img { width:100%; height:100%; object-fit:contain; }
+  .cam img + span { position:absolute; bottom:8px; padding:4px 8px; background:var(--bg); }
+  #camera-reconnect { margin-top:8px; padding:4px 10px; }
   .cam { max-height:60vh; margin:0 auto; }
   canvas { display:block; width:min(100%, 440px); height:auto; margin:auto; background:#14171c; }
   .pad { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; max-width:330px; margin:0 auto; }
@@ -56,6 +58,7 @@
     <section>
       <h2>카메라 (비전 모듈)</h2>
       <div class="cam" id="cam">카메라 설정 확인 중</div>
+      <button id="camera-reconnect" type="button" hidden>다시 연결</button>
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
@@ -142,7 +145,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
-let holding = null, timer = null, camSet = false, controlsEnabled = false, canMove = false;
+let holding = null, timer = null, controlsEnabled = false, canMove = false;
 
 function post(path, body) {
   return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) })
@@ -311,29 +314,67 @@ async function pollScan() {
     setTimeout(pollScan, 250);
   }
 }
-function startUsbCamera() {
+let cameraSource = null;
+let closeCamera = () => {};
+
+function connectCamera(reconnecting = false) {
+  closeCamera();
+  const { usb, url } = cameraSource;
   const img = new Image(), status = document.createElement("span");
-  img.alt = "USB 카메라";
-  $("cam").replaceChildren(status);
-  let currentUrl;
+  const session = new AbortController();
+  let currentUrl, nextRequest, retryDelay = 1000;
+  img.alt = usb ? "USB 카메라" : "Wi-Fi 카메라";
+  status.setAttribute("role", "status");
+  function showStatus(message) {
+    status.textContent = message;
+    $("cam").replaceChildren(status);
+  }
+  closeCamera = () => {
+    session.abort();
+    clearTimeout(nextRequest);
+    img.onload = img.onerror = null;
+    img.removeAttribute("src");
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+  };
+  function startWifi(retry) {
+    showStatus(retry ? "카메라 재연결 중" : "카메라 연결 중");
+    img.onload = () => {
+      retryDelay = 1000;
+      $("cam").replaceChildren(img);
+    };
+    img.onerror = () => {
+      showStatus("카메라 연결 실패 · 재시도 대기");
+      nextRequest = setTimeout(() => startWifi(true), retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 8000);
+    };
+    img.removeAttribute("src");
+    img.src = url;
+    $("cam").replaceChildren(img, status);
+  }
   async function pollFrame() {
     try {
-      const response = await fetch("/api/camera");
-      if (!response.ok) throw new Error((await response.json()).error);
-      const url = URL.createObjectURL(await response.blob());
+      const response = await fetch("/api/camera", { signal: session.signal });
+      if (!response.ok) throw new Error((await response.json()).error || response.status);
+      const frame = await response.blob();
+      if (session.signal.aborted) return;
       if (currentUrl) URL.revokeObjectURL(currentUrl);
-      currentUrl = url;
-      img.src = url;
+      currentUrl = URL.createObjectURL(frame);
+      img.src = currentUrl;
       $("cam").replaceChildren(img);
     } catch (error) {
-      status.textContent = error.message;
-      $("cam").replaceChildren(status);
+      if (!session.signal.aborted) showStatus("카메라 연결 실패 · 재시도 대기 (" + error.message + ")");
     } finally {
-      setTimeout(pollFrame, 750);
+      if (!session.signal.aborted) nextRequest = setTimeout(pollFrame, 750);
     }
   }
-  pollFrame();
+  if (usb) {
+    showStatus(reconnecting ? "카메라 재연결 중" : "카메라 연결 중");
+    pollFrame();
+  } else {
+    startWifi(reconnecting);
+  }
 }
+$("camera-reconnect").onclick = () => connectCamera(true);
 // 초음파 격자: 위 = 로봇 정면, 가로·세로 같은 축척(정사각 격자). 빔 폭 ±15°는 일반 초음파 기준 [가정].
 const SONAR_HALF_DEG = 15;
 let sonarRange = 1, lastSonar = { mm: null, has: false, fresh: false };
@@ -418,10 +459,12 @@ async function poll() {
   try {
     const s = await (await fetch("/api/state")).json();
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
-    if (!camSet && s.usb_camera) { camSet = true; startUsbCamera(); }
-    if (!camSet && s.cam) { $("cam").innerHTML = ""; const img = new Image(); img.src = s.cam; img.alt = "카메라";
-      img.onerror = () => { $("cam").textContent = "카메라 영상 없음: " + s.cam; }; $("cam").appendChild(img); camSet = true; }
-    if (!camSet) $("cam").textContent = "카메라 설정 없음";
+    if (!cameraSource && (s.usb_camera || s.cam)) {
+      cameraSource = { usb: s.usb_camera, url: s.cam };
+      $("camera-reconnect").hidden = false;
+      connectCamera();
+    }
+    if (!cameraSource) $("cam").textContent = "카메라 설정 없음";
     if (s.sensors_only) {
       controlsEnabled = canMove = false;
       stopMove(false);
