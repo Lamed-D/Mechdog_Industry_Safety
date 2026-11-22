@@ -9,7 +9,7 @@
 namespace mech {
 
 struct Config {
-  char ROBOT_ID = 'A';  // 로봇 B 에 올릴 때 'B'. secrets.h 가 아니라 빌드 시 바꾼다.
+  char ROBOT_ID = 'A';  // 기본값. 실제 ID 는 arduino.ino 가 secrets.h 의 MECH_ROBOT_ID 로 덮어쓴다.
 
   uint16_t CMD_PORT = 9100;
   uint16_t TEL_PORT = 9101;
