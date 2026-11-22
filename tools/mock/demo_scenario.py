@@ -70,12 +70,13 @@ def run_demo(finder="A", fault="none"):
             commands()
             record("synthetic_evidence")
         guide = core.scenario.guide
+        record("fall_alert", {"finder": finder, "guide": guide, "alerts": len(core.alerts)})
         if fault == "link":
             links[guide].online = False
             for _ in range(6):
                 tick()
             links[guide].latched, links[guide].reason = True, "link_lost"
-            record("link_lost")
+            record("link_lost", {"robot": guide, "latched": links[guide].latched})
             links[guide].online = True
             tick()
             core.reset_latch(guide, confirmed=True)

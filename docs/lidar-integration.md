@@ -1,4 +1,4 @@
-# MechDog + RPLIDAR A1M8-R6 + Raspberry Pi 5 연동 설계
+# MechDog + RPLIDAR A1M8-R6 + Windows 노트북 연동 설계
 
 ## 중계 진단 지표
 
@@ -23,7 +23,7 @@ TEL 길이 제한에 따라 덜 급한 경고가 생략될 수 있으므로 호�
 ## 1. 구현 가능 여부: **조건부 가능**
 
 별도 ESP32 보드 없이 **MechDog 메인 컨트롤러의 GPIO 포트(J5: IO32·IO33)를 UART로 써서** 라이다를 받고,
-메인 컨트롤러의 Wi-Fi로 Pi 5에 보낼 수 있습니다. 조건은 아래 세 가지입니다.
+메인 컨트롤러의 Wi-Fi로 노트북에 보낼 수 있습니다. 조건은 아래 세 가지입니다.
 
 1. **라이다 전원은 별도 5V로 시작**합니다. MechDog 5V 레일의 여유 전류가 자료에 없습니다(7절).
 2. **라이다 모터는 CTRL_MOTO를 5V에 묶어 항상 켜기**로 합니다. J5의 두 핀을 UART에 다 쓰므로 모터 제어용 GPIO가 남지 않습니다.
@@ -154,18 +154,16 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
  │ VCC_5V·5V_MOTO·CTRL_MOTO ◀── 별도 5V (1단계)        │
  │                                                    │
  │ 메인 ESP32: main.py                                │
- │   ├ 스레드1: UART1 → TCP 그대로 중계 (A안)          │
- │   ├ 스레드2: Pi 5 명령 수신(UDP) → 공식 API로 이동  │
- │   └ 스레드3: 감시 — 명령 0.5초 끊기면 move(0, 0)    │
- └───────────────── Wi-Fi (Pi 핫스팟) ────────────────┘
+ │   ├ UART1 → TCP 그대로 중계          │
+ │   ├ 노트북 명령 수신(UDP) → 공식 API 제어  │
+ │   └ 감시 — 명령 600ms 끊기면 정지·래치    │
+ └───────────────── Wi-Fi 로봇망 ────────────────┘
                               │
-                 Raspberry Pi 5 (고정 위치)
-   TCP 수신 → sllidar_ros2(TCP 채널) → /scan → SLAM Toolbox, RViz2
+                 Windows 노트북 (고정 위치)
+   TCP 수신 → Python 표준 스캔 → WSL 2 /scan → SLAM (계획)
 ```
 
-기본 로봇망은 Pi 내장 2.4GHz 핫스팟이며 전용 공유기는 예비다. 별도 장치로 받는 인터넷과 라우팅하지 않는다.
-[설치·주소 계획](host-setup.md) 6절을 따른다. 위 도식의 0.5초와 뒤의 예시 메시지는 초기 초안이며
-실제 600ms 감시·명령 형식은 [현재 규약](protocol.md) 5절이 우선한다.
+두 본체와 카메라는 같은 로봇망을 사용합니다. [노트북 실행 계획](host-setup.md)과 [현재 규약](protocol.md)을 따릅니다.
 
 ## 4. 배선표
 
@@ -216,7 +214,7 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 | 비전 모듈 | 5V 2A 이상 권장 | 비전 모듈 설명서 |
 
 권장 순서:
-0. **0단계(라이다 단독):** 키트의 USB 어댑터로 Pi 5나 PC에 연결해 라이다가 정상인지 먼저 확인(전원·모터·데이터 모두 USB).
+0. **0단계(라이다 단독):** 키트의 USB 어댑터로 노트북에 연결해 라이다가 정상인지 먼저 확인(전원·모터·데이터 모두 USB).
 1. **1단계(테스트):** 라이다는 USB 보조배터리(5V 2A 이상) 또는 실험용 전원(5V, 전류 제한 1A)으로 따로 구동. MechDog와는 **GND와 UART 두 선만** 연결.
 2. **전류 실측:** 기동 시·정상 회전 시 전류를 측정해 데이터시트 값(합계 약 0.4~0.7A)과 비교해 기록.
 3. **2단계(탑재):** 실측값을 보고 결정
@@ -226,7 +224,7 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
      배터리 VIN 직접 공급을 기본 구성으로 사용하지 않습니다.
    - J5-1(5V) 사용: 비전 모듈과 같은 레일이라 여유가 확인될 때만.
 4. 서보 노이즈 대책: 라이다 전원 입력에 100~470µF 전해 + 100nF 세라믹 콘덴서, 배선은 짧게, GND는 한 점에서 공통.
-5. 배터리 전압이 떨어지면(`Hiwonder.Battery_power()`) Pi 5에 알리고 시연을 멈춥니다.
+5. 배터리 전압이 떨어지면(`Hiwonder.Battery_power()`) 노트북에 알리고 시연을 멈춥니다.
 
 ## 6. Wi-Fi 통신 설계
 
@@ -234,200 +232,22 @@ J5의 커넥터 형번은 회로도에 적혀 있지 않습니다 **[확인 필�
 
 | | TCP | UDP | MQTT |
 | --- | --- | --- | --- |
-| 라이다 원시 스트림 | **적합** — 순서 보장, Pi 쪽 공식 드라이버가 TCP 채널 지원 | 손실 시 패킷 경계가 깨져 재동기화 필요 | 브로커 경유 지연·오버헤드, 스트림에 부적합 |
-| 이동 명령 | 재전송 때문에 늦은 명령이 뒤늦게 도착할 수 있음 | **적합** — 순번으로 오래된 명령 버림 (공식 군집 제어 예제도 UDP) | 가능하지만 브로커 필요 |
-| 대시보드 알림 | — | — | Pi 5 내부에서는 선택 가능 |
+| 라이다 원시 스트림 | **적합** — 순서 보장, 노트북의 표준 스캔 클라이언트가 지원 | 손실 시 패킷 경계가 깨져 재동기화 필요 | 브로커 경유 지연·오버헤드, 스트림에 부적합 |
+| 명령과 상태 | 노트북 ↔ 로봇 | UDP, [현재 규약](protocol.md) | 9100/9101 |
 
-**결정: 라이다 = TCP, 명령·상태 = UDP.**
+## 7. 본체 중계
 
-### 6.2 A안(원시 중계) vs B안(ESP32에서 파싱)
+본체 MicroPython의 라이다 중계는 `robot/main.py`와 읽기 전용 추가 센서 중계를 사용합니다.
+제어·정지 규칙과 메시지 형식은 [통신 규약](protocol.md)을 따릅니다.
 
-| | A안: 원시 UART → TCP | B안: ESP32에서 파싱 |
-| --- | --- | --- |
-| ESP32 CPU | 낮음(바이트 복사만) | **높음** — MicroPython으로 초당 수천 개 샘플을 파싱하면 걸음·통신 스레드가 밀릴 위험 |
-| 메모리 | 수 KB 버퍼 | 한 바퀴 분량 배열 + 파싱 중 객체 생성 → GC 정지 |
-| 대역폭 | 115200bps 상한 ≈ 11.5KB/s (≈0.1Mbps) | 비슷하거나 약간 적음 |
-| 구현 | 단순. Pi에서 **Slamtec 공식 SDK/ROS 2 드라이버를 그대로 사용** | 프로토콜을 직접 구현하고 검증해야 함 |
-| 데이터 손실 | TCP가 보장. 끊기면 재연결 후 드라이버가 재시작 | 파싱 오류를 ESP32에서 디버깅하기 어려움 |
-| 모터·명령 | 드라이버가 보내는 명령(스캔 시작·정지)이 그대로 라이다에 전달 | 직접 처리 |
+## 8. 노트북 수신
 
-**결정: A안.** MicroPython은 펌웨어(C)를 고칠 수 없으므로 B안의 FreeRTOS 태스크 설계를 적용할 수 없고,
-Python 파싱은 부담이 큽니다. Arduino(C++)로 펌웨어 전체를 새로 쓰면 B안도 가능하지만, 공식 MicroPython 펌웨어와
-`main.py` 기반 Python API(프로젝트 규칙)를 버려야 하므로 택하지 않습니다(10.3절 참고).
+Windows에서는 [test_PC](../test_PC/README.md)의 USB 진단과 TCP 진단을 각각 실행합니다.
+USB는 장치 정보·건강 상태·표준 스캔·종료를 확인합니다. J5 UART 경로는 본체 TCP 20108에서
+건강 상태와 표준 스캔을 확인합니다. ROS 없이 두 경로를 검증할 수 있습니다.
 
-### 6.3 포트·메시지
-
-| 용도 | 방향 | 방식 | 포트(제안) |
-| --- | --- | --- | --- |
-| 라이다 원시 데이터 | 로봇(서버) ↔ Pi 5(클라이언트) | TCP, 양방향 그대로 | 20108 |
-| 이동 명령 | Pi 5 → 로봇 | UDP `CMD|<seq>|<step>|<angle>|$` | 9100 |
-| 정지 | Pi 5 → 로봇 | UDP `STOP|<seq>|$` | 9100 |
-| 상태 | 로봇 → Pi 5 | UDP `STAT|<id>|<seq>|<battery>|$` (1초마다) | 9101 |
-
-## 7. ESP32 측 구현 (`main.py`, MicroPython)
-
-- 펌웨어는 그대로 두고 `main.py`만 올립니다(Hiwonder Python Editor). **업로드는 사용자 확인 후** 합니다.
-- 프로젝트 규칙상 통신 코드는 `robot/comm.py`, 라이다 중계는 `custom_sensors/lidar_bridge.py`로 나누는 것이 맞지만,
-  Hiwonder Editor가 파일 여러 개 업로드를 지원하는지 **[확인 필요]** 라서 우선 한 파일 예시로 둡니다.
-
-```python
-# main.py — MechDog: RPLIDAR UART→TCP 중계 + Pi 5 명령 수신 + 통신 감시 정지
-import time, socket, network, machine
-import Hiwonder
-from HW_MechDog import MechDog
-
-ROBOT_ID = "A"
-SSID = "change-me"          # 실제 값은 커밋하지 않는다
-PASSWORD = "change-me"
-LIDAR_TCP_PORT = 20108
-CMD_UDP_PORT = 9100
-CMD_TIMEOUT_MS = 500        # 명령이 이 시간 끊기면 정지
-
-mechdog = MechDog()
-last_cmd_ms = time.ticks_ms()
-last_seq = -1
-moving = False
-
-# --- Wi-Fi ---
-wlan = network.WLAN(network.STA_IF)
-wlan.active(True)
-try:
-    wlan.config(pm=network.WLAN.PM_NONE)   # 순정 펌웨어에 상수 있음 [확인], 실제 효과는 실측
-except Exception as e:
-    print("pm config not supported:", e)
-wlan.connect(SSID, PASSWORD)
-while not wlan.isconnected():
-    time.sleep(0.2)
-print("wifi ok", wlan.ifconfig())
-
-# --- 라이다 UART (J5: IO32=RX, IO33=TX) ---
-lidar = machine.UART(1, baudrate=115200, rx=32, tx=33, rxbuf=4096)
-
-def lidar_bridge():
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("0.0.0.0", LIDAR_TCP_PORT))
-    srv.listen(1)
-    while True:
-        conn, addr = srv.accept()
-        conn.setblocking(False)
-        print("lidar client", addr)
-        try:
-            while True:
-                n = lidar.any()
-                if n:
-                    conn.write(lidar.read(n))       # 라이다 → Pi 5
-                try:
-                    data = conn.recv(256)           # Pi 5(드라이버 명령) → 라이다
-                    if data == b"":
-                        break                       # 연결 종료
-                    lidar.write(data)
-                except OSError:
-                    pass                            # 받을 데이터 없음
-                time.sleep_ms(5)
-        except OSError as e:
-            print("lidar link lost", e)
-        finally:
-            conn.close()
-
-def command_loop():
-    global last_cmd_ms, last_seq, moving
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", CMD_UDP_PORT))
-    while True:
-        data, _ = sock.recvfrom(128)
-        try:
-            parts = data.decode().split("|")
-            kind, seq = parts[0], int(parts[1])
-            if seq <= last_seq:
-                continue                            # 오래된 명령 버림
-            last_seq = seq
-            last_cmd_ms = time.ticks_ms()
-            if kind == "STOP":
-                mechdog.move(0, 0); moving = False
-            elif kind == "CMD":
-                step = max(-100, min(100, int(parts[2])))   # 문서 범위
-                angle = max(-30, min(30, int(parts[3])))
-                mechdog.move(step, angle); moving = step != 0 or angle != 0
-        except Exception as e:
-            print("bad cmd", e)
-            mechdog.move(0, 0); moving = False      # 이상하면 멈춘다
-
-def watchdog():
-    global moving
-    while True:
-        if moving and time.ticks_diff(time.ticks_ms(), last_cmd_ms) > CMD_TIMEOUT_MS:
-            mechdog.move(0, 0); moving = False
-            print("cmd timeout -> stop")
-        if not wlan.isconnected():
-            mechdog.move(0, 0); moving = False
-            wlan.connect(SSID, PASSWORD)            # 자동 재연결 시도
-            time.sleep(1)
-        time.sleep_ms(100)
-
-Hiwonder.startMain(lidar_bridge)
-Hiwonder.startMain(command_loop)
-Hiwonder.startMain(watchdog)
-```
-
-## 8. Raspberry Pi 5 측 (ROS 2)
-
-### 8.1 권장: Slamtec 공식 ROS 2 드라이버를 TCP 채널로 사용
-
-`sllidar_ros2`는 TCP 채널(`channel_type: tcp`)을 지원합니다. 로봇의 TCP 서버(포트 20108)가 라이다 UART를 그대로 중계하므로
-드라이버는 라이다가 네트워크에 직접 붙은 것처럼 동작합니다. **A1M8에서 TCP 채널 동작은 [확인 필요]**(TCP 채널은 원래 네트워크형 모델용).
-
-```bash
-# ROS 2 Jazzy 기준 (Pi 5 + Ubuntu 24.04)
-mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
-git clone https://github.com/Slamtec/sllidar_ros2.git
-cd ~/ros2_ws && colcon build --symlink-install && source install/setup.bash
-ros2 run sllidar_ros2 sllidar_node --ros-args \
-  -p channel_type:=tcp -p tcp_ip:=<로봇A_IP> -p tcp_port:=20108 \
-  -p frame_id:=laser_a -p angle_compensate:=true -p scan_mode:=Standard \
-  -r scan:=/robot_a/scan
-```
-
-### 8.2 대안: 가상 시리얼 포트
-
-TCP 채널이 A1M8에서 안 되면 `socat`으로 가상 시리얼 포트를 만들어 시리얼 채널로 씁니다.
-
-```bash
-sudo apt install socat
-socat pty,link=/tmp/ttyLIDAR_A,raw,echo=0 tcp:<로봇A_IP>:20108 &
-ros2 run sllidar_ros2 sllidar_node --ros-args -p serial_port:=/tmp/ttyLIDAR_A \
-  -p serial_baudrate:=115200 -p frame_id:=laser_a -r scan:=/robot_a/scan
-```
-
-주의: USB 어댑터처럼 DTR로 모터를 켜고 끄는 기능은 없습니다(모터는 CTRL_MOTO 상시 ON).
-
-### 8.3 원시 수신 확인용 스크립트 (ROS 없이)
-
-```python
-# pi/raw_check.py — 로봇의 라이다 TCP 스트림에 접속해 스캔을 시작하고 받은 바이트 수를 출력
-import socket, sys, time
-ip = sys.argv[1]
-s = socket.create_connection((ip, 20108), timeout=3)
-s.sendall(bytes([0xA5, 0x25])); time.sleep(0.1)   # STOP
-s.sendall(bytes([0xA5, 0x20]))                    # SCAN (표준 스캔 시작)
-total, t0 = 0, time.time()
-while time.time() - t0 < 5:
-    total += len(s.recv(4096))
-print(f"{total/5:.0f} bytes/s")                   # 정상이면 수 KB/s
-s.sendall(bytes([0xA5, 0x25]))
-```
-
-### 8.4 SLAM Toolbox · RViz2
-
-```bash
-sudo apt install ros-jazzy-slam-toolbox ros-jazzy-rviz2
-ros2 launch slam_toolbox online_async_launch.py \
-  slam_params_file:=<params.yaml>  # scan_topic: /robot_a/scan, base_frame, odom_frame 설정
-rviz2   # Fixed Frame: map, LaserScan 토픽 추가
-```
-
-**MechDog에는 바퀴 오도메트리가 없습니다.** SLAM Toolbox는 odom 프레임을 요구하므로 처음에는
-`rf2o_laser_odometry`(라이다 기반 오도메트리) 같은 패키지로 odom을 만들어야 합니다 **[확인 필요: 4족 보행 흔들림에서의 성능]**.
+ROS가 필요한 경우 같은 노트북의 WSL 2 Ubuntu에서 [스캔 노드](../ros2/README.md)를 실행합니다.
+실물 J5·Wi-Fi, 스캔 정면 교정, TF·odometry·SLAM과 주행 연결은 검증 대기입니다.
 
 ## 9. 견적 (예산 150,000원)
 
@@ -459,15 +279,15 @@ rviz2   # Fixed Frame: map, LaserScan 토픽 추가
 | 단계 | 하는 일 | 정상 결과 | 실패 시 확인 |
 | --- | --- | --- | --- |
 | 1. J5 핀 확인 | 멀티미터로 J5 1~4번 측정(전원 ON, 아무것도 연결 안 함) | 1번 ≈5V, 2번 0V | 1번 핀 방향, 보드 버전 |
-| 2. 라이다 단독 | 먼저 USB 어댑터로 PC/Pi 5에서 확인 → 다음 피그테일로 별도 5V에 VCC_5V·5V_MOTO, CTRL_MOTO=5V | 모터 회전, 전류 실측(데이터시트 합계 0.4~0.7A) | 커넥터 핀 방향, 전원 극성 |
+| 2. 라이다 단독 | 먼저 USB 어댑터로 노트북에서 확인 → 다음 피그테일로 별도 5V에 VCC_5V·5V_MOTO, CTRL_MOTO=5V | 모터 회전, 전류 실측(데이터시트 합계 0.4~0.7A) | 커넥터 핀 방향, 전원 극성 |
 | 3. UART 루프백 | J5-3·J5-4를 서로 연결, REPL에서 `u=machine.UART(1,baudrate=115200,rx=32,tx=33); u.write(b'hi'); time.sleep(0.1); u.read()` | `b'hi'` | UART 번호·핀 지정 지원 여부, J5 핀 방향 |
 | 4. 라이다 응답 | 라이다 연결, `u.write(bytes([0xA5,0x50]))`(GET_INFO) 후 `u.read()` | `A5 5A ...`로 시작하는 응답 | TX/RX 교차, GND 공통 |
 | 5. Wi-Fi | `main.py`의 Wi-Fi 부분만 실행 | `wifi ok` + IP | SSID, 2.4GHz 여부, `pm` 지원 |
-| 6. 원시 수신 | Pi 5에서 `python3 raw_check.py <IP>` | 수 KB/s | 포트, 방화벽, 스레드 시작 여부 |
-| 7. 360° 시각화 | sllidar_ros2 + RViz2 | 주변 벽이 원형으로 보임 | TCP 채널 지원 → 8.2절 socat |
+| 6. 원시 수신 | 노트북에서 `python -m test_PC.lidar_probe --tcp %ROBOT_A_IP%` | 건강 상태와 완전한 스캔 여러 회 | 포트, 방화벽, 중계 상태 |
+| 7. 360° 시각화 | WSL 2 스캔 노드 + RViz2 | 주변 벽이 원형으로 보임 | WSL 2에서 TCP 도달 여부 |
 | 8. `/scan` 발행 | `ros2 topic hz /robot_a/scan` | 5~10Hz | 드라이버 로그, scan_mode |
 | 9. SLAM | SLAM Toolbox + rf2o | 지도가 쌓임 | odom 프레임, TF |
-| 10. 보행 중 | 로봇을 걷게 하면서 7~9 반복 (**사용자 확인 후, 줄 묶은 상태로**) | 걸음 정상, `/scan` 끊김 없음, 명령 끊으면 0.5초 안에 정지 | 걸음 흔들림 → B안 금지, 브리지 보드 재검토 |
+| 10. 보행 중 | 로봇을 걷게 하면서 7~9 반복 (**사용자 확인 후, 줄 묶은 상태로**) | 걸음 정상, `/scan` 끊김 없음, 명령 끊으면 600 ms 감시 후 정지 | 걸음 흔들림 → B안 금지, 브리지 보드 재검토 |
 
 ## 11. 추가로 확인할 것
 
@@ -477,7 +297,7 @@ rviz2   # Fixed Frame: map, LaserScan 토픽 추가
 4. 걸음 궤적 계산이 C인지 Python 래퍼인지(서보 출력은 C 타이머로 확인), 보행 중 라이다 중계 시 걸음 품질
 5. MechDog 5V 레일 여유 전류, 라이다 기동·정상 전류 실측(데이터시트: 합계 약 0.4~0.7A)
 6. 라이다 3핀·4핀 커넥터의 실물 1번 핀 방향(도면과 같은지), 키트 케이블 선 색
-7. sllidar_ros2 TCP 채널이 A1M8 + 중계 구성에서 동작하는지
+7. WSL 2에서 A/B의 TCP 스캔에 접근하고 ROS 토픽을 발행할 수 있는지
 8. 4족 보행 흔들림에서 라이다 오도메트리·SLAM 품질
 9. 로봇 2대분 라이다 예산
 
