@@ -59,6 +59,7 @@
       <h2>카메라 (비전 모듈)</h2>
       <div class="cam" id="cam">카메라 설정 확인 중</div>
       <button id="camera-reconnect" type="button" hidden>다시 연결</button>
+      <p id="monitor-status" hidden></p>
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
@@ -146,6 +147,7 @@
 const $ = id => document.getElementById(id);
 const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
 let holding = null, timer = null, controlsEnabled = false, canMove = false;
+let motionEpoch;
 
 function post(path, body) {
   return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) })
@@ -164,14 +166,14 @@ function motion(dir) {
 function sendMove() {
   const input = holding;
   const [step, angle] = motion(input.dir);
-  post("/api/move", { step, angle }).catch(e => {
+  post("/api/move", { step, angle, epoch: input.epoch }).catch(e => {
     if (holding === input) say("이동 요청 실패: " + e.message);
   });
 }
 function start(dir, input) {
   if (!canMove || $("reset-dialog").open || holding?.input === input) return;
   stopMove(false);
-  holding = { dir, input };
+  holding = { dir, input, epoch: motionEpoch };
   const button = document.querySelector(`[data-dir="${dir}"]`);
   button.classList.add("held");
   $("drive-input").textContent = "입력: " + button.firstChild.textContent.trim();
@@ -319,7 +321,7 @@ let closeCamera = () => {};
 
 function connectCamera(reconnecting = false) {
   closeCamera();
-  const { usb, url } = cameraSource;
+  const { usb, url, monitored } = cameraSource;
   const img = new Image(), status = document.createElement("span");
   const session = new AbortController();
   let currentUrl, nextRequest, retryDelay = 1000;
@@ -364,10 +366,10 @@ function connectCamera(reconnecting = false) {
     } catch (error) {
       if (!session.signal.aborted) showStatus("카메라 연결 실패 · 재시도 대기 (" + error.message + ")");
     } finally {
-      if (!session.signal.aborted) nextRequest = setTimeout(pollFrame, 750);
+      if (!session.signal.aborted) nextRequest = setTimeout(pollFrame, monitored ? 200 : 750);
     }
   }
-  if (usb) {
+  if (usb || monitored) {
     showStatus(reconnecting ? "카메라 재연결 중" : "카메라 연결 중");
     pollFrame();
   } else {
@@ -460,11 +462,29 @@ async function poll() {
     const s = await (await fetch("/api/state")).json();
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
     if (!cameraSource && (s.usb_camera || s.cam)) {
-      cameraSource = { usb: s.usb_camera, url: s.cam };
+      cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!s.monitor };
       $("camera-reconnect").hidden = false;
       connectCamera();
     }
     if (!cameraSource) $("cam").textContent = "카메라 설정 없음";
+    const monitor = s.monitor;
+    if (monitor && (motionEpoch === undefined || monitor.epoch >= motionEpoch)) {
+      if (holding && holding.epoch !== monitor.epoch) stopMove(false);
+      motionEpoch = monitor.epoch;
+      const video = monitor.frame_age == null ? "영상 없음"
+        : `${monitor.fps.toFixed(1)} FPS · 마지막 수신 ${monitor.frame_age.toFixed(1)}초 전`;
+      const person = monitor.person == null ? "사람 확인 불가"
+        : monitor.person ? "사람 감지" : "사람 미감지";
+      const sonar = s.fresh && s.tel?.sonar_mm > 0
+        ? `전방 ${(s.tel.sonar_mm / 10).toFixed(1)} cm` : "전방 거리 확인 불가";
+      const reasons = [
+        monitor.person_stop && "사람 감지",
+        monitor.obstacle_stop && "전방 장애물",
+      ].filter(Boolean);
+      const event = reasons.length ? (monitor.override ? "수동 개입 중 · " : "정지 요청 · ") + reasons.join(", ") : "";
+      $("monitor-status").hidden = false;
+      $("monitor-status").textContent = [video, person, sonar, event].filter(Boolean).join(" · ");
+    }
     if (s.sensors_only) {
       controlsEnabled = canMove = false;
       stopMove(false);

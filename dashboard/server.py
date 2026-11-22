@@ -29,6 +29,7 @@ from dashboard.udp_transport import UdpTransport  # noqa: E402
 from firmware.robot.python import config as settings  # noqa: E402
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
+from dashboard.camera_monitor import CameraMonitor  # noqa: E402
 
 MAX_BODY = 256
 
@@ -132,16 +133,50 @@ class ConsoleLink(RobotLink):
 
 
 class Console:
-    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None):
+    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None):
         self.lock = threading.Lock()
         self.transport = transport
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
         self.robot = robot
         self.cam = cam
         self.usb_camera = usb_camera
+        self.monitor = monitor
+        self.person_stop = self.obstacle_stop = False
+        self.motion_epoch = 0
+        self.manual_led = (0, 0, 0)
+        self.applied_led = None
         self.lidar = lidar or LidarFeed()
         self.error = None
         self.running = True
+
+    def monitor_stop(self):
+        video, _ = self.monitor.snapshot()
+        t = self.link.latest if self.link.fresh() else None
+        distance = t.sonar_mm if t else None
+        person = self.person_stop if video["person"] is None else video["person"]
+        obstacle = self.obstacle_stop
+        if distance is not None and distance > 0:
+            if distance <= 300:
+                obstacle = True
+            elif distance >= 400:
+                obstacle = False
+        tripped = (person and not self.person_stop) or (obstacle and not self.obstacle_stop)
+        self.person_stop, self.obstacle_stop = person, obstacle
+        if tripped:
+            self.motion_epoch += 1
+            self.link.pending_led = None
+            self.applied_led = None
+            self.link.stop()
+        return tripped
+
+    def monitor_led(self):
+        if not self.link.fresh() or not self.link.latest.has_sonar or self.link.emergency:
+            self.applied_led = None
+            return
+        desired = (255, 0, 0) if self.person_stop or self.obstacle_stop else self.manual_led
+        if desired != self.applied_led:
+            self.link.set_led(*desired)
+            self.applied_led = desired
 
     def loop(self):
         while True:
@@ -157,7 +192,10 @@ class Console:
                 except OSError:
                     self.link.estop()
                 try:
+                    tripped = self.monitor and self.monitor_stop()
                     self.link.step()
+                    if self.monitor and not tripped:
+                        self.monitor_led()
                     self.error = None
                 except Exception as error:  # 송신 실패: link 가 이미 ESTOP 쪽으로 바꿈
                     self.error = str(error)
@@ -178,6 +216,13 @@ class Console:
                 "error": self.error,
                 "cam": self.cam,
                 "usb_camera": self.usb_camera is not None,
+                "monitor": ({
+                    **self.monitor.snapshot()[0],
+                    "person_stop": self.person_stop,
+                    "obstacle_stop": self.obstacle_stop,
+                    "epoch": self.motion_epoch,
+                    "override": bool((self.person_stop or self.obstacle_stop) and self.link.intent),
+                } if self.monitor else None),
                 "robot_ip": self.transport.peer[0] if self.transport.peer else None,
                 "tel": None if t is None else {
                     "state": t.state, "latched": t.latched, "reason": t.reason,
@@ -195,6 +240,8 @@ class Console:
             if not self.running:
                 raise ValueError("console is closing")
             if path == "/api/move":
+                if self.monitor and body.get("epoch") != self.motion_epoch:
+                    raise ValueError("감지로 정지했습니다. 방향을 다시 누르세요")
                 self.link.move(body["step"], body["angle"])
             elif path == "/api/stop":
                 self.link.stop()
@@ -203,7 +250,11 @@ class Console:
             elif path == "/api/stand":
                 self.link.request_stand()
             elif path == "/api/led":
+                if self.monitor and (self.person_stop or self.obstacle_stop):
+                    raise ValueError("감지 경고 중에는 빨간색을 유지합니다")
                 self.link.set_led(body["r"], body["g"], body["b"])
+                if self.monitor:
+                    self.manual_led = self.applied_led = self.link.pending_led
             elif path == "/api/reset":
                 self.link.request_reset()  # 잠김·배터리 조건이 안 맞으면 ValueError
             else:
@@ -266,6 +317,11 @@ def make_handler(console):
                 return self._send(200, console.state())
             if self.path == "/api/lidar":
                 return self._send(200, console.lidar.snapshot())
+            if self.path == "/api/camera" and console.monitor:
+                _, jpeg = console.monitor.snapshot()
+                if jpeg is None:
+                    return self._send(503, {"error": "최신 영상 없음"})
+                return self._send(200, jpeg, "image/jpeg")
             if self.path == "/api/camera" and console.usb_camera:
                 jpeg, error = console.usb_camera.snapshot()
                 if jpeg is not None:
@@ -322,6 +378,7 @@ def main():
                    help="Windows 모바일 핫스팟에서 로봇과 비전 모듈 자동 연결")
     p.add_argument("--allow-real", action="store_true", help="실제 로봇에 보내기 허용")
     p.add_argument("--sensors-only", action="store_true", help="카메라·라이다 표시, 본체 UDP 소켓 없음")
+    p.add_argument("--monitor", action="store_true", help="Wi-Fi 영상 사람 감지와 초음파 정지 활성화")
     camera_source = p.add_mutually_exclusive_group()
     camera_source.add_argument("--cam", default="", help="카메라 영상 주소 예: http://192.168.5.1:81/stream")
     camera_source.add_argument("--cam-usb", metavar="COM_PORT", help="USB JPEG 펌웨어가 설치된 ESP32-S3")
@@ -332,6 +389,13 @@ def main():
     lidar_source.add_argument("--relay-lidar", action="store_true", help="--robot-ip와 같은 본체의 중계 사용")
     p.add_argument("--lidar-port", type=int, default=settings.LIDAR_TCP_PORT)
     a = p.parse_args()
+    if a.monitor and (a.sensors_only or a.cam_usb or not (a.cam or a.hotspot)):
+        p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
+    if a.monitor:
+        try:
+            import cv2
+        except ImportError:
+            p.error("--monitor에는 opencv-python-headless 설치가 필요합니다")
     a.robot_ip = a.robot_ip or ("auto" if a.hotspot else "127.0.0.1")
     a.broadcast = a.broadcast or ("192.168.137.255" if a.hotspot else "192.168.5.255")
     if a.relay_lidar and a.robot_ip == "auto":
@@ -352,7 +416,8 @@ def main():
         transport = UdpTransport(a.robot_ip, allow_real=a.allow_real)
     camera = UsbCamera(a.cam_usb) if a.cam_usb else None
     cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
-    console = Console(a.robot, transport, cam, lidar, camera)
+    monitor = CameraMonitor(cam, cv2) if a.monitor else None
+    console = Console(a.robot, transport, cam, lidar, camera, monitor)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
@@ -364,12 +429,16 @@ def main():
             if camera:
                 camera_worker = threading.Thread(target=camera.run, daemon=True)
                 camera_worker.start()
+            if monitor:
+                monitor.start()
             print("열기: http://127.0.0.1:%d  (로봇 %s @ %s)" % (server.server_port, a.robot, a.robot_ip))
             server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         console.close()
+        if monitor:
+            monitor.stop_event.set()
         if transport:
             transport.close()
         lidar.stop_event.set()
