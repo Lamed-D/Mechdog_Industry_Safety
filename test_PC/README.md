@@ -13,6 +13,7 @@ python tools\check_confidential.py range origin/main..HEAD
 ```
 
 카메라·조작·LiDAR 그래프를 함께 검증하는 모의 및 실물 절차는 [PC 조종 콘솔](robot_console/README.md)에 있습니다.
+기본 영상 Wi‑Fi와 두 대 공통 로봇망 연결은 [ESP32-S3 카메라 연결 안내](camera-setup.md)를 따릅니다.
 
 통합 시험은 A/B를 번갈아 발견 로봇으로 사용해 합성 낙상 이벤트, 대시보드 알림, 반대쪽 로봇의 관리자 호출·사고 지점 안내, 링크 손실 시 정지와 자동 재개 방지를 확인합니다. 본체 watchdog과 역할 인수 테스트는 별도로 가짜 본체의 정지 래치를 확인합니다.
 
