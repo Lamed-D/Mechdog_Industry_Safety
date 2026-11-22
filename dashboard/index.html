@@ -68,6 +68,13 @@
       <div class="row"><label>회전 각도</label><input id="angle" type="range" min="1" max="30" value="5"><output id="anglev">5</output></div>
       <button class="estop" id="estop">비상 정지 (Esc)</button>
       <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
+      <dialog id="reset-dialog" aria-labelledby="reset-question">
+        <form method="dialog">
+          <p id="reset-question">로봇 주변에 사람·장애물이 없고 상태를 확인했나요? 잠금 해제만으로는 움직이지 않습니다.</p>
+          <button value="cancel" autofocus>취소</button>
+          <button value="reset">잠금 해제</button>
+        </form>
+      </dialog>
       <button id="stand" style="width:100%;height:42px;margin-top:8px">일어서기 (기본 자세)</button>
       <div id="msg"></div>
       <div class="hint">보폭 -100~100, 회전 -30~30 (공식 API 범위). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
@@ -167,10 +174,15 @@ document.querySelectorAll("[data-dir]").forEach(b => {
 });
 $("stop").onclick = () => stopMove();
 $("estop").onclick = () => { stopMove(false); post("/api/estop").then(() => say("비상 정지 보냄")); };
+const resetDialog = $("reset-dialog");
 $("reset").onclick = () => {
-  if (!confirm("로봇 주변에 사람·장애물이 없고 상태를 확인했나요? 잠금을 해제합니다(해제만으로는 움직이지 않음).")) return;
-  post("/api/reset").then(() => say("잠금 해제 요청 보냄")).catch(e => say("해제 불가: " + e.message));
+  resetDialog.returnValue = "";
+  resetDialog.showModal();
 };
+resetDialog.addEventListener("close", () => {
+  if (resetDialog.returnValue !== "reset") return;
+  post("/api/reset").then(() => say("잠금 해제 요청 보냄")).catch(e => say("해제 불가: " + e.message));
+});
 $("stand").onclick = () => { stopMove(false);
   post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
 ["step","angle"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
@@ -179,6 +191,7 @@ const KEYS = { w:"fwd", ArrowUp:"fwd", s:"back", ArrowDown:"back", a:"left", Arr
 addEventListener("keydown", e => {
   if (!controlsEnabled) return;
   if (e.key === "Escape") { $("estop").click(); return; }
+  if (resetDialog.open) return;
   if (e.key === " ") { e.preventDefault(); stopMove(); return; }
   const dir = KEYS[e.key]; if (dir && !e.repeat) { e.preventDefault(); start(dir); }
 });
