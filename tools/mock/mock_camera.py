@@ -9,6 +9,7 @@ import json
 import threading
 import time
 import urllib.parse
+from pathlib import Path
 
 BOUNDARY = "mechdogframe"
 
@@ -19,10 +20,11 @@ def synthetic_jpeg(seq):
 
 
 class CameraState:
-    def __init__(self, robot="A", key=None, fps=20.0):
+    def __init__(self, robot="A", key=None, fps=20.0, frame=None):
         self.robot = robot
         self.key = key
         self.fps = fps
+        self.frame = frame
         self.seq = 0
         self.stall = threading.Event()   # set → stream stops sending without closing
         self.clients = 0
@@ -31,7 +33,7 @@ class CameraState:
     def next_frame(self):
         with self.lock:
             self.seq += 1
-            return self.seq, synthetic_jpeg(self.seq)
+            return self.seq, self.frame if self.frame is not None else synthetic_jpeg(self.seq)
 
     def status(self):
         return {"robot": self.robot, "host": "mechdog-%s-cam" % self.robot.lower(), "fw": "mock",
@@ -39,7 +41,8 @@ class CameraState:
                 "wifi": {"mode": "sta", "ip": "127.0.0.1", "rssi": -50, "reconnects": 0},
                 "camera": {"ok": True, "sensor": "MOCK", "psram": True, "width": 640, "height": 480,
                            "quality": 12, "fps": self.fps, "idle": False, "frames": self.seq,
-                           "failures": 0, "reinits": 0, "frame_age_ms": 10, "frame_bytes": 78},
+                           "failures": 0, "reinits": 0, "frame_age_ms": 10,
+                           "frame_bytes": len(self.frame) if self.frame is not None else 78},
                 "stream": {"port": 81, "clients": self.clients, "max_clients": 2},
                 "memory": {"heap_free": 100000, "psram_free": 4000000},
                 "i2c": {"addr": 0x53, "requests": 0}, "recognition": False, "auth": bool(self.key)}
@@ -119,8 +122,9 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--stream-port", type=int, default=8081)
     parser.add_argument("--key")
+    parser.add_argument("--frame", type=Path, help="synthetic JPEG fixture for browser display")
     args = parser.parse_args()
-    state = CameraState(args.robot, args.key)
+    state = CameraState(args.robot, args.key, frame=args.frame.read_bytes() if args.frame else None)
     serve(state, "127.0.0.1", args.port)
     serve(state, "127.0.0.1", args.stream_port)
     print("mock camera %s: http://127.0.0.1:%d/status  stream :%d/stream" % (args.robot, args.port, args.stream_port))

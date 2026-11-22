@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MechDog 조종</title>
+<style>
+  :root { --bg:#14171c; --panel:#1e232b; --line:#2e3540; --text:#e6e9ee; --dim:#8a93a0;
+          --ok:#3fb950; --warn:#d29922; --bad:#f85149; --btn:#2b323d; --btnon:#3b82f6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 "Malgun Gothic",system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  .pill { padding:3px 10px; border-radius:999px; font-size:13px; background:var(--btn); }
+  .pill.ok { background:#1f3d27; color:var(--ok); } .pill.warn { background:#3d321a; color:var(--warn); }
+  .pill.bad { background:#4a1f1f; color:var(--bad); }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:14px; padding:14px 16px; align-items:stretch; }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  h2 { font-size:14px; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  .cam { aspect-ratio:4/3; background:#000; border-radius:6px; display:flex; align-items:center;
+         justify-content:center; color:var(--dim); overflow:hidden; }
+  .cam img { width:100%; height:100%; object-fit:contain; }
+  .cam { max-height:48vh; margin:0 auto; }
+  canvas { display:block; width:min(100%, 440px); height:auto; margin:auto; background:#14171c; }
+  .pad { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; max-width:330px; margin:0 auto; }
+  .pad button { height:72px; font-size:16px; }
+  button { background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px;
+           cursor:pointer; font:inherit; user-select:none; touch-action:none; }
+  button.held { background:var(--btnon); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .stop { background:#3a2b10; } .estop { background:var(--bad); color:#fff; font-weight:700; height:56px; width:100%; margin-top:12px; font-size:17px; }
+  .row { display:flex; align-items:center; gap:10px; margin:10px 0; } .row label { width:92px; color:var(--dim); }
+  .row input { flex:1; } .row output { width:40px; text-align:right; }
+  dl { display:grid; grid-template-columns:110px 1fr; gap:4px 10px; margin:0; font-size:14px; }
+  dt { color:var(--dim); } dd { margin:0; }
+  .hint { color:var(--dim); font-size:13px; margin-top:10px; }
+  #msg { min-height:20px; color:var(--warn); font-size:14px; margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MechDog 조종 · 모니터링 <span id="robot" class="pill">로봇 ?</span></h1>
+  <span id="link" class="pill">연결 확인 중</span>
+  <span id="lock" class="pill">잠금 ?</span>
+</header>
+<main>
+    <section>
+      <h2>카메라 (비전 모듈)</h2>
+      <div class="cam" id="cam">카메라 주소 없음 (--cam 으로 지정)</div>
+    </section>
+    <section>
+      <h2>이동 — 누르고 있는 동안만 움직임</h2>
+      <div class="pad">
+        <span></span><button data-dir="fwd">▲ 전진<br><small>W</small></button><span></span>
+        <button data-dir="left">◀ 좌회전<br><small>A</small></button>
+        <button class="stop" id="stop">■ 정지<br><small>Space</small></button>
+        <button data-dir="right">우회전 ▶<br><small>D</small></button>
+        <span></span><button data-dir="back">▼ 후진<br><small>S</small></button><span></span>
+      </div>
+      <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="20"><output id="stepv">20</output></div>
+      <div class="row"><label>회전 각도</label><input id="angle" type="range" min="1" max="30" value="5"><output id="anglev">5</output></div>
+      <button class="estop" id="estop">비상 정지 (Esc)</button>
+      <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
+      <button id="stand" style="width:100%;height:42px;margin-top:8px">일어서기 (기본 자세)</button>
+      <div id="msg"></div>
+      <div class="hint">보폭 -100~100, 회전 -30~30 (공식 API 범위). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
+    </section>
+    <section>
+      <h2>로봇 상태</h2>
+      <dl>
+        <dt>상태</dt><dd id="s-state">-</dd>
+        <dt>잠금 사유</dt><dd id="s-reason">-</dd>
+        <dt>배터리</dt><dd id="s-batt">-</dd>
+        <dt>기울기 x / y</dt><dd id="s-tilt">-</dd>
+        <dt>경고</dt><dd id="s-warn">-</dd>
+        <dt>링크 문제</dt><dd id="s-fault">-</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>LiDAR 최신 스캔</h2>
+      <canvas id="scan" width="440" height="440" aria-label="라이다 거리 점 표시"></canvas>
+      <div class="hint" id="scan-status" role="status"></div>
+    </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
+let holding = null, timer = null, camSet = false;
+
+function post(path, body) {
+  return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) })
+    .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.status); return j; }));
+}
+function say(text) { $("msg").textContent = text || ""; }
+
+function motion(dir) {
+  const s = +$("step").value, a = +$("angle").value;
+  // 좌·우는 실물에서 시험한 것과 같이 전진하면서 회전: move(20, 5) / move(20, -5)
+  return { fwd:[s,0], back:[-s,0], left:[s,a], right:[s,-a] }[dir];
+}
+function sendMove() {
+  const [step, angle] = motion(holding);
+  post("/api/move", { step, angle }).catch(e => say("이동 거절: " + e.message));
+}
+function start(dir) {
+  if (holding === dir) return;
+  stopMove(false);
+  holding = dir;
+  document.querySelector(`[data-dir="${dir}"]`).classList.add("held");
+  sendMove();
+  timer = setInterval(sendMove, 100);  // 서버 쪽 의도는 0.3초 뒤 사라짐 -> 계속 보내야 움직임
+}
+function stopMove(send = true) {
+  clearInterval(timer); timer = null;
+  if (holding) document.querySelector(`[data-dir="${holding}"]`).classList.remove("held");
+  holding = null;
+  if (send) post("/api/stop").catch(() => {});
+}
+
+document.querySelectorAll("[data-dir]").forEach(b => {
+  b.addEventListener("pointerdown", e => { b.setPointerCapture(e.pointerId); start(b.dataset.dir); });
+  b.addEventListener("pointerup", () => stopMove());
+  b.addEventListener("pointercancel", () => stopMove());
+  b.addEventListener("lostpointercapture", () => { if (holding === b.dataset.dir) stopMove(); });
+});
+$("stop").onclick = () => stopMove();
+$("estop").onclick = () => { stopMove(false); post("/api/estop").then(() => say("비상 정지 보냄")); };
+$("reset").onclick = () => {
+  if (!confirm("로봇 주변에 사람·장애물이 없고 상태를 확인했나요? 잠금을 해제합니다(해제만으로는 움직이지 않음).")) return;
+  post("/api/reset").then(() => say("잠금 해제 요청 보냄")).catch(e => say("해제 불가: " + e.message));
+};
+$("stand").onclick = () => { stopMove(false);
+  post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
+["step","angle"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
+
+const KEYS = { w:"fwd", ArrowUp:"fwd", s:"back", ArrowDown:"back", a:"left", ArrowLeft:"left", d:"right", ArrowRight:"right" };
+addEventListener("keydown", e => {
+  if (e.key === "Escape") { $("estop").click(); return; }
+  if (e.key === " ") { e.preventDefault(); stopMove(); return; }
+  const dir = KEYS[e.key]; if (dir && !e.repeat) { e.preventDefault(); start(dir); }
+});
+addEventListener("keyup", e => { if (KEYS[e.key] === holding) stopMove(); });
+addEventListener("blur", () => stopMove());
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopMove(); });
+
+function pill(el, text, kind) { el.textContent = text; el.className = "pill " + (kind || ""); }
+function drawScan(scan) {
+  const canvas = $("scan"), ctx = canvas.getContext("2d"), center = canvas.width / 2;
+  const radius = center - 22, maxMetres = 12;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#525d6d";
+  ctx.fillStyle = "#aab5c6";
+  for (const metres of [3, 6, 9, 12]) {
+    const r = radius * metres / maxMetres;
+    ctx.beginPath();
+    ctx.arc(center, center, r, 0, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fillText(metres + " m", center + 4, center - r - 3);
+  }
+  ctx.fillRect(center - 2, center - 2, 4, 4);
+  const statuses = { disabled:"입력 미설정", waiting:"첫 스캔 대기", stale:"새 스캔 없음",
+                     error:"수신 오류", ready:"수신 중" };
+  const ranges = scan.ranges_m;
+  ctx.fillStyle = "#42dfae";
+  let count = 0;
+  ranges.forEach((distance, bin) => {
+    if (distance === null) return;
+    const angle = 2 * Math.PI * bin / ranges.length, r = radius * distance / maxMetres;
+    ctx.fillRect(center + Math.sin(angle) * r - 1, center - Math.cos(angle) * r - 1, 3, 3);
+    count++;
+  });
+  $("scan-status").textContent = [
+    scan.source, statuses[scan.status], scan.error, scan.status === "ready" ? `유효 각도 ${count}개` : null
+  ].filter(Boolean).join(" · ");
+}
+async function pollScan() {
+  try {
+    const response = await fetch("/api/lidar");
+    if (!response.ok) throw new Error("LiDAR response unavailable");
+    drawScan(await response.json());
+  } catch {
+    drawScan({status:"error", error:"콘솔 연결 확인", ranges_m:[]});
+  } finally {
+    setTimeout(pollScan, 250);
+  }
+}
+async function poll() {
+  try {
+    const s = await (await fetch("/api/state")).json();
+    $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
+    if (!camSet && s.cam) { $("cam").innerHTML = ""; const img = new Image(); img.src = s.cam; img.alt = "카메라";
+      img.onerror = () => { $("cam").textContent = "카메라 영상 없음: " + s.cam; }; $("cam").appendChild(img); camSet = true; }
+    const t = s.tel;
+    if (s.emergency) pill($("link"), "비상 정지 중", "bad");
+    else if (!s.fresh) pill($("link"), s.status === "unknown" ? "로봇 응답 없음" : "응답 지연", "bad");
+    else pill($("link"), "연결됨", "ok");
+    if (t) {
+      pill($("lock"), t.latched ? "잠김" : "움직일 수 있음", t.latched ? "warn" : "ok");
+      $("s-state").textContent = t.state;
+      $("s-reason").textContent = REASON[t.reason] || t.reason;
+      $("s-batt").textContent = t.battery_mv == null ? "모름" : (t.battery_mv / 1000).toFixed(2) + " V";
+      $("s-tilt").textContent = t.tilt.map(v => v == null ? "?" : v + "°").join(" / ");
+      $("s-warn").textContent = t.warnings.length ? t.warnings.join(", ") : "없음";
+    } else pill($("lock"), "잠금 ?", "");
+    $("s-fault").textContent = s.error || s.fault || "없음";
+    document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !t || t.latched || !s.fresh || s.emergency);
+    if (holding && (!t || t.latched || !s.fresh)) stopMove();
+  } catch (e) { pill($("link"), "서버 꺼짐", "bad"); stopMove(false); }
+}
+setInterval(poll, 250); poll(); pollScan();
+</script>
+</body>
+</html>
