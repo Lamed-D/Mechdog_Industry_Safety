@@ -25,7 +25,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 
 | 대상 | 결과 폴더 | A/B 구분 | 다음에 누가 |
 | --- | --- | --- | --- |
-| `python` | `build/robot_<ID>/python/` (11개 .py) | `config.py`의 `ROBOT_ID` 치환 | **사용자**가 2.2절 순서로 업로드 |
+| `python` | `build/robot_<ID>/python/` (12개 .py) | `config.py`의 `ROBOT_ID` 치환 | **사용자**가 2.2절 순서로 업로드 |
 | `vision` | `build/robot_<ID>/vision/latest/` 합본·`.sha256`·`manifest.json`(`robot` 기록) | 빌드 플래그 `CAM_BUILD_ROBOT_<ID>`가 카메라 기본 ID가 됨 | **AI**가 6.5절로 굽기 |
 | `arduino` | `build/robot_<ID>/arduino/` | ID는 `secrets.h`의 `MECH_ROBOT_ID`(Wi-Fi와 같은 파일). 다르면 빌드가 멈춤 | **사용자**가 4.2절로 Arduino IDE 업로드 |
 
@@ -59,7 +59,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 
 | 명령 | 결과 | 비고 |
 | --- | --- | --- |
-| `python firmware/build.py B --only python` | `build/robot_B/python/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 이전 빌드의 남은 .py는 지움 |
+| `python firmware/build.py B --only python` | `build/robot_B/python/` 파일 12개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 이전 빌드의 남은 .py는 지움 |
 
 ### 2.2 업로드 순서 (사용자 가이드)
 
@@ -69,7 +69,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 
 1. 로봇을 받침대에 올리고 다리 주변을 비웁니다. 편집기로 메인 보드에 연결, Ctrl+C로 자동 실행 중단. 본체와 카메라 COM 포트를 구분합니다.
 2. `secrets.py`를 올립니다.
-3. 순서대로 Download: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, **마지막에 `main.py`**. 실행은 `import main` 또는 재부팅.
+3. 순서대로 Download: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `sonar` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, **마지막에 `main.py`**. 실행은 `import main` 또는 재부팅.
 4. 첫 확인: 예외·MemoryError 없음, Wi-Fi 연결, 텔레메트리의 ID·boot 래치·배터리·경고. 처음에는 RESET·MOVE를 보내지 않습니다. MechDog 초기화 자체의 움직임은 실물 미검증입니다.
 5. 문제 시 자동 실행을 멈추고 기존 `main.py`·설정을 되돌린 뒤 재시작. REPL 접근이 안 되면 반복 재부팅하지 말고 제조사 복구 절차로 순정 MicroPython을 복원합니다.
 

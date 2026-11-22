@@ -30,6 +30,8 @@ class Telemetry:
     uptime_ms: int
     boot_id: str
     warnings: frozenset
+    sonar_mm: int | None = None  # 초음파 거리. None = NA
+    has_sonar: bool = False      # TEL 에 초음파 필드가 있음 = LED 명령 지원(MicroPython 판)
 
 
 def parse_telemetry(data):
@@ -66,8 +68,10 @@ def parse_telemetry(data):
     warnings = frozenset() if warn == "none" else frozenset(warn.split(","))
     if not warnings <= WARN or integer(seq) > MAX_SEQ:
         raise ValueError("invalid warnings or sequence")
+    has_sonar = len(fields) >= 15  # 선택 필드: 초음파 mm 또는 NA (예전 펌웨어·Arduino 판에는 없음)
+    sonar = None if not has_sonar or fields[13] == "NA" else integer(fields[13])
     return Telemetry(robot, integer(tseq), integer(seq), state, latched == "1", reason,
-                     volts, tuple(tilt), integer(uptime), boot, warnings)
+                     volts, tuple(tilt), integer(uptime), boot, warnings, sonar, has_sonar)
 
 
 class RobotLink:
@@ -93,6 +97,8 @@ class RobotLink:
         self.role_request = None
         self.role_ack = None
         self.role_seen = self.next_role = -math.inf
+        self.pending_led = None
+        self.led = None  # 마지막으로 보낸 LED 색 (r, g, b)
 
     def observe(self, data):
         if data.startswith(b"ROLE|"):
@@ -190,6 +196,16 @@ class RobotLink:
         self.ack_wait_since = None
         self.fault = None
 
+    def set_led(self, r, g, b):
+        """초음파 센서 LED 색. 움직이지 않는 명령이라 잠김 중에도 보냄. 지원하는 펌웨어만."""
+        rgb = (r, g, b)
+        if any(isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= 255 for v in rgb):
+            raise ValueError("r, g, b 는 0~255 정수")
+        if not self.fresh() or not self.latest.has_sonar:
+            raise ValueError("로봇 연결·초음파 지원 펌웨어를 확인하세요")
+        self.pending_led = rgb
+        self.next_send = -math.inf
+
     def fresh(self):
         return self.latest is not None and 0 <= self.clock() - self.last_seen < settings.HOST_TEL_FRESH_MS / 1000
 
@@ -239,6 +255,9 @@ class RobotLink:
             term, code = self.role_request
             payload = self._command("ROLE", self.boot_id, term, code, settings.ROLE_LEASE_MS)
             self.next_role = now + settings.ROLE_RENEW_MS / 1000
+        elif self.pending_led is not None:
+            payload = self._command("LED", *self.pending_led)  # 한 번만. 이동 중이면 다음 주기에 MOVE 계속
+            self.led, self.pending_led = self.pending_led, None
         elif self.latest.latched:
             self.intent = None
             payload = self._command("PING")

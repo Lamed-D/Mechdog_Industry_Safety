@@ -10,6 +10,7 @@ from motion import Motion
 
 COMM_PERIOD_MS = 5
 VISION_PERIOD_MS = 200
+SONAR_PERIOD_MS = 100  # 제조사 예제는 80 ms
 
 
 def make_lock():
@@ -33,7 +34,7 @@ def safe_reader(func):
 
 class App:
     def __init__(self, cfg, dog, read_battery, read_tilt, network, socket, machine, clock,
-                 ssid=None, password=None, lock=None, vision=None):
+                 ssid=None, password=None, lock=None, vision=None, sonar=None):
         self.cfg = cfg
         self.clock = clock
         self.motion = Motion(dog)
@@ -46,6 +47,8 @@ class App:
             self.lidar = LidarBridge(cfg, machine, socket, clock)
         self.vision = vision
         self.next_vision_ms = None
+        self.sonar = sonar
+        self.next_sonar_ms = None
         self.vision_status = {"status": "unknown", "reason": "not_read"}
         self.ready = False
         self.startup_failed = False
@@ -118,6 +121,8 @@ class App:
                 self.lidar_step()
             except Exception:
                 self.lidar.stop()
+        if self.sonar is not None:
+            self.sonar_step()
         if self.vision is not None:
             now = self.clock.ticks_ms()
             if self.next_vision_ms is None or self.clock.ticks_diff(now, self.next_vision_ms) >= 0:
@@ -126,6 +131,16 @@ class App:
                     self.vision_step()
                 except Exception:
                     self.vision_failed()
+
+    def sonar_step(self):
+        """LED 요청이 있으면 적용하고, 100 ms 마다 거리를 읽어 텔레메트리에 넣습니다(표시용)."""
+        rgb, self.robot.led_request = self.robot.led_request, None
+        if rgb is not None:
+            self.sonar.set_rgb(*rgb)
+        now = self.clock.ticks_ms()
+        if self.next_sonar_ms is None or self.clock.ticks_diff(now, self.next_sonar_ms) >= 0:
+            self.next_sonar_ms = self.clock.ticks_add(now, SONAR_PERIOD_MS)
+            self.robot.sonar_mm = self.sonar.read_mm()  # 실패는 None(NA)
 
     def run(self):
         """start() 뒤 main.py 가 부릅니다. 돌아오지 않으며, 중단·예외 시 fail_safe 후 예외를 올립니다."""

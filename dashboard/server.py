@@ -179,7 +179,9 @@ class Console:
                     "state": t.state, "latched": t.latched, "reason": t.reason,
                     "battery_mv": t.battery_mv, "tilt": t.tilt,
                     "warnings": sorted(t.warnings), "last_seq": t.last_seq,
+                    "sonar_mm": t.sonar_mm, "has_sonar": t.has_sonar,
                 },
+                "led": self.link.led,
             }
 
     def command(self, path, body):
@@ -196,6 +198,8 @@ class Console:
                 self.link.estop()
             elif path == "/api/stand":
                 self.link.request_stand()
+            elif path == "/api/led":
+                self.link.set_led(body["r"], body["g"], body["b"])
             elif path == "/api/reset":
                 self.link.request_reset()  # 잠김·배터리 조건이 안 맞으면 ValueError
             else:

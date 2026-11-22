@@ -75,9 +75,21 @@
         <dt>잠금 사유</dt><dd id="s-reason">-</dd>
         <dt>배터리</dt><dd id="s-batt">-</dd>
         <dt>기울기 x / y</dt><dd id="s-tilt">-</dd>
+        <dt>초음파 거리</dt><dd id="s-sonar">-</dd>
         <dt>경고</dt><dd id="s-warn">-</dd>
         <dt>링크 문제</dt><dd id="s-fault">-</dd>
       </dl>
+      <h2 style="margin-top:16px">초음파 LED 색</h2>
+      <div class="row" id="led-controls">
+        <input id="led-color" type="color" value="#00ff00" aria-label="LED 색 고르기">
+        <button type="button" id="led-apply">적용</button>
+        <button type="button" data-led="#ff0000" style="color:#ff6b6b">빨강</button>
+        <button type="button" data-led="#00ff00" style="color:#42dfae">초록</button>
+        <button type="button" data-led="#0000ff" style="color:#7aa2ff">파랑</button>
+        <button type="button" data-led="#ffffff">흰색</button>
+        <button type="button" data-led="#000000">끄기</button>
+      </div>
+      <div class="hint" id="led-status">로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)</div>
     </section>
 
     <section>
@@ -251,6 +263,15 @@ function startUsbCamera() {
   }
   pollFrame();
 }
+function sendLed(hex) {
+  const n = parseInt(hex.slice(1), 16), rgb = { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
+  $("led-color").value = hex;
+  post("/api/led", rgb).then(() => $("led-status").textContent = `보냄: ${hex} (R${rgb.r} G${rgb.g} B${rgb.b})`)
+    .catch(e => $("led-status").textContent = "LED 거절: " + e.message);
+}
+$("led-apply").onclick = () => sendLed($("led-color").value);
+document.querySelectorAll("[data-led]").forEach(b => b.onclick = () => sendLed(b.dataset.led));
+
 async function poll() {
   try {
     const s = await (await fetch("/api/state")).json();
@@ -277,7 +298,12 @@ async function poll() {
       $("s-batt").textContent = t.battery_mv == null ? "모름" : (t.battery_mv / 1000).toFixed(2) + " V";
       $("s-tilt").textContent = t.tilt.map(v => v == null ? "?" : v + "°").join(" / ");
       $("s-warn").textContent = t.warnings.length ? t.warnings.join(", ") : "없음";
-    } else pill($("lock"), "잠금 ?", "");
+      $("s-sonar").textContent = !t.has_sonar ? "지원 안 함(펌웨어)" : t.sonar_mm == null ? "모름 (측정 실패·범위 밖)"
+        : (t.sonar_mm / 10).toFixed(1) + " cm";
+    } else { pill($("lock"), "잠금 ?", ""); $("s-sonar").textContent = "-"; }
+    const ledOk = !!(t && t.has_sonar && s.fresh);
+    document.querySelectorAll("#led-controls button").forEach(b => b.disabled = !ledOk);
+    if (!ledOk) $("led-status").textContent = "로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)";
     $("s-fault").textContent = s.error || s.fault || "없음";
     document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !t || t.latched || !s.fresh || s.emergency);
     if (holding && (!t || t.latched || !s.fresh)) stopMove();

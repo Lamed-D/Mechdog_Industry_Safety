@@ -22,7 +22,7 @@
 | --- | --- | --- | --- |
 | 1 | 외관·고정·배선·배터리, 라이다 고정·0° 방향 (전원 OFF) | 손상·느슨함 없음 | 고정 후 재확인 |
 | 2 | 카메라 펌웨어 굽기·설정 — **에이전트** ([firmware.md](firmware.md) 6.5) | `/status`의 `robot` ID·`camera.ok=true`·`wifi.mode=sta`, `/capture`, `:81/stream`, 창을 닫고 다시 열어도 새 영상 | 합본 다시 굽기·설정, 다음 단계 금지 |
-| 3 | 로봇 Python 업로드 — **사용자**, 가이드 [firmware.md](firmware.md) 2.2: `python firmware/build.py <ID> --only python` → `secrets.py` → `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`(`import app` 확인) → **마지막 `main.py`** | 예외·MemoryError 없음, Wi-Fi 연결, TEL에 ID·`boot` 래치·배터리 | 자동 실행 중단, 기존 `main.py` 복원 |
+| 3 | 로봇 Python 업로드 — **사용자**, 가이드 [firmware.md](firmware.md) 2.2: `python firmware/build.py <ID> --only python` → `secrets.py` → `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `sonar` → `comm` → `lidar_bridge` → `core` → `app`(`import app` 확인) → **마지막 `main.py`** | 예외·MemoryError 없음, Wi-Fi 연결, TEL에 ID·`boot` 래치·배터리 | 자동 실행 중단, 기존 `main.py` 복원 |
 | 4 | 대시보드 연결·정지 (2절) | 잠금·해제·정지·ESTOP 모두 기대대로 | 원인 확인 전 재개 금지 |
 | 5 | 통신 끊김 정지 (2절 6) | 로봇이 스스로 멈추고 `link_lost` 래치 유지 | 원인 확인 전 재개 금지 |
 | 6 | LiDAR USB (3절) | 상태 Good, 화면에 점 | 케이블·전원·COM 포트 |

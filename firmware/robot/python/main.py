@@ -12,6 +12,7 @@ from HW_MechDog import MechDog
 
 import config
 from app import App
+from sonar import Sonar
 from vision import Vision
 
 try:
@@ -25,15 +26,17 @@ except Exception:
 mechdog = MechDog()
 try:
     mechdog.move(0, 0)
+    _iic1 = Hiwonder_IIC.IIC(1)  # IMU·초음파가 함께 쓰는 버스(제조사 예제)
     try:
-        _imu = Hiwonder_IIC.MPU(Hiwonder_IIC.IIC(1))
+        _imu = Hiwonder_IIC.MPU(_iic1)
         read_tilt = _imu.read_angle
     except Exception:
         def read_tilt():
             raise OSError("imu unavailable")  # 텔레메트리에 NA, imu_unknown
 
     app = App(config, mechdog, Hiwonder.Battery_power, read_tilt, network, socket, machine, time,
-              SSID, PASSWORD, vision=Vision(Hiwonder_IIC, config.VISION_RECOGNITION_ON_CAMERA))
+              SSID, PASSWORD, vision=Vision(Hiwonder_IIC, config.VISION_RECOGNITION_ON_CAMERA),
+              sonar=Sonar(Hiwonder_IIC, _iic1))
     app.start(Hiwonder.startMain)  # 감시 스레드 하나 + Wi-Fi
     app.run()  # 명령·텔레메트리·비전을 이 스레드에서 계속 (돌아오지 않음)
 except BaseException:
