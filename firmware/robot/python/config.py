@@ -47,6 +47,9 @@ ACTION_DURATION_MS = {
 DEFAULT_POSE_SETTLE_MS = 600  # [가정]
 ACTION_MIN_MS = 200           # 동작 시작 뒤 이 시간이 지나야 action_is_over() 를 믿음 [가정]
 
+# 라이다 J5 -> TCP 중계(동결, 실물 미검증). 지금은 라이다를 노트북 USB에 꽂으므로 꺼 둡니다.
+# 켜면 UART 버퍼 4 KB·TCP 서버만큼 메모리를 더 씁니다(본체는 Wi-Fi 뒤 여유가 거의 없음).
+LIDAR_RELAY_ENABLED = False
 LIDAR_UART_ID = 1
 LIDAR_RX_PIN = 32
 LIDAR_TX_PIN = 33

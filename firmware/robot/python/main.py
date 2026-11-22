@@ -34,7 +34,8 @@ try:
 
     app = App(config, mechdog, Hiwonder.Battery_power, read_tilt, network, socket, machine, time,
               SSID, PASSWORD, vision=Vision(Hiwonder_IIC, config.VISION_RECOGNITION_ON_CAMERA))
-    app.start(Hiwonder.startMain)
+    app.start(Hiwonder.startMain)  # 감시 스레드 하나 + Wi-Fi
+    app.run()  # 명령·텔레메트리·비전을 이 스레드에서 계속 (돌아오지 않음)
 except BaseException:
     # 초기화·부분 루프 등록 실패/중단에도 동작 그룹과 이동 정지를 각각 시도합니다.
     try:
