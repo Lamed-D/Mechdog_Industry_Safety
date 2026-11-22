@@ -9,10 +9,13 @@ import socket
 import sys
 import time
 
+from tests.fakes.HW_MechDog import MechDog
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "robot"))
 
 import config  # noqa: E402
+from comm import MAX_DATAGRAM, POLL_LIMIT  # noqa: E402
 from core import Robot  # noqa: E402
 from motion import Motion  # noqa: E402
 
@@ -32,36 +35,41 @@ class Clock:
         time.sleep(ms / 1000)
 
 
-class PrintDog:
-    def __getattr__(self, name):
-        def call(*args):
-            print("  MechDog.%s%s" % (name, args))
-            return True
-        return call
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--robot", choices=("A", "B"), default="A")
     config.ROBOT_ID = parser.parse_args().robot
-    robot = Robot(config, Motion(PrintDog()), Clock(), lambda: 7400, lambda: (0.0, 0.0))
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("127.0.0.1", config.CMD_PORT))
-    sock.setblocking(False)
-    print("가짜 로봇 %s 대기 중 (UDP %d)" % (config.ROBOT_ID, config.CMD_PORT))
-    while True:
-        try:
+    dog = MechDog()
+    robot = Robot(config, Motion(dog), Clock(), lambda: 7400, lambda: (0.0, 0.0))
+    last_call = None
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.bind(("127.0.0.1", config.CMD_PORT))
+            sock.setblocking(False)
+            print("가짜 로봇 %s 대기 중 (UDP %d)" % (config.ROBOT_ID, config.CMD_PORT))
             while True:
-                data, addr = sock.recvfrom(256)
-                robot.handle(data, addr)
-        except BlockingIOError:
-            pass
-        robot.tick(True)
-        if robot.telemetry_due():
-            dest = robot.telemetry_dest()
-            if dest:
-                sock.sendto(robot.telemetry().encode(), dest)
-        time.sleep(0.005)
+                for _ in range(POLL_LIMIT):
+                    try:
+                        data, addr = sock.recvfrom(MAX_DATAGRAM)
+                    except (BlockingIOError, ConnectionResetError):
+                        break
+                    robot.handle(data, addr)
+                robot.tick(True)
+                if robot.telemetry_due():
+                    dest = robot.telemetry_dest()
+                    if dest:
+                        sock.sendto(robot.telemetry().encode(), dest)
+                for call in dog.calls:
+                    name, args = call
+                    if name != "action_is_over" and call != last_call:
+                        print("  MechDog.%s%s" % (name, args))
+                        last_call = call
+                dog.calls.clear()
+                time.sleep(0.005)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        robot.fail_safe()
 
 
 if __name__ == "__main__":
