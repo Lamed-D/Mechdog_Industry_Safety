@@ -136,7 +136,7 @@ python -m ai.tools.make_robot_files A
 - `build/robot_files_A/`에 주석 없는 ASCII 파일 11개가 생깁니다(동작 코드는 `firmware/robot/python/`과 같음).
 - 업로드 순서: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, 마지막에 `main`.
 - `secrets.py`(커밋 금지)는 `firmware/robot/python/secrets.example.py`를 참고해 장치에만 만듭니다. 기본 AP면 `WIFI_SSID = "HW_ESP32S3CAM"`, `WIFI_PASSWORD = ""`.
-- 업로드·기존 `main.py` 덮어쓰기는 **사용자만**, 받침대 위에서, 복구 수단을 확인한 뒤 합니다.
+- 본체 업로드·기존 `main.py` 덮어쓰기는 **사용자만**(에이전트는 가이드 안내), 받침대 위에서, 복구 수단을 확인한 뒤 합니다.
 
 ## 7. LiDAR USB 단독 확인
 

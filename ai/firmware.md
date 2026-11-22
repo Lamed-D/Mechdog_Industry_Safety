@@ -1,12 +1,15 @@
 # 펌웨어 (메인 보드 · 비전 모듈)
 
-로봇에는 프로그램이 올라가는 칩이 두 개 있습니다. **굽기·업로드·전원 조작은 사람(사용자)만** 하고, 에이전트는 빌드·문서까지만 합니다.
+로봇에는 프로그램이 올라가는 칩이 두 개 있습니다. 역할은 [rules.md](rules.md) 4.1절.
+
+- **메인 보드(본체):** 업로드·굽기·구동은 **사용자만**. 에이전트는 업로드 파일·빌드를 만들고 2.2·4.2절 **사용자 가이드**를 고친 뒤 채팅으로 순서를 안내합니다.
+- **비전 모듈(카메라):** 에이전트가 백업·굽기·설정·확인까지 직접 합니다(6.5절). 전원·케이블 같은 물리 조작만 사용자에게 요청합니다.
 
 | 칩 | 위치 | 방식 | 폴더 | 상태 |
 | --- | --- | --- | --- | --- |
 | 메인 보드 ESP32(클래식) | 몸통 | **MicroPython(주)**, 순정 펌웨어 위에 `.py` 업로드 | [`firmware/robot/python/`](../firmware/robot/python/) | 주 펌웨어. 통합 main 실물 미검증 |
 | 메인 보드 ESP32 | 몸통 | Arduino(C++), 예비·유지 | [`firmware/robot/arduino/`](../firmware/robot/arduino/) | 전체 이식 완료. 벤더 백엔드·실물 미검증 |
-| 비전 모듈 ESP32-S3 | 앞쪽 카메라 | Arduino(C++) 맞춤 영상 펌웨어 | [`firmware/vision/`](../firmware/vision/) | v0.1.8. 로봇 B 카메라에서 실물 동작 확인 |
+| 비전 모듈 ESP32-S3 | 앞쪽 카메라 | Arduino(C++) 맞춤 영상 펌웨어 | [`firmware/vision/`](../firmware/vision/) | v0.1.9(AP 기본 비밀번호만 변경). v0.1.8은 로봇 B 카메라에서 실물 동작 확인 |
 
 제조사 Scratch 방식은 쓰지 않습니다. 제어 API 규칙은 [mechdog-api.md](mechdog-api.md), 메시지 형식은 [protocol.md](protocol.md), 배선·전원은 [hardware.md](hardware.md), 실물 확인 순서는 [robot-tests.md](robot-tests.md).
 
@@ -34,7 +37,10 @@
 | --- | --- | --- |
 | `python -m ai.tools.make_robot_files B` | `build/robot_files_B/` 파일 11개(주석·설명문 제거, ASCII, 짧은 줄; 동작 코드 동일, `ROBOT_ID` 치환) | 업로드 방식. 인자 생략 시 B |
 
-### 2.2 업로드 순서 (사람)
+### 2.2 업로드 순서 (사용자 가이드)
+
+사용자가 그대로 따라 합니다. 에이전트는 이 절을 최신으로 유지하고, 업로드가 필요할 때 채팅으로 이 순서를 안내합니다.
+
 
 1. 로봇을 받침대에 올리고 다리 주변을 비웁니다. 편집기로 메인 보드에 연결, Ctrl+C로 자동 실행 중단. 본체와 카메라 COM 포트를 구분합니다.
 2. 기존 `main.py`·설정 백업과 복구 위치를 확인합니다(3절). 백업은 저장소에 새로 추가하지 않습니다.
@@ -78,7 +84,10 @@ python ai/tools/build_main_arduino.py  # arduino-cli 컴파일만, 산출물은 
 - 벤더 라이브러리는 제조사 ESP32 개발 패키지로 사용자 Arduino 라이브러리 폴더에 설치합니다. 저장소에 넣지 않습니다.
 - 보드 **ESP32 Dev Module**, ESP32 Arduino 코어 **3.3.12**. 합본·업로드 기능은 빌드 도구에 없습니다.
 
-### 4.2 설정·업로드 (사람)
+### 4.2 설정·업로드 (사용자 가이드)
+
+사용자가 그대로 따라 합니다. 에이전트는 빌드(4.1)까지만 하고 이 순서를 안내합니다.
+
 
 1. `secrets.example.h` → `secrets.h`(커밋 금지): `MECH_WIFI_SSID`, `MECH_WIFI_PASS`, `MECH_ROBOT_ID` ('A'/'B'). 로봇 간 차이는 ID뿐.
 2. 받침대에 올리고 USB 연결 → `esptool.py --port COM<n> read_flash 0 ALL main_backup.bin` 백업 → Arduino IDE 업로드.
@@ -104,7 +113,7 @@ Windows 노트북의 모바일 핫스팟(2.4 GHz 고정, WPA2)에 메인 보드�
 
 | 항목 | 제조사 기본 영상 펌웨어 | 맞춤 펌웨어 |
 | --- | --- | --- |
-| Wi-Fi | AP `HW_ESP32S3CAM`(`192.168.5.1`) | STA 접속, 실패 30초 뒤 점검용 AP `MECHDOG-<ID>-CAM`(`ap_pass` 설정 시만, `192.168.5.1`), STA 재시도 계속 |
+| Wi-Fi | AP `HW_ESP32S3CAM`(`192.168.5.1`) | STA 접속, 실패 30초 뒤 점검용 AP `MECHDOG-<ID>-CAM`(기본 비밀번호 `password`, `192.168.5.1`), STA 재시도 계속 |
 | 영상 | 웹 화면 | `:81/stream` MJPEG(최신 프레임만, 최대 2 수신자), `:80/capture` JPEG 1장, `:80/status` JSON, USB 시리얼 `frame`(JPEG 1장, 진단용) |
 | 이름 | 고정 IP | mDNS `mechdog-a-cam.local` / `mechdog-b-cam.local` |
 | 메인 보드 I2C | 응답 없음(errno 19) | 공식 `ESP32S3Cam` 읽기에 **"결과 없음"** 고정 응답(연결 확인 용도) |
@@ -161,6 +170,7 @@ HTTP 머리글·I2C 명령표는 [protocol.md](protocol.md).
 | 워치독 | 10초 | `CAM_WDT_TIMEOUT_MS` |
 | STA 재시도 / AP 전환 | 15초(AP 접속자 있으면 60초) / 30초 | `CAM_STA_RETRY_MS`, `CAM_STA_RETRY_AP_BUSY_MS`, `CAM_STA_FALLBACK_MS` |
 | 고립 재부팅 | 10분(SSID 설정 시) | `CAM_NET_RESTART_MS` |
+| 점검용 AP 비밀번호 | `password`(v0.1.9~, 약한 값이라 STA 실패 때만 켜짐. 현장에서는 `set ap_pass`로 변경, `set ap_pass`만 쓰면 AP 끔) | `CAM_AP_PASSWORD` |
 | 영상 방향 | 센서별 기본 | `CAM_VFLIP`, `CAM_HMIRROR` |
 
 XCLK 15 MHz는 속도를 위해 올리지 않습니다. 원시 RGB/YUV 전송은 하지 않습니다.
@@ -180,25 +190,33 @@ python ai/tools/build_vision_cam.py --verify-release  # 장치·컴파일러 없
 - 해시는 산출물 변경 확인용이며 서명·실물 검증이 아닙니다. 이전 바이너리는 보관하지 않고 Git 이력으로만 복원합니다.
 - 제조사 개발 환경은 코어 2.0.x였고 우리는 3.3.12입니다(카메라 드라이버·SCCB·워치독 설정 방식 차이). 2.0.x 빌드는 확인하지 않았습니다. 공개 라이브러리는 Arduino-ESP32 코어(LGPL-2.1)와 그 안의 ESP-IDF·esp32-camera(Apache-2.0)만.
 
-### 6.5 굽기·설정 (사람)
+### 6.5 굽기·설정 (에이전트 수행)
 
-1. 본체 전원을 끄고 카메라 IIC 케이블을 뺀 뒤, 데이터용 Type-C로 **카메라만** PC에 연결(역급전 미확인에 따른 우리 안전 권고, 제조사 절차 아님). 장치 관리자 `USB-SERIAL CH340` 포트 확인, 메인 보드 포트와 혼동 금지. 포트를 잡은 프로그램은 닫습니다.
+에이전트가 직접 합니다. **[사용자]** 표시 단계만 사용자에게 요청하고 끝날 때까지 기다립니다.
+
+1. **[사용자]** 본체 전원을 끄고 카메라 IIC 케이블을 뺀 뒤, 데이터용 Type-C로 **카메라만** PC에 연결(역급전 미확인에 따른 우리 안전 권고, 제조사 절차 아님). 장치 관리자 `USB-SERIAL CH340` 포트 확인, 메인 보드 포트와 혼동 금지. 포트를 잡은 프로그램은 닫습니다.
+   에이전트는 `flash-id`로 ESP32-S3인지 확인한 뒤 진행합니다. 메인 보드(ESP32 클래식) 포트면 즉시 멈춥니다.
 2. 합본 해시 확인: `Get-FileHash build\vision_cam\latest\mechdog_vision_cam_0x0.bin -Algorithm SHA256` = `.sha256`.
 3. **백업 먼저:** `esptool --chip esp32s3 --port COMx flash-id` 후 `esptool --chip esp32s3 --port COMx --baud 460800 read-flash 0 ALL C:\camera-backup\robot<ID>_cam_full.bin` (저장소 밖, 크기 = 플래시 크기. esptool 4.x는 `read_flash`처럼 밑줄).
 4. 굽기: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 build\vision_cam\latest\mechdog_vision_cam_0x0.bin`. 제조사 플래시 도구를 쓰면 ESP32-S3 / 0x0000 / 80MHz / DIO / 460800, **ERASE 누르지 않음**. 쓰는 중 케이블·전원 분리 금지.
    - 업데이트(설정 유지): 같은 맞춤 펌웨어가 있는 카메라는 앱만 `write-flash 0x10000 build\vision_cam\compile\vision.ino.bin`. 0x0 합본은 NVS를 지울 수 있으므로 굽고 나서 설정을 다시 입력합니다.
    - Arduino IDE로 올릴 때: `firmware/vision/vision.ino`를 폴더째 열고 Board ESP32S3 Dev Module, PSRAM OPI, Flash Mode DIO 80MHz, Flash Size 4MB, Partition Huge APP, CPU 240MHz, USB CDC On Boot Disabled, Erase All Flash Disabled. 합본 bin을 스케치로 열지 않습니다.
 5. 설정: 시리얼 115200, 줄 끝 Newline. `set robot <ID>`, `set ssid <SSID>`, `set pass <비밀번호>`, (선택) `set ap_pass <8자 이상>`, `set key <키>`, `show`, `reboot`.
+   - Wi-Fi 비밀번호는 에이전트가 Windows(`netsh wlan show profile name=<SSID> key=clear`, 모바일 핫스팟 설정)에서 얻어 시리얼로만 보냅니다. 출력·로그·파일·커밋에 남기지 않습니다([rules.md](rules.md) 4.1절).
    - `show`는 비밀값을 가림. `clear <항목>`은 빌드 기본값으로, `set key`(값 없음)는 빈 값 저장 → 키·AP 꺼짐. 키는 영문·숫자·`. _ ~ -`만.
    - 시리얼 값이 `secrets.h` 빌드 값보다 우선. 카메라 ID는 그 카메라가 달린 로봇의 ID.
    - 비밀번호는 장치에만 입력하고 저장소·이슈·채팅에 적지 않습니다.
 6. 확인: 10초마다 `sta <IP> rssi -55 | cam 1 fps 0.0 clients 0` 줄. `/status`에 `"robot":"<ID>"`, `camera.ok=true`, `wifi.mode=sta`, `camera.psram=true`. `/capture`, `:81/stream`. `.local`이 안 되면(Windows mDNS 불안정) 시리얼의 IP 사용. 키를 설정했으면 `?key=<키>`, 없으면 401.
-7. 본체 연결: 본체 전원 끈 상태에서 IIC 케이블을 **본체 물리 IIC 포트 1**에 복원(Python에서는 `Hiwonder_IIC.IIC(2)`). 메인 보드의 공식 `ESP32S3Cam` 읽기는 `observed`, `has_result=False`(결과 없음 고정 응답)가 정상입니다.
+7. **[사용자]** 본체 연결: 본체 전원 끈 상태에서 IIC 케이블을 **본체 물리 IIC 포트 1**에 복원(Python에서는 `Hiwonder_IIC.IIC(2)`). 메인 보드의 공식 `ESP32S3Cam` 읽기는 `observed`, `has_result=False`(결과 없음 고정 응답)가 정상입니다.
 
+- 끝나면 에이전트가 채팅으로 알립니다: 로봇 ID, SSID, 펌웨어 버전, IP, 점검용 AP 비밀번호, 확인 결과(비밀번호 제외).
 - 접근 키는 HTTPS가 아니므로 같은 망 도청에는 보호가 되지 않습니다. 망 자체를 WPA2, 외부와 분리. 핫스팟/공유기에서 DHCP 예약을 권장.
 - 영상·사진은 저장하거나 이슈에 붙이지 않고 숫자(fps, `frame_age_ms`, RSSI)만 남깁니다.
 
-### 6.6 복구 (사람)
+### 6.6 복구 (에이전트 수행)
+
+6.5절처럼 물리 조작만 사용자에게 요청하고 에이전트가 굽습니다.
+
 
 - 가장 확실: `esptool --chip esp32s3 --port COMx --baud 460800 write-flash 0x0 C:\camera-backup\robot<ID>_cam_full.bin`.
 - 또는 제조사 기본 영상 전송 바이너리를 같은 설정(ESP32-S3, 0x0000, 80MHz, DIO, 460800)으로 → AP `HW_ESP32S3CAM` 방식으로 돌아감.

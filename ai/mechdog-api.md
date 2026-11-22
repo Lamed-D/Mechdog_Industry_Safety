@@ -36,7 +36,7 @@
   모듈 파일을 순서대로 나눠 올립니다([firmware.md](firmware.md) 2절). 장치 메모리 여유는 REPL 확인 필요.
 - 메인 보드 주 펌웨어는 MicroPython([`../firmware/robot/python/`](../firmware/robot/python/)), Arduino 판([`../firmware/robot/arduino/`](../firmware/robot/arduino/))은 예비 이식판입니다.
   비전 모듈(ESP32-S3)은 Arduino 맞춤 펌웨어입니다 → [firmware.md](firmware.md).
-- 장치의 기존 `main.py` 덮어쓰기·삭제, 펌웨어 굽기(ERASE 포함)는 **사용자 확인 후에만** 합니다.
+- 메인 보드의 기존 `main.py` 덮어쓰기·삭제, 펌웨어 굽기(ERASE 포함)는 **사용자만** 합니다(에이전트는 가이드 작성). 비전 모듈은 [rules.md](rules.md) 4.1절.
 
 ## 2. 반드시 지킬 것
 
@@ -260,7 +260,7 @@ I2C 신호 핀·카메라 슬레이브 핀은 [hardware.md](hardware.md).
 - 초음파·추가 센서 값이 없거나 비정상(`None`)이면 "위험 없음"으로 보지 않고 정지합니다.
 - `action_run` 직후 다른 동작을 보내지 않습니다. 동작 시간만큼 기다리거나 `action_is_over()`로 확인합니다.
 - 비전 모듈은 5V 2A 이상 전원 필요(부족하면 영상 깨짐). 추가 센서 전원도 합산해 확인합니다.
-- 실제 로봇에 업로드·구동은 사용자 확인 후에만.
+- 로봇 본체 업로드·구동은 사용자만(비전 모듈 굽기는 [rules.md](rules.md) 4.1절).
 
 ## 9. 통신 예외
 
@@ -272,5 +272,5 @@ I2C 신호 핀·카메라 슬레이브 핀은 [hardware.md](hardware.md).
 
 ## 10. 확인 방법
 
-- PC에는 공식 모듈(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)이 없으므로 동작 확인은 **실물에서만** 합니다. 업로드·구동은 사용자만 하며 절차는 [robot-tests.md](robot-tests.md).
+- PC에는 공식 모듈(`HW_MechDog`, `Hiwonder`, `Hiwonder_IIC`)이 없으므로 동작 확인은 **실물에서만** 합니다. 본체 업로드·구동은 사용자만 하며 절차는 [robot-tests.md](robot-tests.md).
 - 실물로 확인하지 못한 동작·값은 문서와 PR에 "실물 미검증"으로 남깁니다.
