@@ -22,7 +22,7 @@
 
 | 설정 | 값 | 위치 |
 | --- | --- | --- |
-| 로봇 ID | `A` / `B` (현재 장비는 1대, 코드는 ID 유지) | Python `ROBOT_ID`, Arduino `MECH_ROBOT_ID` |
+| 로봇 ID | `A` / `B` (현재 장비는 1대, 코드는 ID 유지) | Python: `make_robot_files <ID>`가 `ROBOT_ID` 치환 / Arduino: `secrets.h`의 `MECH_ROBOT_ID` / 카메라: 빌드 공통, 시리얼 `set robot <ID>` (사용자 설명은 README "로봇 A/B 구분") |
 | 통신 끊김·이동 유효시간 | 600 ms [가정] | `config.py` / `mech_config.h` |
 | 저전압 경고/래치/해제 | 7000 / 6600 / 6800 mV [가정, 단위 mV 확인 필요] | 〃 |
 
