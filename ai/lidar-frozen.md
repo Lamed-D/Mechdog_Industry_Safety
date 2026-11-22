@@ -4,6 +4,8 @@
 >
 > 대상 코드: [`dashboard/lidar/`](../dashboard/lidar/)(수신·표시·USB 확인), [`firmware/robot/python/lidar_bridge.py`](../firmware/robot/python/lidar_bridge.py)·Arduino `lidar_relay.*`(로봇 J5 → TCP 중계, 코드만 유지·실물 미검증).
 > 이 문서는 현재 상태 기록이며 계획이 아닙니다.
+>
+> 예외(사용자 요청, 2026-11-22): 대시보드 **표시 범위 확대·축소**(1·3·6·12 m 버튼, 휠)와 가장 가까운 점 표시를 `dashboard/index.html`에 추가했습니다. 수신·파싱 코드는 바꾸지 않았습니다.
 
 관련: [hardware.md](hardware.md)(배선·전원·부품), [protocol.md](protocol.md) 7절(TCP 20108 원시 중계), [dashboard.md](dashboard.md)(LiDAR 점 표시·USB 확인)
 
@@ -61,7 +63,7 @@
 
 | 경로 | 상태 |
 | --- | --- |
-| A1M8 → USB → Windows (`dashboard.lidar.probe --usb`, 대시보드 `--lidar-usb`) | 장치 응답, 상태 0, 연속 스캔 3회, STOP·포트 닫기 확인. 대시보드 점 표시 확인. 모터 정지 육안·거리 정확도는 미확인 |
+| A1M8 → USB → Windows (`dashboard.lidar.probe --usb`, 대시보드 `--lidar-usb`) | 장치 응답, 상태 0, 연속 스캔 3회, STOP·포트 닫기 확인. 대시보드 점 표시 확인. 2026-11-22 COM3(CP210x)로 `ready`, 유효 각도 약 100개 수신 재확인. 모터 정지 육안·거리 정확도는 미확인 |
 | A1M8 → J5 UART → Wi-Fi → Windows | **실물 미검증**(J5 루프백, GET_INFO 응답, 무선 부하, 보행 중 걸음 품질 포함) |
 
 남은 하드웨어 확인 항목(보드 회로도 버전, J5 1번 핀·커넥터 형번, 라이다 커넥터 핀 방향, 5V 레일 여유, 실측 전류)은 [hardware.md](hardware.md)에서 관리합니다.
