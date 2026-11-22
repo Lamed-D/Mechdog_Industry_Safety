@@ -2,6 +2,7 @@
 
 PC(Windows) 브라우저에서 **비전 모듈 Wi-Fi**를 통해 로봇 한 대를 직접 조종하고 카메라 영상을 보는 시험·조종 도구입니다.
 상태·카메라·LiDAR를 한 화면에서 점검합니다. 두 대의 낙상 알림·안내 시나리오는 [상위 시험 안내](../README.md)를 따릅니다.
+기본 카메라 AP와 두 대 공통 Wi‑Fi 연결은 [ESP32-S3 카메라 연결 안내](../camera-setup.md)에 있습니다.
 
 ```text
 브라우저 화면(index.html) ⇄ PC 중계(server.py) ⇄ UDP(docs/protocol.md) ⇄ 로봇 메인 보드(robot/)
