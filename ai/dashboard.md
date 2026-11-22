@@ -34,6 +34,7 @@ Windows 노트북 브라우저에서 로봇 **한 대**를 조종하고 카메�
 | 목적 | 명령 |
 | --- | --- |
 | 실물, 제조사 기본 영상 펌웨어 AP | `python -m dashboard.server --robot A --robot-ip auto --allow-real --cam http://192.168.5.1:81/stream` |
+| 실물, Windows 모바일 핫스팟 | `python -m dashboard.server --hotspot --allow-real` (USB LiDAR는 `--lidar-usb COM번호` 추가) |
 | 실물, IP 지정 + LiDAR 로봇 중계 | `python -m dashboard.server --robot A --robot-ip %ROBOT_IP% --allow-real --cam %CAM_URL% --relay-lidar` |
 | 실물 LiDAR만 USB로 | `.private\lidar-pc\Scripts\python.exe -m dashboard.server --lidar-usb COM번호` (로봇 IP 기본 루프백이라 실물 명령 없음) |
 | 센서 전용(인터넷 Wi-Fi 유지, 로봇 UDP 소켓 없음) | `.private\lidar-pc\Scripts\python.exe -m dashboard.server --sensors-only --cam-usb COM카메라 --lidar-usb COM라이다 --port 8091` |
@@ -54,6 +55,7 @@ python -m venv .private\lidar-pc
 | `--robot` | `A` | 로봇 ID(`A`/`B`) |
 | `--robot-ip` | `127.0.0.1` | 로봇 IP. `auto`면 방송으로 HELLO/STOP을 보내고 처음 답한 해당 ID 로봇(송신 포트 9100)의 IP로 고정. 고정 전에는 그 로봇 TEL 외에 받지 않음 |
 | `--broadcast` | `192.168.5.255` | `auto`용 방송 주소(기본 영상 펌웨어 AP 기준) |
+| `--hotspot` | 꺼짐 | 본체 IP와 방송 주소 기본값을 `auto`, `192.168.137.255`로 설정. 카메라를 지정하지 않으면 로봇 ID에 해당하는 `mechdog-<id>-cam.local`의 `/status`에서 영상 주소 확인. 조회 실패 시 같은 이름의 81번 포트 사용 |
 | `--allow-real` | 꺼짐 | 루프백이 아닌 실제 로봇에 보내기 허용. `auto`에는 필수 |
 | `--sensors-only` | 꺼짐 | 카메라·LiDAR만 표시, 본체 UDP 없음. `--allow-real`과 함께 불가 |
 | `--cam URL` / `--cam-usb COM` | 없음 | 카메라 영상 주소 / USB JPEG 펌웨어가 든 비전 모듈. 둘 중 하나만 |

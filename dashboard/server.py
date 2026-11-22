@@ -16,6 +16,8 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.error import URLError
+from urllib.request import urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -296,12 +298,26 @@ def make_handler(console):
     return Handler
 
 
+def hotspot_camera_url(robot):
+    host = f"mechdog-{robot.lower()}-cam.local"
+    try:
+        with urlopen(f"http://{host}/status", timeout=3) as response:
+            status = json.load(response)
+        if status["robot"] == robot:
+            return f"http://{status['wifi']['ip']}:{status['stream']['port']}/stream"
+    except (URLError, TimeoutError, ValueError, KeyError, TypeError):
+        pass
+    return f"http://{host}:81/stream"
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--robot", choices=("A", "B"), default="A")
-    p.add_argument("--robot-ip", default="127.0.0.1",
+    p.add_argument("--robot-ip",
                    help="로봇 IP. 'auto' 면 같은 Wi-Fi에서 자동으로 찾음(--broadcast 사용)")
-    p.add_argument("--broadcast", default="192.168.5.255", help="자동 찾기용 방송 주소(비전 모듈 Wi-Fi 기준)")
+    p.add_argument("--broadcast", help="자동 찾기용 방송 주소")
+    p.add_argument("--hotspot", action="store_true",
+                   help="Windows 모바일 핫스팟에서 로봇과 비전 모듈 자동 연결")
     p.add_argument("--allow-real", action="store_true", help="실제 로봇에 보내기 허용")
     p.add_argument("--sensors-only", action="store_true", help="카메라·라이다 표시, 본체 UDP 소켓 없음")
     camera_source = p.add_mutually_exclusive_group()
@@ -314,6 +330,8 @@ def main():
     lidar_source.add_argument("--relay-lidar", action="store_true", help="--robot-ip와 같은 본체의 중계 사용")
     p.add_argument("--lidar-port", type=int, default=settings.LIDAR_TCP_PORT)
     a = p.parse_args()
+    a.robot_ip = a.robot_ip or ("auto" if a.hotspot else "127.0.0.1")
+    a.broadcast = a.broadcast or ("192.168.137.255" if a.hotspot else "192.168.5.255")
     if a.relay_lidar and a.robot_ip == "auto":
         p.error("--relay-lidar에는 명시적 --robot-ip가 필요합니다")
     if a.sensors_only and a.allow_real:
@@ -331,7 +349,8 @@ def main():
     else:
         transport = UdpTransport(a.robot_ip, allow_real=a.allow_real)
     camera = UsbCamera(a.cam_usb) if a.cam_usb else None
-    console = Console(a.robot, transport, a.cam, lidar, camera)
+    cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
+    console = Console(a.robot, transport, cam, lidar, camera)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
