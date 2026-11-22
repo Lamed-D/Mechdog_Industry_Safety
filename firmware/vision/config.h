@@ -10,7 +10,7 @@
 #define CAM_HAS_SECRETS 0
 #endif
 
-#define CAM_FW_VERSION "0.1.8"
+#define CAM_FW_VERSION "0.1.9"
 
 // ── 로봇 ID: "A" 또는 "B". mDNS 이름은 mechdog-<소문자 ID>-cam ──
 #ifndef CAM_ROBOT_ID
@@ -30,9 +30,10 @@
 #define CAM_STA_RETRY_AP_BUSY_MS 60000  // 점검용 AP에 접속자가 있을 때
 // 네트워크가 이 시간 동안 전혀 없으면(STA 끊김 + AP 접속자 없음) 재부팅합니다.
 #define CAM_NET_RESTART_MS (10UL * 60UL * 1000UL)
+// 점검용 AP 기본 비밀번호는 "password"(STA 실패 30초 뒤에만 켜짐). 현장에서는 set ap_pass 로 바꿉니다.
 // AP 비밀번호가 8자 미만이면 AP를 켜지 않습니다(열린 AP로 영상이 새지 않게).
 #ifndef CAM_AP_PASSWORD
-#define CAM_AP_PASSWORD ""
+#define CAM_AP_PASSWORD "password"
 #endif
 // 고정 IP(선택). 비워 두면 DHCP. 공유기에서 DHCP 예약을 쓰는 것을 권장합니다.
 #ifndef CAM_STATIC_IP

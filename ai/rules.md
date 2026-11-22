@@ -49,6 +49,22 @@ AI가 읽을 규칙·설계·도구는 모두 이 폴더(`ai/`)에 둡니다.
 - API에 없는 기능이 필요하면 우회 구현하지 말고 사용자에게 묻습니다.
 - 자세한 표와 범위: [mechdog-api.md](mechdog-api.md).
 
+## 4.1 펌웨어 올리기 역할
+
+| 대상 | 누가 | 에이전트가 할 일 |
+| --- | --- | --- |
+| **로봇 본체**(메인 보드 MicroPython `.py` 업로드, `main.py` 덮어쓰기, Arduino 굽기, 구동) | **사용자만** | 업로드 파일·빌드를 만들고, [firmware.md](firmware.md) 2.2·4.2절 사용자 가이드를 최신으로 고치고, 작업 때 채팅으로 "이렇게 하세요" 순서를 안내 |
+| **비전 모듈**(ESP32-S3 카메라) 백업·굽기·설정·확인 | **에이전트가 직접** 해도 됨 | [firmware.md](firmware.md) 6.5절대로 수행 |
+
+비전 모듈 작업 조건:
+
+- 굽기 전 플래시 전체 백업(저장소 밖 `C:\camera-backup\`). 백업 없으면 굽지 않습니다. ERASE·전체 지우기 금지.
+- 본체 전원 끄기, IIC 케이블 분리·복원, USB 연결 같은 **물리 조작은 사용자에게 요청**합니다.
+- 포트가 카메라(CH340)인지 `flash-id`(ESP32-S3)로 확인하고, 메인 보드 포트에는 절대 쓰지 않습니다.
+- **Wi-Fi 비밀번호**: 에이전트가 Windows에서 직접 얻어(`netsh wlan show profile name=<SSID> key=clear`, 모바일 핫스팟 설정 등) 시리얼로만 입력합니다.
+  화면 출력·로그·파일·커밋·PR·이슈에 남기지 않습니다(필요하면 `.private/`에만 임시 보관 후 삭제). 명령 결과에서 비밀번호 줄은 걸러서 봅니다.
+- 끝나면 채팅으로 사용자에게 알립니다: 대상 로봇 ID, 접속 SSID, 펌웨어 버전, IP, 점검용 AP 비밀번호(기본 `password`), 확인 결과.
+
 ## 5. 비공개 자료
 
 - 참고한 외부 저장소·자료의 이름·주소·경로·코드·문구를 커밋·PR·이슈·문서 어디에도 남기지 않습니다.
@@ -69,7 +85,7 @@ AI가 읽을 규칙·설계·도구는 모두 이 폴더(`ai/`)에 둡니다.
 | [mechdog-api.md](mechdog-api.md) | 공식 API 규칙·표, 포즈·동작 목록, 추가 센서 규칙·배선 표, API 대조 |
 | [hardware.md](hardware.md) | 장비 구성·전원·배선 |
 | [protocol.md](protocol.md) | 로봇 ↔ 노트북 통신 규약, A/B 역할 |
-| [firmware.md](firmware.md) | 메인 보드(MicroPython·Arduino)·비전 모듈 펌웨어, 빌드·업로드·복구 |
+| [firmware.md](firmware.md) | 메인 보드(MicroPython·Arduino) 사용자 업로드 가이드, 비전 모듈 펌웨어 빌드·굽기·복구 |
 | [dashboard.md](dashboard.md) | 노트북 대시보드(`dashboard/`), 라이다 USB 확인 |
 | [robot-tests.md](robot-tests.md) | 실물 확인 절차·결과 양식 |
 | [`tools/`](tools/) | 빌드·업로드 파일 생성·에이전트 설정 스크립트 |
