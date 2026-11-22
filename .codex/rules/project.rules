@@ -1,5 +1,5 @@
 # Codex 명령 규칙 (prefix_rule). decision: allow | prompt | forbidden
-# 병합은 자체 검증 후 PR 작성자가(docs/ai/rules.md 3절). main 직접 푸시·강제 푸시·훅 우회 금지
+# 병합은 자체 검증 후 PR 작성자가(ai/rules.md 3절). main 직접 푸시·강제 푸시·훅 우회 금지
 prefix_rule(pattern=["gh", "pr", "merge"], decision="allow")
 prefix_rule(pattern=["gh", "pr", "review"], decision="forbidden")
 prefix_rule(pattern=["gh", "repo", "delete"], decision="forbidden")

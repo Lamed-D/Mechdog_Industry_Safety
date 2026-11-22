@@ -3,11 +3,14 @@
 import threading
 import time
 
-from host.vision.camera_client import is_jpeg
 
 MAX_JPEG = 128 * 1024
 HEADER = b"MECHDOG_JPEG "
 TIMEOUT_S = 16
+
+
+def is_jpeg(data):
+    return len(data) > 4 and data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9"
 
 
 def read_frame(port, stop, *, clock=time.monotonic):

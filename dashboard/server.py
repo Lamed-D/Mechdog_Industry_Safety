@@ -1,7 +1,7 @@
 """PC 로봇 조종·모니터링 화면 (PC에서 로봇에 바로 연결하는 시험·조종 도구).
 
-브라우저는 UDP를 못 보내므로 이 서버가 중간에서 저장소의 통신 규약(docs/ai/protocol.md)대로
-로봇 메인 보드에 HELLO/MOVE/STOP/ESTOP/RESET 을 보냅니다. 안전 규칙은 host/robot_link.py 를 그대로 씁니다.
+브라우저는 UDP를 못 보내므로 이 서버가 중간에서 저장소의 통신 규약(ai/protocol.md)대로
+로봇 메인 보드에 HELLO/MOVE/STOP/ESTOP/RESET 을 보냅니다. 안전 규칙은 dashboard/robot_link.py 를 그대로 씁니다.
 - 이동은 버튼을 누르고 있는 동안만(0.3초 안에 다시 안 오면 STOP)
 - 로봇은 부팅 시 잠겨 있고, 사람이 '잠금 해제'를 눌러야 움직임
 - 화면이 닫히거나 서버가 끝나면 STOP
@@ -22,10 +22,10 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 import socket  # noqa: E402
-from host.robot_link import RobotLink, parse_telemetry  # noqa: E402
-from host.udp_transport import UdpTransport  # noqa: E402
-from robot import config as settings  # noqa: E402
-from dashboard.lidar import LidarFeed  # noqa: E402
+from dashboard.robot_link import RobotLink, parse_telemetry  # noqa: E402
+from dashboard.udp_transport import UdpTransport  # noqa: E402
+from firmware.robot.python import config as settings  # noqa: E402
+from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 
 MAX_BODY = 256
