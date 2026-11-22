@@ -73,7 +73,12 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 4. 첫 확인: 예외·MemoryError 없음, Wi-Fi 연결, 텔레메트리의 ID·boot 래치·배터리·경고. 처음에는 RESET·MOVE를 보내지 않습니다. MechDog 초기화 자체의 움직임은 실물 미검증입니다.
 5. 문제 시 자동 실행을 멈추고 기존 `main.py`·설정을 되돌린 뒤 재시작. REPL 접근이 안 되면 반복 재부팅하지 말고 제조사 복구 절차로 순정 MicroPython을 복원합니다.
 
-실물 확인 순서는 [robot-tests.md](robot-tests.md). `Hiwonder.startMain` 4개 루프 동시 실행을 포함해 통합 main 실물 결과는 아직 없습니다.
+실물 확인 순서는 [robot-tests.md](robot-tests.md).
+
+**스레드 구성(실물 근거, 2026-11-22 로봇 A):** 예전처럼 `startMain` 루프 4개를 띄우면 순정 펌웨어 + Wi-Fi 뒤 시스템 메모리가 모자라 두 번째부터 `OSError: can't create thread`(직후 `free heap: 52 bytes`)였습니다. 그래서 **감시 스레드 하나만** `startMain`으로 Wi-Fi보다 먼저 띄우고, 명령·텔레메트리·비전 읽기는 `main.py`의 시작 스레드에서 `app.run()` 한 루프로 돕니다. 라이다 J5 중계는 `config.LIDAR_RELAY_ENABLED = False`(기본)로 만들지 않습니다.
+같은 부팅 로그에 `QMI8658 init.`이 보여 로봇 A IMU 칩은 QMI8658로 보입니다(순정 펌웨어 출력).
+- `main.py`가 이제 돌아오지 않으므로 REPL은 Ctrl+C로 들어갑니다(감시 스레드는 계속 돌며 정지·래치 유지).
+- 원래 프로그램이 돌던 상태에서 Ctrl+C 후 `import main`하면 원래 스레드가 메모리를 쥐고 있어 실패합니다. 업로드 뒤에는 **재부팅**으로 실행합니다.
 
 ## 3. 원래 시작 파일·복구
 
