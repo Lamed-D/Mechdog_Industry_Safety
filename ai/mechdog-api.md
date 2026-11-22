@@ -89,7 +89,7 @@
 | IMU | `Hiwonder_IIC.MPU()`, `read_angle()` | **실물(로봇 B)에서 `MPU()`는 인자 없음, `MPU(IIC(1))`은 TypeError.** 예제에는 `MPU(iic)` 형태도 있음 | 실패는 NA. 칩 종류·축 방향 실물 확인 필요 |
 | 비전 모듈 | `Hiwonder_IIC.ESP32S3Cam(Hiwonder_IIC.IIC(2))`, `read_face()` | 예제·문자열 있음. 4.4절 | 얼굴 읽기 우선 |
 | 비전(구형) | `face_recognition()`, `color_recognition()`, `color_follow(color)`, `line_follow(color)` | `face_recognition`은 예제에 있으나 **문자열에서 못 찾음** | 구형 장치 호환 읽기만, 없으면 unknown |
-| 초음파 | `Hiwonder_IIC.I2CSonar(iic)`, `getDistance()`, `setRGB(n,r,g,b)` | 있음. `getDistance` 단위는 cm로 보이나 실물 확인 필요(시리얼 기능은 mm) | 런타임 미사용, 장착 여부 미확인 |
+| 초음파 | `Hiwonder_IIC.I2CSonar(iic)`, `getDistance()`, `setRGB(n,r,g,b)` | 있음. 제조사 예제는 `IIC(1)`, `setRGB(0, r, g, b)`, `getDistance()`를 cm로 보고 ×10 해서 mm로 보냄. 단위 실물 확인 필요 | `firmware/robot/python/sonar.py`: 100 ms마다 거리 → TEL `sonar_mm`(표시용), 대시보드 `LED` 명령 → `setRGB`. IMU와 같은 `IIC(1)` 객체를 나눠 씀. 실물 미검증 |
 | 음성 인식 | `Hiwonder_IIC.asr_module(iic)`, `getResult()`(0=없음), `speak(mode, id)` | 문서. 장착·버스 미확인 | — |
 | MP3 | `Hiwonder_IIC.MP3(iic)`, `volume(v)`, `play(n)`, `pause()` | 문서. 장착·버스 미확인 | — |
 

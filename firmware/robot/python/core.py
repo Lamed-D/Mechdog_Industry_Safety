@@ -74,6 +74,8 @@ class Robot:
         self._last_tel = now
         self.uptime_ms = 0
         self._last_tick = now
+        self.sonar_mm = None          # 초음파 거리(mm). app 이 채움, None = 모름(TEL 에 NA)
+        self.led_request = None       # LED 명령으로 받은 (r, g, b). app 이 적용 후 비움
 
     # ---------- 공용 ----------
     def _now(self):
@@ -173,6 +175,9 @@ class Robot:
             self.urgent = True
             return
         self._accept(cmd.seq)
+        if name == "LED":
+            self.led_request = tuple(cmd.args)  # 잠김 중에도 받음(움직이지 않음). app 이 공식 API 로 적용
+            return
         if self.latched or self.stop_pending:
             if name == "RESET":
                 self._reset()
@@ -403,9 +408,11 @@ class Robot:
             self.cfg.ROBOT_ID, self.tseq, self.last_cmd_seq, self.state(), 1 if self.latched else 0,
             self.latch_reason, battery, tilt[0], tilt[1], self.uptime_ms,
             self.boot_id if self.boot_id is not None else "-")
-        while ordered and len(head) + len(",".join(ordered)) + 2 > MAX_TEL_LEN:
+        # 마지막 필드: 초음파 거리 mm 또는 NA (ai/protocol.md TEL 표). 표시용, 안전 판단에 쓰지 않음
+        sonar = "|%s|$" % ("NA" if self.sonar_mm is None else str(self.sonar_mm))
+        while ordered and len(head) + len(",".join(ordered)) + len(sonar) > MAX_TEL_LEN:
             ordered.pop()  # 길이 제한: 뒤쪽(덜 급한) 낱말부터 뺌
-        line = head + (",".join(ordered) if ordered else "none") + "|$"
+        line = head + (",".join(ordered) if ordered else "none") + sonar
         self.tseq += 1
         self.events.clear()
         self.urgent = False

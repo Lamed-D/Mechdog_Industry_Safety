@@ -15,9 +15,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-MODULES = ("config", "proto", "roles", "netutil", "motion", "vision", "lidar_bridge", "core", "comm", "app", "main")
+MODULES = ("config", "proto", "roles", "netutil", "motion", "vision", "sonar", "lidar_bridge", "core", "comm", "app",
+           "main")
 
-UPLOAD_ORDER = ("netutil", "motion", "roles", "config", "proto", "vision", "comm",
+UPLOAD_ORDER = ("netutil", "motion", "roles", "config", "proto", "vision", "sonar", "comm",
                 "lidar_bridge", "core", "app", "main")  # main.py 는 반드시 마지막
 
 

@@ -72,7 +72,8 @@ python -m venv .private\lidar-pc
 | 잠금 해제 | `RESET`. 신선한 래치 TEL과 배터리 `LOW_BATT_RESET_MV` 이상일 때만(아니면 400 오류). 해제돼도 움직이지 않음 |
 | 일어서기 | 잠금 해제 뒤, 신선·비상정지 아님·`idle`·배터리 `LOW_BATT_WARN_MV` 이상·`batt_unknown`/`batt_low`/`lidar_uart`/`lidar_backlog`/`proto` 경고 없음일 때만 `CMD\|POSE\|<id>\|<seq>\|default\|$`(`set_default_pose()`)를 한 번 보냄. 정지·비상 정지·이동·종료·조건 깨짐이 대기 요청을 취소 |
 | 비상 정지 | `ESTOP` 래치(호스트·로봇 양쪽). 이전 이동 의도 복원 없음 |
-| 상태 | 연결(연결됨/응답 지연/로봇 응답 없음/비상 정지 중), 잠김, `state`, 래치 사유, 배터리 V, 기울기, `warn`, 호스트 fault. 0.25초마다 `/api/state` |
+| 상태 | 연결(연결됨/응답 지연/로봇 응답 없음/비상 정지 중), 잠김, `state`, 래치 사유, 배터리 V, 기울기, **초음파 거리 cm**(TEL `sonar_mm`, 표시용), `warn`, 호스트 fault. 0.25초마다 `/api/state` |
+| 초음파 LED | 색 고르기 + 적용, 빨강·초록·파랑·흰색·끄기 버튼 → `POST /api/led {r,g,b}` → `CMD\|LED` 한 번. 신선한 TEL에 초음파 필드가 있을 때만 켜짐(잠김 중에도 가능, 움직이지 않음) |
 | 이동 버튼 비활성 | TEL 없음·잠김·신선하지 않음·비상 정지 중. 누르는 중 이 상태가 되면 정지 |
 | 카메라 | `--cam`이면 `<img>`로 MJPEG 직접 표시. `--cam-usb`면 0.75초마다 `/api/camera` JPEG(메모리에서만, 파일 저장 없음) |
 | LiDAR | 0.25초마다 `/api/lidar`. 최신 한 회전을 점으로 그림. **표시 범위** 버튼 1·3·6·12 m와 캔버스 위 마우스 휠(0.5~12 m)로 확대·축소, 거리 링은 범위에 맞춰 3~6개, 위쪽 점선 = 센서 0°. 범위 밖 점은 숨기고 개수만 표시, 상태 줄에 가장 가까운 점 거리·센서 각도. 0.5 m 미만 점은 빨간색(표시용, 안전 판단 아님). 선택 범위는 브라우저에 기억(기본 6 m). 빈 각도·무효 측정은 비움. 1초 새 스캔 없음·연결 끊김이면 점을 지움(`stale`/`error`). **센서 원시 각도**라 로봇 정면과 맞는지는 장착 후 확인 |
@@ -133,8 +134,8 @@ python -m venv .private\lidar-pc
 python firmware/build.py A --only python
 ```
 
-- `build/robot_A/python/`에 주석 없는 ASCII 파일 11개가 생깁니다(동작 코드는 `firmware/robot/python/`과 같음).
-- 업로드 순서: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, 마지막에 `main`.
+- `build/robot_A/python/`에 주석 없는 ASCII 파일 12개가 생깁니다(동작 코드는 `firmware/robot/python/`과 같음).
+- 업로드 순서: `netutil` → `motion` → `roles` → `config` → `proto` → `vision` → `sonar` → `comm` → `lidar_bridge` → `core` → `app`, REPL에서 `import app` 확인, 마지막에 `main`.
 - `secrets.py`(커밋 금지)는 `firmware/robot/python/secrets.example.py`를 참고해 장치에만 만듭니다. 기본 AP면 `WIFI_SSID = "HW_ESP32S3CAM"`, `WIFI_PASSWORD = ""`.
 - 본체 업로드·기존 `main.py` 덮어쓰기는 **사용자만**(에이전트는 가이드 안내), 받침대 위에서, 복구 수단을 확인한 뒤 합니다.
 

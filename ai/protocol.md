@@ -101,6 +101,7 @@
 | 생존 확인 | `CMD\|PING\|<id>\|<seq>\|$` | 동작 없음. 감시 타이머만 갱신 |
 | 재시작 알림 | `CMD\|HELLO\|<id>\|<boot_id>\|<proto>\|$` | 2.2절 |
 | 역할 | `CMD\|ROLE\|<id>\|<seq>\|<host_boot_id>\|<term>\|<P/S/N>\|<lease_ms>\|$` | 12절 |
+| 초음파 LED 색 | `CMD\|LED\|<id>\|<seq>\|<r>\|<g>\|<b>\|$` (각 0~255) | `I2CSonar.setRGB(0, r, g, b)`. 움직이지 않음. 범위 밖·개수 틀림은 `bad_cmd`. MicroPython 판만(Arduino 판은 모름 → 노트북이 TEL 초음파 필드 없으면 보내지 않음) |
 
 예: `CMD|MOVE|A|3381|40|-10|$`, `CMD|ESTOP|*|902|$`, `CMD|ACTION|B|17|nodding_motion|$`
 
@@ -192,6 +193,7 @@
 | `STOP` | 실행(이미 정지 상태) |
 | `RESET` | 5.3절 |
 | `PING`, `HELLO` | 처리 |
+| `LED` | 처리(움직이지 않으므로 래치 중에도 색 변경) |
 | `MOVE`, `ACTION`, `POSE` | **실행하지 않음**, `warn=latched` |
 
 ### 4.3 텔레메트리 `last_cmd_seq`
@@ -298,7 +300,7 @@ seq는 로봇별로 따로 관리합니다. 로봇은 seq와 상관없이 실행
 ## 6. 텔레메트리 (로봇 → 노트북, UDP 9101)
 
 ```text
-TEL|<robot_id>|<tseq>|<last_cmd_seq>|<state>|<latched>|<latch_reason>|<battery_mv>|<tilt_x>|<tilt_y>|<uptime_ms>|<boot_id>|<warn>|$
+TEL|<robot_id>|<tseq>|<last_cmd_seq>|<state>|<latched>|<latch_reason>|<battery_mv>|<tilt_x>|<tilt_y>|<uptime_ms>|<boot_id>|<warn>|<sonar_mm>|$
 ```
 
 | 필드 | 형식 | 뜻 |
@@ -314,6 +316,7 @@ TEL|<robot_id>|<tseq>|<last_cmd_seq>|<state>|<latched>|<latch_reason>|<battery_m
 | `uptime_ms` | 정수 | 로봇 부팅 후 시간(`time.ticks_ms()` 기준, 넘침은 로봇이 보정) |
 | `boot_id` | 문자열 또는 `-` | 로봇이 기억한 노트북 `boot_id`. 모르면 `-` |
 | `warn` | `none` 또는 쉼표로 이은 낱말 | 6.1절 |
+| `sonar_mm` | 양의 정수 또는 `NA` (선택 필드) | 초음파 `getDistance()`(cm로 보고 ×10). 실패·20 mm 미만·5000 mm 초과는 `NA` [범위 가정]. **표시용, 안전 판단에 쓰지 않음.** MicroPython 판만 보내며, 이 필드가 있으면 노트북은 `LED` 명령을 지원한다고 봄 |
 
 - `tilt_x`·`tilt_y`가 롤·피치 중 어느 것인지는 제조사 자료 안에서 엇갈립니다. 실물 확인 전에는 `roll`/`pitch`로 이름 붙이지 않습니다 **[확인 필요]**.
   실물 B에서는 `imu_unknown`이 나왔습니다(시작 코드의 IMU 생성 인자 차이로 보임, 이동과 무관).
@@ -326,8 +329,8 @@ TEL|<robot_id>|<tseq>|<last_cmd_seq>|<state>|<latched>|<latch_reason>|<battery_m
 예:
 
 ```text
-TEL|A|5120|3381|moving|0|none|7650|1.2|-0.4|512034|6f3a91|none|$
-TEL|B|88|0|stopped|1|boot|NA|NA|NA|8810|-|batt_unknown|$
+TEL|A|5120|3381|moving|0|none|7650|1.2|-0.4|512034|6f3a91|none|412|$
+TEL|B|88|0|stopped|1|boot|NA|NA|NA|8810|-|batt_unknown|NA|$
 TEL|A|5131|3390|stopped|1|link_lost|7610|0.8|-0.2|513141|6f3a91|none|$
 ```
 

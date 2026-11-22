@@ -20,7 +20,7 @@ POSE_ACTION = {"default": None, "sit": "sit_dowm", "prone": "go_prone"}
 _ARG_COUNT = {
     "MOVE": 2, "STOP": 0, "ACTION": 1, "POSE": 1,
     "ESTOP": 0, "RESET": 0, "PING": 0, "HELLO": 1,
-    "ROLE": 4,
+    "ROLE": 4, "LED": 3,
 }
 _ALL_ROBOTS_OK = ("STOP", "ESTOP")
 
@@ -120,6 +120,11 @@ def parse(data, robot_id):
         return BAD, None
     elif name == "POSE" and args[0] not in POSE_ACTION:
         return BAD, None
+    elif name == "LED":  # 초음파 센서 RGB LED (r, g, b 각 0~255). 로봇을 움직이지 않음
+        rgb = [parse_int(v) for v in args]
+        if any(v is None or not 0 <= v <= 255 for v in rgb):
+            return BAD, None
+        args = rgb
     elif name == "ROLE":
         session, term, code, lease = args
         term, lease = parse_int(term), parse_int(lease)

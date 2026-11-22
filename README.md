@@ -44,7 +44,7 @@ python firmware/build.py B --only python
 
 | 생기는 폴더 | 내용 | 다음 |
 | --- | --- | --- |
-| `build/robot_A/python/` | 본체에 올릴 `.py` 11개 (ID A가 들어 있음) | **사람**이 Hiwonder Python Editor로 올림 → [가이드](ai/firmware.md) 2.2절 |
+| `build/robot_A/python/` | 본체에 올릴 `.py` 12개 (ID A가 들어 있음) | **사람**이 Hiwonder Python Editor로 올림 → [가이드](ai/firmware.md) 2.2절 |
 | `build/robot_A/vision/latest/` | 카메라 펌웨어 `mechdog_vision_cam_0x0.bin` (ID A가 기본값) | **AI**가 굽고 확인 |
 | `build/robot_A/arduino/` | Arduino 판 (`--only arduino` 일 때만) | **사람**이 Arduino IDE로 올림. ID는 `secrets.h` 의 `MECH_ROBOT_ID` → 가이드 4.2절 |
 
