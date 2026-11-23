@@ -58,5 +58,5 @@ LIDAR_RXBUF = 4096       # [가정]
 LIDAR_PENDING_WARN_MS = 100  # [가정] TCP로 보내지 못한 묶음의 나이
 
 # 비전 모듈 펌웨어가 카메라 안에서 인식을 하는지. 맞춤 영상 펌웨어(firmware/vision)는 False:
-# 메인 보드의 공식 읽기는 늘 "결과 없음"이고, 쓰러진 사람 판단은 Pi 5가 영상으로 합니다.
+# 메인 보드의 공식 읽기는 늘 "결과 없음"이고, 쓰러진 사람 판단은 노트북이 영상으로 합니다.
 VISION_RECOGNITION_ON_CAMERA = False

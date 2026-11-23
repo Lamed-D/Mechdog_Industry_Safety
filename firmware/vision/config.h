@@ -95,7 +95,7 @@
 // ── HTTP ──
 #define CAM_HTTP_PORT 80           // /, /capture, /status
 #define CAM_STREAM_PORT 81         // /stream (제조사 기본 펌웨어와 같은 포트)
-#define CAM_MAX_STREAM_CLIENTS 2   // Pi 5 한 개 + 점검용 브라우저 한 개
+#define CAM_MAX_STREAM_CLIENTS 2   // 노트북 대시보드 한 개 + 점검용 브라우저 한 개
 #define CAM_FRAME_WAIT_MS 3000     // 새 프레임을 이 시간 넘게 못 받으면 스트림을 끊음
 #define CAM_CAPTURE_WAIT_MS 1500   // /capture 는 짧게 기다리고 503(:80 서버가 오래 막히지 않게)
 
