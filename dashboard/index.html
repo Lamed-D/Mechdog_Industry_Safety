@@ -42,6 +42,8 @@
   .start-row small { color:var(--dim); font-size:12px; }
   #motion-controls .row { flex-wrap:wrap; gap:4px 10px; }
   #motion-controls .row label { width:100%; white-space:nowrap; }
+  #motion-controls .row .val { min-width:64px; text-align:right; white-space:nowrap; }  /* 현재 값 + 흐린 '/ 최대값' */
+  #motion-controls .row .val output { width:auto; } #motion-controls .row .max { color:#6b7480; font-size:13px; }
   button { background:var(--btn); color:var(--text); border:1px solid var(--line); border-radius:8px;
            cursor:pointer; font:inherit; user-select:none; touch-action:none; }
   button.held { background:var(--btnon); }
@@ -52,9 +54,28 @@
   #scan-ranges { display:flex; gap:6px; flex:1; } #scan-ranges button { flex:1; padding:6px 0; } #scan-range-v { width:56px; }
   #scan { max-width:100%; height:auto; cursor:zoom-in; }
   #sonar-ranges { display:flex; gap:6px; flex:1; } #sonar-ranges button { flex:1; padding:6px 0; }
-  #sonar { width:100%; max-width:440px; height:auto; display:block; background:var(--bg); border-radius:6px; }
-  #led-controls { flex-wrap:wrap; } #led-controls #led-color { flex:0 0 56px; height:34px; padding:0; }
-  #led-controls button { padding:6px 10px; }
+  #sonar { width:100%; max-width:440px; height:300px; display:block; margin:0 auto; background:var(--bg); border-radius:6px; }  /* 격자 칸 높이 300px */
+  .sub-head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:4px 8px; margin-top:16px; }
+  .sub-head h2 { margin:0 0 10px; white-space:nowrap; }
+  .sub-head.inline { justify-content:flex-start; align-items:center; gap:10px; } .sub-head.inline h2 { margin:0; }  /* 현재 색 알약은 제목 바로 옆 */
+  .sub-head.inline + .row { margin-top:10px; }
+  #robot-status .row > label { width:auto; }  /* 좁은 상태 칸: '범위' 글자 칸을 글자만큼만, 버튼이 나머지 폭 사용 */
+  #sonar-ranges button { white-space:nowrap; }
+  .sub-right { text-align:right; } .big-value { display:block; font-size:20px; font-weight:700; color:var(--text); line-height:1.2; }
+  .sub-note { display:block; font-size:12px; color:var(--dim); } .sub-note[hidden] { display:none; }
+  .sonar-head { align-items:baseline; justify-content:flex-start; gap:10px; } .sonar-head h2 { margin:0; }  /* 거리 수치는 제목 바로 옆 */
+  .sub-notes { margin:2px 0 4px; text-align:left; }  /* 오래된 값·안내는 칸 맨 왼쪽부터 */
+  #led-controls { flex-wrap:wrap; gap:10px; }
+  .swatch { display:inline-block; width:32px; height:32px; min-width:32px; border-radius:6px; padding:0; border:none; background:var(--c); flex:0 0 32px; cursor:pointer; position:relative; overflow:hidden; }
+  .swatch.off { box-shadow:inset 0 0 0 2px #f85149;  /* 끄기: 다른 네모와 같은 크기, 테두리는 가장자리에 */
+    background:linear-gradient(to top right, transparent calc(50% - 1.25px), #f85149 calc(50% - 1.25px), #f85149 calc(50% + 1.25px), transparent calc(50% + 1.25px)), #000; }
+  .swatch.off.sel { box-shadow:inset 0 0 0 2px #f85149, 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+  .swatch.custom { background:conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }  /* 직접 고르기(색 조절) */
+  .swatch.custom input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; border:0; padding:0; }
+  .swatch.sel { box-shadow:0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+  .swatch:disabled, .swatch.dim { opacity:.35; cursor:not-allowed; }
+  .led-pill { display:inline-flex; align-items:center; gap:7px; padding:4px 10px; border-radius:999px; font-size:13px; font-weight:700; border:1px solid; white-space:nowrap; }
+  .led-pill i { width:12px; height:12px; border-radius:50%; display:inline-block; box-sizing:border-box; }
   dl { display:grid; grid-template-columns:110px 1fr; gap:4px 10px; margin:0; font-size:14px; }
   dt { color:var(--dim); } dd { margin:0; }
   .hint { color:var(--dim); font-size:13px; margin-top:10px; }
@@ -101,29 +122,28 @@
         <dt>경고</dt><dd id="s-warn">-</dd>
         <dt>링크 문제</dt><dd id="s-fault">-</dd>
       </dl>
-      <h2 style="margin-top:16px">초음파 거리 (로봇 정면)</h2>
+      <div class="sub-head sonar-head"><h2>초음파 · 로봇 정면</h2><span class="big-value" id="sonar-value">-</span></div>
+      <div class="sub-notes"><span class="sub-note" id="sonar-stale" hidden>오래된 값</span><span class="sub-note">표시용, 정지 판단에 쓰지 않음</span></div>
       <div class="row" role="group" aria-label="초음파 표시 범위">
         <label>범위</label>
         <span id="sonar-ranges">
-          <button type="button" data-sonar-range="0.5">50 cm</button>
+          <button type="button" data-sonar-range="0.5">0.5 m</button>
           <button type="button" data-sonar-range="1">1 m</button>
           <button type="button" data-sonar-range="2">2 m</button>
           <button type="button" data-sonar-range="4">4 m</button>
         </span>
       </div>
       <canvas id="sonar" width="440" height="260" aria-label="초음파 거리 격자 표시"></canvas>
-      <div class="hint" id="sonar-status">-</div>
-      <h2 style="margin-top:16px">초음파 LED 색</h2>
+      <div class="sub-head inline"><h2>초음파 LED 색</h2><span class="led-pill" id="led-current">-</span></div>
       <div class="row" id="led-controls">
-        <input id="led-color" type="color" value="#00ff00" aria-label="LED 색 고르기">
-        <button type="button" id="led-apply">적용</button>
-        <button type="button" data-led="#ff0000" style="color:#ff6b6b">빨강</button>
-        <button type="button" data-led="#00ff00" style="color:#42dfae">초록</button>
-        <button type="button" data-led="#0000ff" style="color:#7aa2ff">파랑</button>
-        <button type="button" data-led="#ffffff">흰색</button>
-        <button type="button" data-led="#000000">끄기</button>
+        <button type="button" class="swatch" data-led="#ff0000" style="--c:#ff3b30" title="빨강" aria-label="빨강"></button>
+        <button type="button" class="swatch" data-led="#00ff00" style="--c:#22c55e" title="초록" aria-label="초록"></button>
+        <button type="button" class="swatch" data-led="#0000ff" style="--c:#3b82f6" title="파랑" aria-label="파랑"></button>
+        <button type="button" class="swatch" data-led="#ffffff" style="--c:#ffffff" title="흰색" aria-label="흰색"></button>
+        <button type="button" class="swatch off" data-led="#000000" title="끄기" aria-label="끄기"></button>
+        <label class="swatch custom" title="직접 고르기 (고른 뒤 창을 닫으면 적용)"><input id="led-color" type="color" value="#00ff00" aria-label="LED 색 직접 고르기"></label>
       </div>
-      <div class="hint" id="led-status">로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)</div>
+      <div class="hint" id="led-status">로봇 연결 후 사용<br>(로봇을 움직이지 않음, 잠김 중에도 가능)</div>
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
@@ -150,11 +170,11 @@
         <button data-dir="back">▼ 후진<br><small>S</small></button>
         <button data-dir="back-right">↷ 후진 우회전<br><small>C</small></button>
       </div>
-      <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><output id="stepv">50</output></div>
-      <div class="row"><label for="angle" title="전진·후진하며 도는 버튼(Q/E/Z/C)에만 적용. 제자리 회전(A/D)은 아래 슬라이더">회전 (Q/E/Z/C)</label><input id="angle" type="range" min="1" max="30" value="15"><output id="anglev">15</output></div>
-      <div class="row"><label for="spin" title="제자리 회전(A/D)에만 적용. 상한 60">제자리 회전 (A/D)</label><input id="spin" type="range" min="1" max="60" value="60"><output id="spinv">60</output></div>
+      <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><span class="val"><output id="stepv">50</output><span class="max"> / 100</span></span></div>
+      <div class="row"><label for="angle" title="전진·후진하며 도는 버튼(Q/E/Z/C)에만 적용. 제자리 회전(A/D)은 아래 슬라이더">회전 (Q/E/Z/C)</label><input id="angle" type="range" min="1" max="30" value="15"><span class="val"><output id="anglev">15</output><span class="max"> / 30</span></span></div>
+      <div class="row"><label for="spin" title="제자리 회전(A/D)에만 적용. 상한 60">제자리 회전 (A/D)</label><input id="spin" type="range" min="1" max="60" value="60"><span class="val"><output id="spinv">60</output><span class="max"> / 60</span></span></div>
       <div id="msg" role="status"></div>
-      <div class="hint">보폭 -100~100, 회전 -60~60 (프로젝트 상한). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
+      <div class="hint">화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
     </section>
   </div>
     <section id="lidar-panel">
@@ -443,7 +463,11 @@ function setSonarRange(m) {
 document.querySelectorAll("[data-sonar-range]").forEach(b => b.onclick = () => setSonarRange(+b.dataset.sonarRange));
 function drawSonar(v) {
   lastSonar = v;
-  const c = $("sonar"), ctx = c.getContext("2d"), W = c.width, H = c.height;
+  // 칸 실제 크기(CSS)로 그림: 통째로 줄이면 눈금 글씨까지 작아지므로 화면 픽셀에 맞춰 다시 잡음
+  const c = $("sonar"), ctx = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth || 440, H = c.clientHeight || 300;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const left = 46, right = W - 10, top = 14, base = H - 46;           // base = 센서 위치(거리 0)
   const scale = (base - top) / sonarRange, cx = (left + right) / 2;    // px / m
   const step = sonarRange <= 0.5 ? 0.05 : sonarRange <= 1 ? 0.1 : sonarRange <= 2 ? 0.25 : 0.5;
@@ -496,19 +520,44 @@ function drawSonar(v) {
   ctx.fillStyle = "#aab5c6"; ctx.textAlign = "center"; ctx.fillText("로봇", cx, base + 26);
   if (text) { ctx.fillStyle = "#8a93a0"; ctx.textAlign = "center"; ctx.fillText(text, cx, top + (base - top) / 2); }
   ctx.textAlign = "left";
-  $("sonar-status").textContent = !v.has ? "-" : d == null ? "측정 없음 (NA)"
-    : `정면 ${(v.mm / 10).toFixed(1)} cm` + (v.fresh ? "" : " (오래된 값)") + " · 표시용, 정지 판단에 쓰지 않음";
+  const sv = $("sonar-value");  // 숫자는 항상 흰색(색 규칙은 격자에만)
+  sv.textContent = !v.has ? "-" : d == null ? "측정 없음" : `${(v.mm / 10).toFixed(1)} cm`;
+  $("sonar-stale").hidden = !(v.has && d != null && !v.fresh);  // 오래된 값은 수치 아래 줄
 }
 setSonarRange(sonarRange);
+addEventListener("resize", () => { if (lastSonar) drawSonar(lastSonar); });  // 칸 폭이 바뀌면 다시 그림
 
 function sendLed(hex) {
   const n = parseInt(hex.slice(1), 16), rgb = { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 };
-  $("led-color").value = hex;
   post("/api/led", rgb).then(() => $("led-status").textContent = `보냄: ${hex} (R${rgb.r} G${rgb.g} B${rgb.b})`)
     .catch(e => $("led-status").textContent = "LED 거절: " + e.message);
 }
-$("led-apply").onclick = () => sendLed($("led-color").value);
 document.querySelectorAll("[data-led]").forEach(b => b.onclick = () => sendLed(b.dataset.led));
+$("led-color").onchange = () => sendLed($("led-color").value);  // 색 고르기 창을 닫을 때 한 번만 보냄
+const LED_NAMES = { "#ff0000": "빨강", "#00ff00": "초록", "#0000ff": "파랑", "#ffffff": "흰색", "#000000": "꺼짐" };
+// 제목 줄 오른쪽 알약: 마지막으로 보낸 색(s.led). 감지 경고 중이면 빨강 고정이라 견본을 흐리게
+function showLed(s, ok) {
+  const pillEl = $("led-current"), warn = !!(s.monitor && (s.monitor.person_stop || s.monitor.obstacle_stop));
+  const rgb = Array.isArray(s.led) ? s.led : null;
+  const hex = rgb ? "#" + rgb.map(v => v.toString(16).padStart(2, "0")).join("") : null;
+  document.querySelectorAll("#led-controls .swatch").forEach(b => {
+    if (b.tagName === "BUTTON") b.disabled = !ok || warn; else b.querySelector("input").disabled = !ok || warn;
+    b.classList.toggle("dim", warn);
+    b.classList.toggle("sel", !!hex && (b.dataset.led ? b.dataset.led === hex : !(hex in LED_NAMES)));
+  });
+  let text, c;
+  if (warn) { text = "경고 · 빨강 고정"; c = "#f85149"; }
+  else if (!hex) { text = ok ? "아직 안 보냄" : "확인 불가"; c = null; }
+  else if (hex === "#000000") { text = "현재 꺼짐"; c = null; }
+  else { text = "현재 " + (LED_NAMES[hex] || hex); c = hex; }
+  const col = c || "#8a93a0";
+  pillEl.innerHTML = "";
+  const dot = document.createElement("i");
+  dot.style.background = c || "#000"; if (!c) dot.style.border = "1.5px solid #8a93a0";
+  pillEl.append(dot, text);
+  pillEl.style.borderColor = col; pillEl.style.color = c ? "#fff" : "#aab3bf";
+  pillEl.style.background = c ? `color-mix(in srgb, ${col} 22%, #1e232b)` : "#2b323d";
+}
 
 async function poll() {
   try {
@@ -577,8 +626,8 @@ async function poll() {
       drawSonar({ mm: t?.sonar_mm, has: !!t?.has_sonar, fresh: false });
     }
     const ledOk = !!(t && t.has_sonar && s.fresh);
-    document.querySelectorAll("#led-controls button").forEach(b => b.disabled = !ledOk);
-    if (!ledOk) $("led-status").textContent = "로봇 연결 후 사용 (로봇을 움직이지 않음, 잠김 중에도 가능)";
+    showLed(s, ledOk);
+    if (!ledOk) $("led-status").innerHTML = "로봇 연결 후 사용<br>(로봇을 움직이지 않음, 잠김 중에도 가능)";
     $("s-fault").textContent = s.error || s.fault || "없음";
     canMove = !!(t && !t.latched && s.fresh && !s.emergency);
     document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !canMove);
