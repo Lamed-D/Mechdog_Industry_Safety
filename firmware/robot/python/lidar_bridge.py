@@ -6,7 +6,7 @@
 import errno
 
 CHUNK = 512      # 한 번에 UART 에서 읽는 최대 바이트
-RECV_SIZE = 64   # Pi 5 -> 라이다 명령은 짧음
+RECV_SIZE = 64   # 노트북 -> 라이다 명령은 짧음
 DRAIN_MAX = 16   # 한 번에 버리는 최대 묶음 수 (다른 일을 막지 않게)
 
 _NO_DATA = [errno.EAGAIN, errno.ETIMEDOUT]
@@ -42,10 +42,10 @@ class LidarBridge:
         self.uart = None
         self.server = None
         self.conn = None
-        self.pending = b""     # 라이다 -> Pi 5 로 아직 못 보낸 바이트
-        self.tx_pending = b""  # Pi 5 -> 라이다 로 아직 못 쓴 바이트
-        self.sent = 0       # 라이다 -> Pi 5 바이트 수
-        self.received = 0   # Pi 5 -> 라이다 바이트 수
+        self.pending = b""     # 라이다 -> 노트북으로 아직 못 보낸 바이트
+        self.tx_pending = b""  # 노트북 -> 라이다로 아직 못 쓴 바이트
+        self.sent = 0       # 라이다 -> 노트북 바이트 수
+        self.received = 0   # 노트북 -> 라이다 바이트 수
         try:
             self.uart = machine.UART(cfg.LIDAR_UART_ID, baudrate=cfg.LIDAR_BAUD,
                                      rx=cfg.LIDAR_RX_PIN, tx=cfg.LIDAR_TX_PIN, rxbuf=cfg.LIDAR_RXBUF)
