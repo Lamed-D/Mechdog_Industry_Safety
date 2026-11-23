@@ -18,6 +18,7 @@ AI는 따로 스크립트를 만들지 않고 이 명령을 실행합니다. 결
 
 ```powershell
 python firmware/build.py A                           # 기본: python + vision
+python firmware/build.py B --wifi-setup              # 핫스팟 정보를 입력해 본체용 secrets.py도 생성
 python firmware/build.py B --only python             # 본체 Python 파일만
 python firmware/build.py A --only vision --profile detail
 python firmware/build.py A --only arduino            # Arduino 판(예비) 컴파일 확인
@@ -30,6 +31,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 | `arduino` | `build/robot_<ID>/arduino/` | ID는 `secrets.h`의 `MECH_ROBOT_ID`(Wi-Fi와 같은 파일). 다르면 빌드가 멈춤 | **사용자**가 4.2절로 Arduino IDE 업로드 |
 
 - 끝에 대상별 `[성공]/[실패]`와 다음 단계가 나옵니다. 하나라도 실패하면 종료 코드 1.
+- `--wifi-setup`은 대화형 터미널에서 본체 Wi-Fi를 입력받아 `build/robot_<ID>/wifi/secrets.py`에 저장합니다. 본체에 이 파일을 별도 업로드합니다. 사용자는 Vision 합본을 올린 뒤 `python -m firmware.builder.configure_vision_wifi <ID> --port COMx`로 같은 값을 카메라 NVS에 저장할 수 있습니다. `pyserial`이 필요하며 Vision 빌드에는 자격 증명을 넣지 않습니다.
 - Vision과 Arduino 빌드는 `--arduino-cli <실행 파일>`, `ARDUINO_CLI`, `PATH`, Arduino IDE의 사용자/시스템 설치 폴더 순서로 탐색합니다. PowerShell에서 현재 세션에만 적용하려면 `$env:ARDUINO_CLI = 'C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe'`를 실행합니다. esptool 경로는 `ESPTOOL_PATH`로 지정할 수 있습니다.
 - 에이전트의 Git Bash 샌드박스에서는 `build/`가 실제 폴더와 다르게 보일 수 있으니 빌드·확인은 PowerShell로 합니다.
 - 개별 도구도 그대로 쓸 수 있습니다: `firmware/builder/make_robot_files.py <ID>`, `build_vision_cam.py [--robot <ID>] [--release] [--verify-release]`, `build_main_arduino.py [--robot <ID>]`. `--robot` 없이 만든 카메라 합본은 A/B 공통(`build/vision_cam/latest/`, ID는 시리얼로 설정).

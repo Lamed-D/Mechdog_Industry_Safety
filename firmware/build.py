@@ -30,9 +30,12 @@ NEXT = {
 }
 
 
-def run(target, robot, profile, arduino_cli=None):
+def run(target, robot, profile, arduino_cli=None, wifi_setup=False):
     if target == "python":
-        return make_robot_files.main([robot])
+        out = make_robot_files.main([robot])
+        if wifi_setup:
+            make_robot_files.configure_wifi(robot)
+        return out
     tool_args = ["--arduino-cli", arduino_cli] if arduino_cli else []
     if target == "vision":
         return build_vision_cam.main(["--release", "--robot", robot, "--profile", profile, *tool_args])
@@ -46,13 +49,16 @@ def main():
                         help="빌드할 대상 (기본: python vision)")
     parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced", help="카메라 영상 프로필")
     parser.add_argument("--arduino-cli", help="Vision/Arduino 빌드에 사용할 Arduino CLI 실행 파일 경로")
+    parser.add_argument("--wifi-setup", action="store_true", help="본체 Wi-Fi 입력을 받아 secrets.py 생성")
     args = parser.parse_args()
+    if args.wifi_setup and "python" not in args.only:
+        parser.error("--wifi-setup은 python 빌드 대상과 함께 사용하세요.")
 
     results = []
     for target in args.only:
         print("\n=== %s (로봇 %s) ===" % (target, args.robot))
         try:
-            out = run(target, args.robot, args.profile, args.arduino_cli)
+            out = run(target, args.robot, args.profile, args.arduino_cli, args.wifi_setup)
             results.append((target, True, out))
         except subprocess.CalledProcessError:
             hint = " — 제조사 MechDog 라이브러리 설치·MECHDOG_VENDOR_LIBS 확인" if target == "arduino" else ""
