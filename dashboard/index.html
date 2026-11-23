@@ -584,8 +584,9 @@ async function poll() {
         monitor.obstacle_stop && "전방 장애물",
       ].filter(Boolean);
       const event = reasons.length ? (monitor.override ? "수동 개입 중 · " : "정지 요청 · ") + reasons.join(", ") : "";
+      const greet = { waiting:"인사 준비", greeting:"인사 중", cooldown:"인사 쉬는 중" }[monitor.greet] || "";
       $("monitor-status").hidden = false;
-      $("monitor-status").textContent = [video, person, sonar, event].filter(Boolean).join(" · ");
+      $("monitor-status").textContent = [video, person, sonar, event, greet].filter(Boolean).join(" · ");
     }
     if (s.sensors_only) {
       controlsEnabled = canMove = false;
