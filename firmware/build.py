@@ -30,12 +30,13 @@ NEXT = {
 }
 
 
-def run(target, robot, profile):
+def run(target, robot, profile, arduino_cli=None):
     if target == "python":
         return make_robot_files.main([robot])
+    tool_args = ["--arduino-cli", arduino_cli] if arduino_cli else []
     if target == "vision":
-        return build_vision_cam.main(["--release", "--robot", robot, "--profile", profile])
-    return build_main_arduino.main(["--robot", robot])
+        return build_vision_cam.main(["--release", "--robot", robot, "--profile", profile, *tool_args])
+    return build_main_arduino.main(["--robot", robot, *tool_args])
 
 
 def main():
@@ -44,13 +45,14 @@ def main():
     parser.add_argument("--only", nargs="+", choices=TARGETS, default=["python", "vision"],
                         help="빌드할 대상 (기본: python vision)")
     parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced", help="카메라 영상 프로필")
+    parser.add_argument("--arduino-cli", help="Vision/Arduino 빌드에 사용할 Arduino CLI 실행 파일 경로")
     args = parser.parse_args()
 
     results = []
     for target in args.only:
         print("\n=== %s (로봇 %s) ===" % (target, args.robot))
         try:
-            out = run(target, args.robot, args.profile)
+            out = run(target, args.robot, args.profile, args.arduino_cli)
             results.append((target, True, out))
         except subprocess.CalledProcessError:
             hint = " — 제조사 MechDog 라이브러리 설치·MECHDOG_VENDOR_LIBS 확인" if target == "arduino" else ""

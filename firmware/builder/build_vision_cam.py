@@ -21,9 +21,9 @@ import subprocess
 import sys
 
 try:
-    from .arduino_workspace import configuration
+    from .arduino_workspace import configuration, find_cli
 except ImportError:
-    from arduino_workspace import configuration
+    from arduino_workspace import configuration, find_cli
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 SKETCH = ROOT / "firmware" / "vision"
@@ -44,7 +44,6 @@ def use_robot(robot):
 FQBN = ("esp32:esp32:esp32s3:PSRAM=opi,FlashMode=dio,FlashSize=4M,"
         "PartitionScheme=huge_app,CDCOnBoot=default,CPUFreq=240")
 LOCAL = pathlib.Path(os.environ.get("LOCALAPPDATA", ""))
-CLI_DEFAULT = LOCAL / "Programs" / "Arduino IDE" / "resources" / "app" / "lib" / "backend" / "resources" / "arduino-cli.exe"
 ESPTOOL_GLOB = "Arduino15/packages/esp32/tools/esptool_py/*/esptool*"
 REQUIRED_CORE = "3.3.12"
 
@@ -117,15 +116,14 @@ def publish(staging):
             print("새 배포는 완료됐으나 이전 복구 폴더 정리는 실패했습니다. 다음 배포 전 확인이 필요합니다.")
 
 
-def find_tool(env, default, pattern):
+def find_esptool():
+    env = "ESPTOOL_PATH"
     if os.environ.get(env):
         return pathlib.Path(os.environ[env])
-    if default and default.exists():
-        return default
-    found = sorted(LOCAL.glob(pattern)) if pattern else []
+    found = sorted(LOCAL.glob(ESPTOOL_GLOB))
     if found:
         return found[-1]
-    name = shutil.which(env.lower().replace("_path", ""))
+    name = shutil.which("esptool")
     if name:
         return pathlib.Path(name)
     sys.exit("%s 를 찾지 못했습니다. 환경 변수 %s 로 경로를 알려 주세요." % (env, env))
@@ -140,6 +138,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--release", action="store_true")
     parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced")
+    parser.add_argument("--arduino-cli", help="Arduino CLI 실행 파일 경로")
     parser.add_argument("--robot", type=str.upper, choices=("A", "B"), help="로봇 전용 기본 ID(생략하면 A/B 공통)")
     parser.add_argument("--verify-release", action="store_true", help="최신 합본·소스·설정만 읽어 검사")
     args = parser.parse_args(argv)
@@ -155,7 +154,10 @@ def main(argv=None):
         sys.exit("secrets.h 가 있어 배포 이미지를 만들지 않습니다. 잠시 다른 곳으로 옮긴 뒤 다시 실행하세요.")
     sources = source_manifest() if args.release else None
 
-    cli = find_tool("ARDUINO_CLI", CLI_DEFAULT, None)
+    try:
+        cli = find_cli(args.arduino_cli)
+    except ValueError as error:
+        sys.exit(str(error))
     tool_config, tool_env = configuration()
     # 이미지 안의 소스 경로(__FILE__)에서 이 PC의 사용자 폴더를 지웁니다.
     remap = "-fmacro-prefix-map=%s=/arduino15 -fmacro-prefix-map=%s=/src" % (LOCAL / "Arduino15", ROOT)
@@ -174,7 +176,7 @@ def main(argv=None):
     if sources != source_manifest():
         sys.exit("컴파일 중 소스가 바뀌어 배포를 중단합니다.")
 
-    esptool = find_tool("ESPTOOL_PATH", None, ESPTOOL_GLOB)
+    esptool = find_esptool()
     boot_app0 = sorted(LOCAL.glob("Arduino15/packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin"))[-1]
     staging = BUILD / "release-pending"
     staging.mkdir(exist_ok=True)

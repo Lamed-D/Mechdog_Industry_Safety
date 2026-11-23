@@ -30,7 +30,7 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 | `arduino` | `build/robot_<ID>/arduino/` | ID는 `secrets.h`의 `MECH_ROBOT_ID`(Wi-Fi와 같은 파일). 다르면 빌드가 멈춤 | **사용자**가 4.2절로 Arduino IDE 업로드 |
 
 - 끝에 대상별 `[성공]/[실패]`와 다음 단계가 나옵니다. 하나라도 실패하면 종료 코드 1.
-- `arduino-cli` 위치가 기본과 다르면 `ARDUINO_CLI`, esptool은 `ESPTOOL_PATH`. 이 PC: `C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`.
+- Vision과 Arduino 빌드는 `--arduino-cli <실행 파일>`, `ARDUINO_CLI`, `PATH`, Arduino IDE의 사용자/시스템 설치 폴더 순서로 탐색합니다. PowerShell에서 현재 세션에만 적용하려면 `$env:ARDUINO_CLI = 'C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe'`를 실행합니다. esptool 경로는 `ESPTOOL_PATH`로 지정할 수 있습니다.
 - 에이전트의 Git Bash 샌드박스에서는 `build/`가 실제 폴더와 다르게 보일 수 있으니 빌드·확인은 PowerShell로 합니다.
 - 개별 도구도 그대로 쓸 수 있습니다: `firmware/builder/make_robot_files.py <ID>`, `build_vision_cam.py [--robot <ID>] [--release] [--verify-release]`, `build_main_arduino.py [--robot <ID>]`. `--robot` 없이 만든 카메라 합본은 A/B 공통(`build/vision_cam/latest/`, ID는 시리얼로 설정).
 - 사람에게 안내할 때는 [README](../README.md) "펌웨어 빌드" 절과 같은 명령을 알려 줍니다.
@@ -214,7 +214,7 @@ python firmware/builder/build_vision_cam.py --robot A --verify-release  # 장치
 python firmware/builder/build_vision_cam.py --release           # A/B 공통 합본 → build/vision_cam/latest/ (ID는 시리얼)
 ```
 
-- 도구: Arduino IDE의 `arduino-cli`, ESP32 Arduino 코어 **3.3.12**(ESP-IDF 5.5.x), 같은 패키지 esptool. 다른 위치면 `ARDUINO_CLI`, `ESPTOOL_PATH`.
+- 도구: `arduino-cli`(탐색 순서는 0절), ESP32 Arduino 코어 **3.3.12**(ESP-IDF 5.5.x), 같은 패키지 esptool. esptool이 다른 위치에 있으면 `ESPTOOL_PATH`를 지정합니다.
 - FQBN: `esp32:esp32:esp32s3:PSRAM=opi,FlashMode=dio,FlashSize=4M,PartitionScheme=huge_app,CDCOnBoot=default,CPUFreq=240` (앱 3 MB·OTA 없음, 현재 앱 약 1.0 MB).
 - `--release`는 `secrets.h`가 있으면 멈추고(배포 이미지에 비밀번호 금지), 이미지 안 소스 경로의 사용자 폴더를 지웁니다. 컴파일·검증이 실패하면 이전 latest를 유지합니다. `release-previous`가 남아 있으면 다음 배포가 중단되며 사람이 확인 후 정리합니다. 빌드와 굽기를 동시에 하지 않습니다.
 - 해시는 산출물 변경 확인용이며 서명·실물 검증이 아닙니다. 이전 바이너리는 보관하지 않고 Git 이력으로만 복원합니다.
