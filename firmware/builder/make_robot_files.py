@@ -7,9 +7,12 @@ build/robot_<ID>/python/ 에 파일별로 씁니다. 동작 코드는 그대로�
 (펌웨어 전체를 로봇별로 한 번에: python firmware/build.py <A|B>)
 """
 import ast
+from getpass import GetPassWarning, getpass
 import io
 import re
 import sys
+from tempfile import NamedTemporaryFile
+import warnings
 import tokenize
 from pathlib import Path
 
@@ -61,6 +64,47 @@ def render(robot):
 
 def output_dir(robot):
     return ROOT / "build" / ("robot_" + robot) / "python"
+
+
+def wifi_file(robot):
+    return output_dir(robot).parent / "wifi" / "secrets.py"
+
+
+def validate_wifi(ssid, password):
+    for value, limit in ((ssid, 32), (password, 63)):
+        if (not isinstance(value, str) or not 1 <= len(value.encode("utf-8")) <= limit
+                or any(char in value for char in "\r\n\0")):
+            raise ValueError("Wi-Fi 이름은 1~32바이트, 비밀번호는 1~63바이트로 입력하세요.")
+
+
+def configure_wifi(robot):
+    """본체에 따로 올릴 Wi-Fi 설정을 만듭니다."""
+    if not sys.stdin.isatty():
+        raise ValueError("--wifi-setup은 대화형 터미널에서 실행하세요.")
+    path = wifi_file(robot)
+    folder = path.parent
+    if not folder.resolve().is_relative_to(ROOT.resolve()):
+        raise ValueError("Wi-Fi 설정 폴더가 작업 폴더 밖입니다.")
+    try:
+        ssid = input("Wi-Fi 이름(SSID): ")
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", GetPassWarning)
+            password = getpass("Wi-Fi 비밀번호: ")
+    except (EOFError, KeyboardInterrupt, GetPassWarning):
+        raise ValueError("Wi-Fi 설정 입력을 완료하지 못했습니다. 기존 설정은 유지됩니다.") from None
+    validate_wifi(ssid, password)
+
+    folder.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(mode="w", encoding="ascii", newline="\n",
+                            dir=folder, delete=False) as temporary:
+        pending = Path(temporary.name)
+    try:
+        pending.write_text(f"WIFI_SSID = {ascii(ssid)}\nWIFI_PASSWORD = {ascii(password)}\n",
+                           encoding="ascii", newline="\n")
+        pending.replace(path)
+    finally:
+        pending.unlink(missing_ok=True)
+    print("Wi-Fi 설정 파일:", path)
 
 
 def main(argv=None):
