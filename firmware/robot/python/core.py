@@ -240,7 +240,7 @@ class Robot:
 
     def _move(self, step, angle):
         step, cut1 = proto.clip(step, -100, 100)
-        angle, cut2 = proto.clip(angle, -30, 30)
+        angle, cut2 = proto.clip(angle, -60, 60)
         if cut1 or cut2:
             self.events.add("clipped")
         if step == 0 and angle == 0:

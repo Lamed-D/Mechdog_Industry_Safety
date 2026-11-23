@@ -119,7 +119,7 @@
 | 필드 | 범위 | 단위·뜻 | 근거 |
 | --- | --- | --- | --- |
 | `step_mm` | -100 ~ 100 | 보폭 mm, 음수 = 후진 | [mechdog-api.md](mechdog-api.md) |
-| `angle_deg` | -30 ~ 30 | 회전, 양수 = 왼쪽 | [mechdog-api.md](mechdog-api.md) |
+| `angle_deg` | -60 ~ 60 | 회전, 양수 = 왼쪽 | [mechdog-api.md](mechdog-api.md) |
 
 - 범위 밖 정수는 로봇이 **경계값으로 잘라서** 실행하고 `warn`에 `clipped`를 남깁니다.
 - 정수가 아닌 값(`12.5`, `abc`, 빈 칸)은 잘못된 명령(4.4절).
@@ -282,7 +282,7 @@ seq는 로봇별로 따로 관리합니다. 로봇은 seq와 상관없이 실행
 
 | 조건 | 호스트 처리 |
 | --- | --- |
-| `move()` 값이 정수가 아니거나 범위(-100~100, -30~30) 밖 | 호출 거부(`ValueError`). 호스트는 자르지 않음 |
+| `move()` 값이 정수가 아니거나 범위(-100~100, -60~60) 밖 | 호출 거부(`ValueError`). 호스트는 자르지 않음 |
 | 이동 의도가 `HOST_INTENT_MS`(300 ms) 안에 갱신되지 않음(버튼을 놓음·화면 끊김) | 의도 폐기, `STOP` |
 | 배터리 `NA` 또는 `LOW_BATT_WARN_MV` 미만, `warn`에 `batt_unknown`·`batt_low`·`lidar_uart`·`lidar_backlog`·`proto`, `state=action` | `MOVE` 대신 `STOP` |
 | 스캔이 `HOST_SCAN_FRESH_MS`(300 ms) 넘게 끊김 (`require_scan=True`일 때. 대시보드는 `False`) | `MOVE` 대신 `STOP`. 센서 유효성·신선도는 호출자가 판정해 `mark_scan`에 전달 |

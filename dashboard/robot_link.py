@@ -175,7 +175,7 @@ class RobotLink:
     def move(self, step, angle):
         if any(isinstance(v, bool) or not isinstance(v, int) for v in (step, angle)):
             raise ValueError("integer motion only")
-        if not (-100 <= step <= 100 and -30 <= angle <= 30):
+        if not (-100 <= step <= 100 and -60 <= angle <= 60):
             raise ValueError("motion out of range")
         self.intent = (step, angle, self.clock() + settings.HOST_INTENT_MS / 1000)
 
