@@ -21,8 +21,10 @@
   .cam { position:relative; aspect-ratio:4/3; background:#000; border-radius:6px; display:flex; align-items:center;
          justify-content:center; color:var(--dim); overflow:hidden; }
   .cam img { width:100%; height:100%; object-fit:contain; }
-  .cam img + span { position:absolute; bottom:8px; padding:4px 8px; background:var(--bg); }
-  #camera-reconnect { margin-top:8px; padding:4px 10px; }
+  .cam img + span { position:absolute; top:8px; left:50%; transform:translateX(-50%); padding:4px 8px; background:var(--bg); white-space:nowrap; }  /* 연결 중 = 위쪽 가운데, 실패 = 정가운데(flex). 영상이 뜨면 문구는 사라짐 */
+  .cam-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; min-height:26px; }
+  .cam-head h2 { margin:0; }
+  #camera-reconnect { padding:3px 10px; font-size:13px; }  /* 제목 줄 오른쪽 끝 */
   .cam { max-height:60vh; margin:0 auto; }
   .top-row { grid-column:1 / -1; display:flex; gap:14px; align-items:start; }
   .top-row > section:first-child { flex:0 1 calc(60vh * 4 / 3 + 26px); min-width:0; }  /* 26px = 칸 안쪽 여백·테두리 */
@@ -62,6 +64,10 @@
   .kbd-toggle input { margin:0; }
   .kbd-toggle.on { background:#1d3557; color:#cfe1ff; border:2px solid var(--btnon); font-weight:700; }
   .kbd-toggle[hidden] { display:none; }
+  #reset-dialog { max-width:min(440px, calc(100vw - 16px)); box-sizing:border-box; }
+  #reset-dialog form { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }  /* 버튼을 창 오른쪽 끝에 → 창 전체가 원래 버튼 왼쪽 */
+  #reset-dialog p { margin:0 0 4px; flex-basis:100%; }
+  #reset-dialog form > button { padding:4px 10px; }
 </style>
 </head>
 <body>
@@ -76,9 +82,8 @@
 <main>
   <div class="top-row">  <!-- 왼쪽부터 카메라(영상 크기만큼) | 로봇 상태·초음파 | 조종. LiDAR는 아래 줄 -->
     <section>
-      <h2>카메라 (비전 모듈)</h2>
+      <div class="cam-head"><h2>카메라 (비전 모듈)</h2><button id="camera-reconnect" type="button" hidden>다시 연결</button></div>
       <div class="cam" id="cam">카메라 설정 확인 중</div>
-      <button id="camera-reconnect" type="button" hidden>다시 연결</button>
       <p id="monitor-status" hidden></p>
     </section>
     <section id="robot-status">
@@ -230,11 +235,26 @@ $("estop").onclick = () => {
     .catch(e => say("비상 정지 요청 실패: " + e.message));
 };
 const resetDialog = $("reset-dialog");
+// 확인창을 잠금 해제 버튼 바로 왼쪽에 띄움: 확인창의 [잠금 해제]가 원래 버튼 왼편 같은 높이에 오도록.
+// 커서 바로 밑이 아니라 옆이라 두 번 클릭으로 실수로 확인되지 않음. 왼쪽 공간이 부족하면(좁은 화면) 버튼 아래에 띄움.
+function placeResetDialog() {
+  const d = resetDialog, ok = d.querySelector('button[value="reset"]');
+  d.style.margin = "0"; d.style.inset = "auto"; d.style.left = "0px"; d.style.top = "0px";
+  const b = $("reset").getBoundingClientRect(), dr = d.getBoundingClientRect(), okr = ok.getBoundingClientRect();
+  const okMid = okr.top + okr.height / 2 - dr.top, gap = 8;
+  let left = b.left - gap - dr.width, top = b.top + b.height / 2 - okMid;  // 창 오른쪽 끝 = 버튼 왼쪽 - 8px
+  if (left < gap) { left = b.left; top = b.bottom + gap; }
+  left = Math.max(gap, Math.min(left, innerWidth - dr.width - gap));
+  top = Math.max(gap, Math.min(top, innerHeight - dr.height - gap));
+  d.style.left = left + "px"; d.style.top = top + "px";
+}
 $("reset").onclick = () => {
   if (holding) stopMove();
   resetDialog.returnValue = "";
   resetDialog.showModal();
+  placeResetDialog();
 };
+addEventListener("resize", () => { if (resetDialog.open) placeResetDialog(); });
 resetDialog.addEventListener("close", () => {
   if (resetDialog.returnValue !== "reset") return;
   post("/api/reset").then(() => say("잠금 해제 요청 보냄")).catch(e => say("해제 불가: " + e.message));
