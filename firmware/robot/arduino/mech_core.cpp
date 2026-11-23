@@ -176,7 +176,7 @@ void Robot::reset_() {
 void Robot::move_(long step, long angle) {
   bool c1, c2;
   step = clip(step, -100, 100, c1);
-  angle = clip(angle, -30, 30, c2);
+  angle = clip(angle, -60, 60, c2);
   if (c1 || c2) addev_(W_CLIPPED);
   if (step == 0 && angle == 0) { stop_(); return; }
   if (need_default_pose_) {

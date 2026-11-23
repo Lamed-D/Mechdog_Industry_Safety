@@ -1,7 +1,7 @@
 # 로봇을 움직이는 호출은 모두 여기 모읍니다. 공식 MechDog API만 씁니다(ai/mechdog-api.md 3절).
 
 STEP_MIN, STEP_MAX = -100, 100
-ANGLE_MIN, ANGLE_MAX = -30, 30
+ANGLE_MIN, ANGLE_MAX = -60, 60  # angle 프로젝트 상한 ±60 (ai/mechdog-api.md 3.1절)
 
 
 class Motion:

@@ -78,7 +78,8 @@
         <button data-dir="back-right">↷ 후진 우회전<br><small>C</small></button>
       </div>
       <div class="row"><label>보폭 (mm)</label><input id="step" type="range" min="5" max="100" value="50"><output id="stepv">50</output></div>
-      <div class="row"><label for="angle">회전 각도</label><input id="angle" type="range" min="1" max="30" value="15"><output id="anglev">15</output></div>
+      <div class="row"><label for="angle" title="전진·후진하며 도는 버튼(Q/E/Z/C)에만 적용. 제자리 회전(A/D)은 아래 슬라이더">회전 (Q/E/Z/C)</label><input id="angle" type="range" min="1" max="30" value="15"><output id="anglev">15</output></div>
+      <div class="row"><label for="spin" title="제자리 회전(A/D)에만 적용. 상한 60">제자리 회전 (A/D)</label><input id="spin" type="range" min="1" max="60" value="60"><output id="spinv">60</output></div>
       <button id="reset" style="width:100%;height:42px;margin-top:8px">잠금 해제 (사람이 로봇 상태 확인 후)</button>
       <dialog id="reset-dialog" aria-labelledby="reset-question">
         <form method="dialog">
@@ -89,7 +90,7 @@
       </dialog>
       <button id="stand" style="width:100%;height:42px;margin-top:8px">일어서기 (기본 자세)</button>
       <div id="msg" role="status"></div>
-      <div class="hint">보폭 -100~100, 회전 -30~30 (공식 API 범위). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
+      <div class="hint">보폭 -100~100, 회전 -60~60 (프로젝트 상한). 화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
     </section>
     <section>
       <h2>로봇 상태</h2>
@@ -155,11 +156,12 @@ function post(path, body) {
 }
 function say(text) { $("msg").textContent = text || ""; }
 
+// 제자리 회전(A/D)은 전용 슬라이더(1~60, 기본 60), 전진·후진 회전(Q/E/Z/C)은 회전 슬라이더(1~30)
 function motion(dir) {
-  const s = +$("step").value, a = +$("angle").value;
+  const s = +$("step").value, a = +$("angle").value, spin = +$("spin").value;
   return {
     "fwd-left": [s, a], fwd: [s, 0], "fwd-right": [s, -a],
-    left: [0, a], right: [0, -a],
+    left: [0, spin], right: [0, -spin],
     "back-left": [-s, a], back: [-s, 0], "back-right": [-s, -a],
   }[dir];
 }
@@ -218,7 +220,7 @@ resetDialog.addEventListener("close", () => {
 });
 $("stand").onclick = () => { stopMove(false);
   post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
-["step","angle"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
+["step","angle","spin"].forEach(id => $(id).oninput = () => $(id + "v").textContent = $(id).value);
 
 const keyboardEnabled = $("keyboard-enabled");
 keyboardEnabled.checked = false;
