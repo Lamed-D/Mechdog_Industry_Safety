@@ -44,6 +44,11 @@
   dt { color:var(--dim); } dd { margin:0; }
   .hint { color:var(--dim); font-size:13px; margin-top:10px; }
   #msg { min-height:20px; color:var(--warn); font-size:14px; margin-top:8px; }
+  .kbd-toggle { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:13px;
+                cursor:pointer; user-select:none; background:var(--btn); color:var(--dim); border:1px solid var(--line); }
+  .kbd-toggle input { margin:0; }
+  .kbd-toggle.on { background:#1d3557; color:#cfe1ff; border:2px solid var(--btnon); font-weight:700; }
+  .kbd-toggle[hidden] { display:none; }
 </style>
 </head>
 <body>
@@ -52,6 +57,7 @@
   <span id="link" class="pill">연결 확인 중</span>
   <span id="lock" class="pill">잠금 ?</span>
   <span id="battery" class="pill">배터리 확인 중</span>
+  <label class="kbd-toggle" id="keyboard-toggle" title="켜면 W/A/S/D·Q/E/Z/C·방향키로 조종 (누르고 있는 동안만)"><input id="keyboard-enabled" type="checkbox" autocomplete="off">⌨ <span id="keyboard-state">방향 단축키 꺼짐</span></label>
   <button class="estop" id="estop" disabled>비상 정지 (Esc)</button>
 </header>
 <main>
@@ -63,7 +69,6 @@
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
-      <label><input id="keyboard-enabled" type="checkbox" autocomplete="off"> 방향 단축키 사용</label>
       <p id="drive-input">입력: 없음</p>
       <p id="drive-state">로봇 상태: 확인 중</p>
       <div class="pad">
@@ -224,8 +229,14 @@ $("stand").onclick = () => { stopMove(false);
 
 const keyboardEnabled = $("keyboard-enabled");
 keyboardEnabled.checked = false;
+function showKeyboardState() {
+  $("keyboard-toggle").classList.toggle("on", keyboardEnabled.checked);
+  $("keyboard-state").textContent = keyboardEnabled.checked ? "방향 단축키 켜짐" : "방향 단축키 꺼짐";
+}
 keyboardEnabled.onchange = () => {
   if (!keyboardEnabled.checked && typeof holding?.input === "string") stopMove();
+  showKeyboardState();
+  keyboardEnabled.blur();  // 체크박스에 포커스가 남으면 방향키가 무시되므로 바로 풀어 줌
 };
 const KEYS = new Map([
   ["q", "fwd-left"], ["w", "fwd"], ["e", "fwd-right"],
@@ -491,6 +502,7 @@ async function poll() {
       controlsEnabled = canMove = false;
       stopMove(false);
       $("estop").hidden = true;
+      $("keyboard-toggle").hidden = true;
       $("battery").hidden = true;
       $("motion-controls").hidden = true;
       $("lock").hidden = true;
@@ -499,7 +511,7 @@ async function poll() {
       return;
     }
     controlsEnabled = true;
-    $("motion-controls").hidden = $("lock").hidden = $("battery").hidden = $("estop").hidden = false;
+    $("motion-controls").hidden = $("lock").hidden = $("battery").hidden = $("estop").hidden = $("keyboard-toggle").hidden = false;
     $("estop").disabled = false;
     const t = s.tel;
     if (s.emergency) pill($("link"), "비상 정지 중", "bad");
