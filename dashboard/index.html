@@ -64,10 +64,14 @@
   .kbd-toggle input { margin:0; }
   .kbd-toggle.on { background:#1d3557; color:#cfe1ff; border:2px solid var(--btnon); font-weight:700; }
   .kbd-toggle[hidden] { display:none; }
-  #reset-dialog { max-width:min(440px, calc(100vw - 16px)); box-sizing:border-box; }
-  #reset-dialog form { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }  /* 버튼을 창 오른쪽 끝에 → 창 전체가 원래 버튼 왼쪽 */
-  #reset-dialog p { margin:0 0 4px; flex-basis:100%; }
-  #reset-dialog form > button { padding:4px 10px; }
+  #reset-dialog { width:max-content; max-width:min(440px, calc(100vw - 16px)); box-sizing:border-box; background:var(--panel); color:var(--text);
+                  border:2px solid var(--warn); border-radius:10px; padding:12px 14px; }  /* 대시보드와 같은 어두운 창 + 주의(노랑) 테두리 */
+  #reset-dialog .dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }  /* 버튼을 창 오른쪽 끝에 → 창 전체가 원래 버튼 왼쪽 */
+  #reset-dialog p { margin:0; }
+  #reset-dialog .dlg-title { display:block; font-weight:700; font-size:16px; color:#f2c94c; }
+  #reset-dialog .dlg-sub { display:block; margin-top:6px; font-size:14px; color:#c4cbd4; line-height:1.55; }  /* 밝은 회색: 어두운 배경에서 읽히게 */
+  #reset-dialog button.primary { background:var(--btnon); border-color:var(--btnon); color:#fff; font-weight:700; }  /* Enter는 autofocus된 취소 */
+  #reset-dialog .dlg-actions > button { padding:6px 14px; }
 </style>
 </head>
 <body>
@@ -129,9 +133,8 @@
       </div>
       <dialog id="reset-dialog" aria-labelledby="reset-question">
         <form method="dialog">
-          <p id="reset-question">로봇 주변에 사람·장애물이 없고 상태를 확인했나요?<br>잠금 해제만으로는 움직이지 않습니다.</p>
-          <button value="cancel" autofocus>취소</button>
-          <button value="reset">잠금 해제</button>
+          <p id="reset-question"><span class="dlg-title">⚠ 로봇 주변에 사람·장애물이 없나요?</span><span class="dlg-sub">상태를 확인한 뒤 해제하세요.<br>잠금 해제만으로는 움직이지 않습니다.</span></p>
+          <div class="dlg-actions"><button value="cancel" autofocus>취소</button><button value="reset" class="primary">잠금 해제</button></div>
         </form>
       </dialog>
       <p id="drive-input">입력: 없음</p>
@@ -244,8 +247,9 @@ function placeResetDialog() {
   const okMid = okr.top + okr.height / 2 - dr.top, gap = 8;
   let left = b.left - gap - dr.width, top = b.top + b.height / 2 - okMid;  // 창 오른쪽 끝 = 버튼 왼쪽 - 8px
   if (left < gap) { left = b.left; top = b.bottom + gap; }
+  const minTop = document.querySelector("header").getBoundingClientRect().bottom + gap;  // 상단바(비상 정지 포함)는 절대 가리지 않음
   left = Math.max(gap, Math.min(left, innerWidth - dr.width - gap));
-  top = Math.max(gap, Math.min(top, innerHeight - dr.height - gap));
+  top = Math.max(minTop, Math.min(top, innerHeight - dr.height - gap));
   d.style.left = left + "px"; d.style.top = top + "px";
 }
 $("reset").onclick = () => {
