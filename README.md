@@ -56,5 +56,12 @@ python firmware/build.py B --only python
 | `build/robot_A/arduino/` | Arduino 판 (`--only arduino` 일 때만) | **사람**이 Arduino IDE로 올림. ID는 `secrets.h` 의 `MECH_ROBOT_ID` → 가이드 4.2절 |
 
 - 처음 한 번 Arduino IDE와 ESP32 보드 패키지 3.3.12 가 있어야 카메라 빌드가 됩니다. 끝에 `[성공]/[실패]` 와 다음 할 일이 나옵니다.
+- 로봇 B의 카메라 펌웨어만 다시 빌드하려면 `python firmware/build.py B --only vision`을 실행합니다. 설치 위치를 직접 지정하려면 아래 PowerShell 예시의 경로를 바꿔 실행하세요.
+
+```powershell
+python firmware/build.py B --only vision --arduino-cli "C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
+```
+
+- 계속 사용하려면 Windows의 **계정의 환경 변수 편집**에서 사용자 `Path`에 `arduino-cli.exe`가 들어 있는 **폴더**를 추가하세요. 새 PowerShell에서 `Get-Command arduino-cli`로 확인한 뒤 `--arduino-cli` 없이 빌드할 수 있습니다.
 - 카메라 ID는 **그 카메라가 달린 로봇의 ID**와 같게 합니다. 두 로봇이 같은 ID를 쓰면 대시보드가 섞입니다.
 - 대시보드도 같은 ID로 실행합니다: `python -m dashboard.server --robot A ...`

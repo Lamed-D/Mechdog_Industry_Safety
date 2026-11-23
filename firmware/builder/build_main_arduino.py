@@ -17,27 +17,11 @@ import subprocess
 import sys
 
 try:
-    from .arduino_workspace import configuration
+    from .arduino_workspace import configuration, find_cli
 except ImportError:
-    from arduino_workspace import configuration
+    from arduino_workspace import configuration, find_cli
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def find_cli():
-    env = os.environ.get("ARDUINO_CLI")
-    if env:
-        return Path(env)
-    local = Path(os.environ["LOCALAPPDATA"])
-    candidates = [
-        local / "Programs/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe",
-        Path(os.environ.get("ProgramFiles", "C:/Program Files"))
-        / "Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe",
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return candidates[0]  # 없으면 첫 후보로 시도(명확한 오류 메시지용)
 
 
 def secrets_robot_id():
@@ -52,9 +36,13 @@ def secrets_robot_id():
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--robot", type=str.upper, choices=("A", "B"))
+    parser.add_argument("--arduino-cli", help="Arduino CLI 실행 파일 경로")
     args = parser.parse_args(argv)
     local = Path(os.environ["LOCALAPPDATA"])
-    cli = find_cli()
+    try:
+        cli = find_cli(args.arduino_cli)
+    except ValueError as error:
+        sys.exit(str(error))
     build = ROOT / "build/main_arduino/compile"
     if args.robot:
         # Arduino 판은 사용자가 Arduino IDE 로 올리고 ID 는 Wi-Fi 값과 같은 secrets.h 에서 옵니다.
