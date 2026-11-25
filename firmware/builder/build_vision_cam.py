@@ -81,7 +81,7 @@ def verify_release():
             or manifest.get("version") != version() or manifest.get("fqbn") != FQBN
             or manifest.get("core_version") != REQUIRED_CORE
             or manifest.get("robot") != ROBOT
-            or manifest.get("profile") not in ("balanced", "detail")
+            or manifest.get("profile") not in ("balanced", "detail", "fall")
             or manifest.get("merged_bytes") != len(data)
             or manifest.get("sha256") != binary_sha
             or checksum != binary_sha + "  mechdog_vision_cam_0x0.bin"):
@@ -137,7 +137,7 @@ def version():
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--release", action="store_true")
-    parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced")
+    parser.add_argument("--profile", choices=("balanced", "detail", "fall"), default="balanced")
     parser.add_argument("--arduino-cli", help="Arduino CLI 실행 파일 경로")
     parser.add_argument("--robot", type=str.upper, choices=("A", "B"), help="로봇 전용 기본 ID(생략하면 A/B 공통)")
     parser.add_argument("--verify-release", action="store_true", help="최신 합본·소스·설정만 읽어 검사")
@@ -161,7 +161,7 @@ def main(argv=None):
     tool_config, tool_env = configuration()
     # 이미지 안의 소스 경로(__FILE__)에서 이 PC의 사용자 폴더를 지웁니다.
     remap = "-fmacro-prefix-map=%s=/arduino15 -fmacro-prefix-map=%s=/src" % (LOCAL / "Arduino15", ROOT)
-    remap += " -DCAM_VIDEO_PROFILE=%d" % (1 if args.profile == "balanced" else 2)
+    remap += " -DCAM_VIDEO_PROFILE=%d" % {"balanced": 1, "detail": 2, "fall": 3}[args.profile]
     if ROBOT:
         remap += " -DCAM_BUILD_ROBOT_" + ROBOT
     props = ["--build-property", "compiler.c.extra_flags=" + remap,

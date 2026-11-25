@@ -12,6 +12,8 @@
 import argparse
 import json
 import os
+import re
+import sqlite3
 import sys
 import threading
 import time
@@ -30,6 +32,7 @@ from firmware.robot.python import config as settings  # noqa: E402
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 from dashboard.camera_monitor import CameraMonitor  # noqa: E402
+from dashboard.fall_events import FallEvents  # noqa: E402
 
 MAX_BODY = 256
 
@@ -133,7 +136,8 @@ class ConsoleLink(RobotLink):
 
 
 class Console:
-    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None):
+    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None,
+                 fall=None, events=None):
         self.lock = threading.Lock()
         self.transport = transport
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
@@ -141,6 +145,8 @@ class Console:
         self.cam = cam
         self.usb_camera = usb_camera
         self.monitor = monitor
+        self.fall = fall
+        self.events = events or FallEvents()
         self.person_stop = self.obstacle_stop = False
         self.motion_epoch = 0
         self.manual_led = (0, 0, 0)
@@ -203,9 +209,11 @@ class Console:
 
     def state(self):
         with self.lock:
+            fall_status = self.fall.snapshot()[0] if self.fall else None
+            fall_fps = self.fall.feed.snapshot()[0]["fps"] if self.fall else None
             if self.link is None:
                 return {"sensors_only": True, "robot": self.robot, "cam": self.cam,
-                        "usb_camera": self.usb_camera is not None}
+                        "usb_camera": self.usb_camera is not None, "fall": fall_status, "fall_fps": fall_fps}
             t = self.link.latest
             return {
                 "robot": self.link.robot,
@@ -215,6 +223,8 @@ class Console:
                 "fault": self.link.fault,
                 "error": self.error,
                 "cam": self.cam,
+                "fall": fall_status,
+                "fall_fps": fall_fps,
                 "usb_camera": self.usb_camera is not None,
                 "monitor": ({
                     **self.monitor.snapshot()[0],
@@ -315,10 +325,24 @@ def make_handler(console):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if self.path == "/api/state":
                 return self._send(200, console.state())
+            page = re.fullmatch(r"/api/falls(?:\?before=([1-9][0-9]{0,17}))?", self.path)
+            photo = re.fullmatch(r"/api/falls/([1-9][0-9]{0,17})/photos/([01])", self.path)
+            try:
+                if page:
+                    before = int(page[1]) if page[1] else 2**63 - 1
+                    return self._send(200, console.events.page(before))
+                if photo:
+                    return self._send(200, console.events.photo(int(photo[1]), int(photo[2])), "image/jpeg")
+            except KeyError:
+                return self._send(404, {"error": "사진 없음"})
+            except sqlite3.Error:
+                return self._send(503, {"error": "사건 기록을 읽을 수 없습니다"})
             if self.path == "/api/lidar":
                 return self._send(200, console.lidar.snapshot())
-            if self.path == "/api/camera" and console.monitor:
-                _, jpeg = console.monitor.snapshot()
+            if self.path == "/api/camera" and (console.fall or console.monitor):
+                _, jpeg = (console.fall or console.monitor).snapshot()
+                if jpeg is None and console.fall:
+                    _, jpeg = console.fall.feed.snapshot()
                 if jpeg is None:
                     return self._send(503, {"error": "최신 영상 없음"})
                 return self._send(200, jpeg, "image/jpeg")
@@ -340,13 +364,19 @@ def make_handler(console):
                 return self._reject_post(400, "invalid length")
             if length < 0:
                 return self._reject_post(400, "invalid length")
-            if length > MAX_BODY:
+            review = re.fullmatch(r"/api/falls/([1-9][0-9]{0,17})/review", self.path)
+            if length > (16384 if review else MAX_BODY):
                 return self._reject_post(413, "too large")
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("JSON object required")
-                console.command(self.path, body)
+                if review:
+                    console.events.review(int(review[1]), body.get("verdict"), body.get("note"))
+                else:
+                    console.command(self.path, body)
+            except sqlite3.Error:
+                return self._send(503, {"error": "판정을 저장할 수 없습니다"})
             except KeyError:
                 return self._send(404, {"error": "not found"})
             except (ValueError, TypeError) as error:
@@ -379,6 +409,7 @@ def main():
     p.add_argument("--allow-real", action="store_true", help="실제 로봇에 보내기 허용")
     p.add_argument("--sensors-only", action="store_true", help="카메라·라이다 표시, 본체 UDP 소켓 없음")
     p.add_argument("--monitor", action="store_true", help="Wi-Fi 영상 사람 감지와 초음파 정지 활성화")
+    p.add_argument("--fall-detection", action="store_true", help="Wi-Fi 영상 쓰러짐 감지 및 검토 사진 저장")
     camera_source = p.add_mutually_exclusive_group()
     camera_source.add_argument("--cam", default="", help="카메라 영상 주소 예: http://192.168.5.1:81/stream")
     camera_source.add_argument("--cam-usb", metavar="COM_PORT", help="USB JPEG 펌웨어가 설치된 ESP32-S3")
@@ -391,11 +422,13 @@ def main():
     a = p.parse_args()
     if a.monitor and (a.sensors_only or a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
-    if a.monitor:
+    if a.fall_detection and (a.cam_usb or not (a.cam or a.hotspot)):
+        p.error("--fall-detection에는 Wi-Fi 카메라(--cam 또는 --hotspot)가 필요합니다")
+    if a.monitor or a.fall_detection:
         try:
             import cv2
         except ImportError:
-            p.error("--monitor에는 opencv-python-headless 설치가 필요합니다")
+            p.error("영상 감지에는 OpenCV 설치가 필요합니다. README를 확인하세요.")
     a.robot_ip = a.robot_ip or ("auto" if a.hotspot else "127.0.0.1")
     a.broadcast = a.broadcast or ("192.168.137.255" if a.hotspot else "192.168.5.255")
     if a.relay_lidar and a.robot_ip == "auto":
@@ -416,8 +449,17 @@ def main():
         transport = UdpTransport(a.robot_ip, allow_real=a.allow_real)
     camera = UsbCamera(a.cam_usb) if a.cam_usb else None
     cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
-    monitor = CameraMonitor(cam, cv2) if a.monitor else None
-    console = Console(a.robot, transport, cam, lidar, camera, monitor)
+    feed = CameraMonitor(cam, cv2, a.monitor, a.robot) if a.monitor or a.fall_detection else None
+    events = FallEvents()
+    fall = None
+    if a.fall_detection:
+        try:
+            from dashboard.fall_detection import FallDetection
+            events.prepare()
+            fall = FallDetection(feed, events, a.robot)
+        except (ImportError, OSError, ValueError, RuntimeError, sqlite3.Error) as error:
+            p.error(f"쓰러짐 감지 초기화 실패: {error}")
+    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
@@ -429,16 +471,20 @@ def main():
             if camera:
                 camera_worker = threading.Thread(target=camera.run, daemon=True)
                 camera_worker.start()
-            if monitor:
-                monitor.start()
+            if feed:
+                feed.start()
+            if fall:
+                fall.worker.start()
             print("열기: http://127.0.0.1:%d  (로봇 %s @ %s)" % (server.server_port, a.robot, a.robot_ip))
             server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         console.close()
-        if monitor:
-            monitor.stop_event.set()
+        if feed:
+            feed.stop_event.set()
+        if fall and fall.worker.is_alive():
+            fall.worker.join()
         if transport:
             transport.close()
         lidar.stop_event.set()
