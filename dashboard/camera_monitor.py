@@ -2,31 +2,44 @@
 
 from collections import deque
 from threading import Event, Lock, Thread
-from time import monotonic
+from time import monotonic, time
 from urllib.request import urlopen
 
 
 class CameraMonitor:
-    def __init__(self, url, cv):
+    def __init__(self, url, cv, person_detection=True, expected_robot=None):
         self.url = url
+        self.expected_robot = expected_robot
         self.cv = cv
-        self.detector = cv.HOGDescriptor()
-        self.detector.setSVMDetector(cv.HOGDescriptor_getDefaultPeopleDetector())
+        self.detector = None
+        if person_detection:
+            self.detector = cv.HOGDescriptor()
+            self.detector.setSVMDetector(cv.HOGDescriptor_getDefaultPeopleDetector())
         self.lock = Lock()
         self.stop_event = Event()
         self.times = deque()
         self.jpeg = None
         self.sequence = 0
+        self.received_at = 0
+        self.frame_time = 0
         self.result = None
 
     def start(self):
         Thread(target=self.receive, daemon=True).start()
-        Thread(target=self.detect, daemon=True).start()
+        if self.detector is not None:
+            Thread(target=self.detect, daemon=True).start()
+
+    def latest(self):
+        with self.lock:
+            return self.sequence, self.frame_time, self.received_at, self.jpeg
 
     def receive(self):
         while not self.stop_event.is_set():
             try:
                 with urlopen(self.url, timeout=2) as stream:
+                    source_robot = stream.headers.get("X-Robot")
+                    if self.expected_robot and source_robot and source_robot != self.expected_robot:
+                        raise ValueError("camera robot ID mismatch")
                     boundary = stream.headers.get_param("boundary", "").encode("ascii")
                     if not boundary:
                         raise ValueError("missing MJPEG boundary")
@@ -44,6 +57,8 @@ class CameraMonitor:
                             key, value = line.split(b":", 1)
                             headers[key.lower()] = value.strip()
                         size = int(headers[b"content-length"])
+                        age = int(headers.get(b"x-frame-age-ms", -1))
+                        frame_time = monotonic() - age / 1000 if 0 <= age <= 500 else 0
                         if not 0 < size <= 2_000_000:
                             raise ValueError("invalid JPEG size")
                         jpeg = stream.read(size)
@@ -57,6 +72,8 @@ class CameraMonitor:
                             while self.times[0] < now - 2:
                                 self.times.popleft()
                             self.sequence += 1
+                            self.received_at = time()
+                            self.frame_time = frame_time
                             self.jpeg = jpeg
             except (OSError, ValueError, KeyError):
                 pass

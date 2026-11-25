@@ -12,6 +12,8 @@
 import argparse
 import json
 import os
+import re
+import sqlite3
 import sys
 import threading
 import time
@@ -30,6 +32,7 @@ from firmware.robot.python import config as settings, proto as wire  # noqa: E40
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 from dashboard.camera_monitor import CameraMonitor  # noqa: E402
+from dashboard.fall_events import DATA_DIR, FallEvents  # noqa: E402
 
 MAX_BODY = 256
 GREET_ACTION = "scrape_a_bow"  # 사람 인식 시 신호 (ai/mechdog-api.md 4.1)
@@ -146,7 +149,8 @@ class ConsoleLink(RobotLink):
 
 
 class Console:
-    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None, greet=False):
+    def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None,
+                 fall=None, events=None, *, greet=False):
         self.lock = threading.Lock()
         self.transport = transport
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
@@ -160,6 +164,16 @@ class Console:
         self.greet_seen_action = False
         self.greet_block_until = -float("inf")
         self.greet_count = 0
+        self.fall = fall
+        self.events = events or FallEvents()
+        self.samples = FallEvents(DATA_DIR / "sample-events.sqlite3")
+        self.sample_lock = threading.Lock()
+        self.hold_until = 0
+        if fall and self.link:
+            fall.on_fall = self.stop_for_fall
+            last = self.events.last_detection(robot)
+            if last:
+                self.hold_until = time.monotonic() + max(0, min(30, last + 30 - time.time()))
         self.person_stop = self.obstacle_stop = False
         self.motion_epoch = 0
         self.manual_led = (0, 0, 0)
@@ -167,6 +181,33 @@ class Console:
         self.lidar = lidar or LidarFeed()
         self.error = None
         self.running = True
+
+    def stop_for_fall(self):
+        with self.lock:
+            self.hold_until = time.monotonic() + 30
+            self.greet_until = self.greet_sent = None
+            self.greet_seen_action = False
+            self.motion_epoch += 1
+            self.link.pending_led = None
+            self.link.stop()
+
+    def replay_sample(self):
+        from dashboard.fall_detection import FallDetection
+        if not self.sample_lock.acquire(blocking=False):
+            raise ValueError("시연 사진 분석 중입니다.")
+        try:
+            frames = [(DATA_DIR / "samples/replay" / name).read_bytes() for name in ("first.jpg", "second.jpg")]
+            self.samples.prepare()
+            detector = FallDetection(None, self.samples, "공개 시연 사진")
+            try:
+                now, wall = time.monotonic(), time.time()
+                for index, frame in enumerate(frames):
+                    status, _ = detector.process(now + index / 3, wall + index / 3, frame)
+                return status
+            finally:
+                detector.close()
+        finally:
+            self.sample_lock.release()
 
     def monitor_stop(self):
         video, _ = self.monitor.snapshot()
@@ -187,7 +228,7 @@ class Console:
             self.link.pending_led = None
             self.applied_led = None
             self.link.stop()
-        if (new_person and self.greet and self.greet_sent is None
+        if (new_person and self.greet and self.greet_sent is None and time.monotonic() >= self.hold_until
                 and self.link.clock() >= self.greet_block_until):
             self.greet_until = self.link.clock() + GREET_WAIT_S
         return tripped
@@ -265,9 +306,11 @@ class Console:
 
     def state(self):
         with self.lock:
+            fall_status = self.fall.snapshot()[0] if self.fall else None
+            fall_fps = self.fall.feed.snapshot()[0]["fps"] if self.fall else None
             if self.link is None:
                 return {"sensors_only": True, "robot": self.robot, "cam": self.cam,
-                        "usb_camera": self.usb_camera is not None}
+                        "usb_camera": self.usb_camera is not None, "fall": fall_status, "fall_fps": fall_fps}
             t = self.link.latest
             return {
                 "robot": self.link.robot,
@@ -277,6 +320,10 @@ class Console:
                 "fault": self.link.fault,
                 "error": self.error,
                 "cam": self.cam,
+                "fall": fall_status,
+                "fall_fps": fall_fps,
+                "fall_hold": max(0, self.hold_until - time.monotonic()),
+                "epoch": self.motion_epoch,
                 "usb_camera": self.usb_camera is not None,
                 "monitor": ({
                     **self.monitor.snapshot()[0],
@@ -307,8 +354,10 @@ class Console:
                 raise ValueError("console is closing")
             if path in ("/api/move", "/api/stop", "/api/estop"):
                 self.greet_until = None  # 사람 입력이 보내기 전 인사보다 우선
+            if path in ("/api/move", "/api/stand", "/api/reset") and time.monotonic() < self.hold_until:
+                raise ValueError("쓰러짐 감지로 30초 정지 중입니다.")
             if path == "/api/move":
-                if self.monitor and body.get("epoch") != self.motion_epoch:
+                if (self.monitor or self.fall) and body.get("epoch") != self.motion_epoch:
                     raise ValueError("감지로 정지했습니다. 방향을 다시 누르세요")
                 self.link.move(body["step"], body["angle"])
             elif path == "/api/stop":
@@ -383,10 +432,25 @@ def make_handler(console):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if self.path == "/api/state":
                 return self._send(200, console.state())
+            archive = console.samples if self.path.startswith("/api/falls-samples") else console.events
+            page = re.fullmatch(r"/api/falls(?:-samples)?(?:\?before=([1-9][0-9]{0,17}))?", self.path)
+            photo = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/photos/([01])", self.path)
+            try:
+                if page:
+                    before = int(page[1]) if page[1] else 2**63 - 1
+                    return self._send(200, archive.page(before))
+                if photo:
+                    return self._send(200, archive.photo(int(photo[1]), int(photo[2])), "image/jpeg")
+            except KeyError:
+                return self._send(404, {"error": "사진 없음"})
+            except sqlite3.Error:
+                return self._send(503, {"error": "사건 기록을 읽을 수 없습니다"})
             if self.path == "/api/lidar":
                 return self._send(200, console.lidar.snapshot())
-            if self.path == "/api/camera" and console.monitor:
-                _, jpeg = console.monitor.snapshot()
+            if self.path == "/api/camera" and (console.fall or console.monitor):
+                _, jpeg = (console.fall or console.monitor).snapshot()
+                if jpeg is None and console.fall:
+                    _, jpeg = console.fall.feed.snapshot()
                 if jpeg is None:
                     return self._send(503, {"error": "최신 영상 없음"})
                 return self._send(200, jpeg, "image/jpeg")
@@ -408,13 +472,24 @@ def make_handler(console):
                 return self._reject_post(400, "invalid length")
             if length < 0:
                 return self._reject_post(400, "invalid length")
-            if length > MAX_BODY:
+            review = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/review", self.path)
+            if length > (16384 if review else MAX_BODY):
                 return self._reject_post(413, "too large")
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("JSON object required")
-                console.command(self.path, body)
+                if self.path == "/api/falls-samples/replay":
+                    return self._send(200, {"status": console.replay_sample()})
+                if review:
+                    archive = console.samples if self.path.startswith("/api/falls-samples/") else console.events
+                    archive.review(int(review[1]), body.get("verdict"), body.get("note"))
+                else:
+                    console.command(self.path, body)
+            except (FileNotFoundError, ImportError):
+                return self._send(503, {"error": "시연 사진 또는 감지 모델이 준비되지 않았습니다."})
+            except (OSError, RuntimeError, sqlite3.Error):
+                return self._send(503, {"error": "사진 분석 또는 저장에 실패했습니다."})
             except KeyError:
                 return self._send(404, {"error": "not found"})
             except (ValueError, TypeError) as error:
@@ -448,6 +523,7 @@ def main():
     p.add_argument("--sensors-only", action="store_true", help="카메라·라이다 표시, 본체 UDP 소켓 없음")
     p.add_argument("--monitor", action="store_true", help="Wi-Fi 영상 사람 감지와 초음파 정지 활성화")
     p.add_argument("--greet", action="store_true", help="--monitor 에서 사람을 새로 보면 멈춘 뒤 인사(scrape_a_bow)")
+    p.add_argument("--fall-detection", action="store_true", help="Wi-Fi 영상 쓰러짐 감지 및 검토 사진 저장")
     camera_source = p.add_mutually_exclusive_group()
     camera_source.add_argument("--cam", default="", help="카메라 영상 주소 예: http://192.168.5.1:81/stream")
     camera_source.add_argument("--cam-usb", metavar="COM_PORT", help="USB JPEG 펌웨어가 설치된 ESP32-S3")
@@ -462,11 +538,13 @@ def main():
         p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
     if a.greet and not a.monitor:
         p.error("--greet에는 --monitor가 필요합니다")
-    if a.monitor:
+    if a.fall_detection and (a.cam_usb or not (a.cam or a.hotspot)):
+        p.error("--fall-detection에는 Wi-Fi 카메라(--cam 또는 --hotspot)가 필요합니다")
+    if a.monitor or a.fall_detection:
         try:
             import cv2
         except ImportError:
-            p.error("--monitor에는 opencv-python-headless 설치가 필요합니다")
+            p.error("영상 감지에는 OpenCV 설치가 필요합니다. README를 확인하세요.")
     a.robot_ip = a.robot_ip or ("auto" if a.hotspot else "127.0.0.1")
     a.broadcast = a.broadcast or ("192.168.137.255" if a.hotspot else "192.168.5.255")
     if a.relay_lidar and a.robot_ip == "auto":
@@ -487,8 +565,17 @@ def main():
         transport = UdpTransport(a.robot_ip, allow_real=a.allow_real)
     camera = UsbCamera(a.cam_usb) if a.cam_usb else None
     cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
-    monitor = CameraMonitor(cam, cv2) if a.monitor else None
-    console = Console(a.robot, transport, cam, lidar, camera, monitor, greet=a.greet)
+    feed = CameraMonitor(cam, cv2, a.monitor, a.robot) if a.monitor or a.fall_detection else None
+    events = FallEvents()
+    fall = None
+    if a.fall_detection:
+        try:
+            from dashboard.fall_detection import FallDetection
+            events.prepare()
+            fall = FallDetection(feed, events, a.robot)
+        except (ImportError, OSError, ValueError, RuntimeError, sqlite3.Error) as error:
+            p.error(f"쓰러짐 감지 초기화 실패: {error}")
+    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events, greet=a.greet)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
@@ -500,16 +587,20 @@ def main():
             if camera:
                 camera_worker = threading.Thread(target=camera.run, daemon=True)
                 camera_worker.start()
-            if monitor:
-                monitor.start()
+            if feed:
+                feed.start()
+            if fall:
+                fall.worker.start()
             print("열기: http://127.0.0.1:%d  (로봇 %s @ %s)" % (server.server_port, a.robot, a.robot_ip))
             server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         console.close()
-        if monitor:
-            monitor.stop_event.set()
+        if feed:
+            feed.stop_event.set()
+        if fall and fall.worker.is_alive():
+            fall.worker.join()
         if transport:
             transport.close()
         lidar.stop_event.set()

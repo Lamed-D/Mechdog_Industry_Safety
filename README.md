@@ -83,3 +83,29 @@ python -m dashboard.server --robot B --hotspot --allow-real
 
 - 카메라 자동 탐색이 안 되면 `--cam http://<카메라 IP>:81/stream`을 붙입니다. USB LiDAR를 쓰면 `--lidar-usb COM3`을 추가하고 실제 포트 번호로 바꿉니다.
 - 처음에는 화면에서 로봇 ID, 배터리, 잠금 상태와 영상을 확인합니다. 조종할 때 **잠금 해제** 후 W/A/S/D를 사용합니다. Space는 정지, Esc는 비상 정지입니다. [실물 점검 순서](ai/robot-tests.md)
+
+### 쓰러짐 감지와 사진 검토
+
+Windows 64비트 Python 3.13 환경에서 최초 한 번 실행합니다. 모델과 검토 기록은 노트북의 사용자 데이터 폴더에 보관합니다.
+
+```powershell
+python -m pip install "mediapipe==0.10.32" pillow
+$data = Join-Path $env:LOCALAPPDATA MechDog
+New-Item -ItemType Directory -Force $data | Out-Null
+curl.exe --fail --location https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task --output "$data/pose_landmarker_lite.task"
+curl.exe --fail --location https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite --output "$data/efficientdet_lite0.tflite"
+```
+
+카메라만 연결한 경우 아래처럼 실행합니다. A/B는 실제 카메라 ID를 사용합니다. 본체를 조종하는 경우 기존 대시보드 실행 명령에 `--fall-detection`을 추가합니다.
+
+```powershell
+python -m dashboard.server --robot A --hotspot --sensors-only --fall-detection
+```
+
+**쓰러짐 로그**에서 사건을 열면 박스가 표시된 첫 의심·감지 확인 사진을 비교하고 확대할 수 있습니다. **쓰러짐 확인**, **오탐**, **판단 보류**를 고른 뒤 메모와 함께 저장합니다. 같은 사람은 두 사진에서 자세가 확인돼야 기록되며 이후 30초간 중복을 억제합니다. 기록은 재시작 후에도 조회할 수 있습니다.
+
+본체 연결 모드에서 실제 카메라로 쓰러짐을 확인하면 현재 이동을 취소하고 30초간 이동·일어서기·잠금 해제를 차단합니다. 이후 새로 조종해야 움직입니다. 센서 전용 모드는 카메라만 사용합니다.
+
+**쓰러짐 로그 → 시연 사진**에서 두 장을 다시 분석하고 판정을 연습할 수 있습니다. 시연용 원본은 `%LOCALAPPDATA%\MechDog\samples\replay\first.jpg`와 같은 폴더의 `second.jpg`입니다. 같은 사람을 연이어 촬영한 사진을 사용합니다. 시연 결과는 전용 보관함에 저장하며 로봇에 명령을 보내지 않습니다.
+
+저대역폭 카메라 이미지는 `python firmware/build.py A --only vision --profile fall`로 빌드한 뒤 위의 카메라 업데이트 절차로 적용합니다. 이 설정은 카메라 전송 해상도를 480×320으로 낮춥니다.

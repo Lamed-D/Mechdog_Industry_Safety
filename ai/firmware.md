@@ -9,7 +9,7 @@
 | --- | --- | --- | --- | --- |
 | 메인 보드 ESP32(클래식) | 몸통 | **MicroPython(주)**, 순정 펌웨어 위에 `.py` 업로드 | [`firmware/robot/python/`](../firmware/robot/python/) | 주 펌웨어. 통합 main 실물 미검증 |
 | 메인 보드 ESP32 | 몸통 | Arduino(C++), 예비·유지 | [`firmware/robot/arduino/`](../firmware/robot/arduino/) | 전체 이식 완료. 벤더 백엔드·실물 미검증 |
-| 비전 모듈 ESP32-S3 | 앞쪽 카메라 | Arduino(C++) 맞춤 영상 펌웨어 | [`firmware/vision/`](../firmware/vision/) | v0.1.9(AP 기본 비밀번호만 변경). v0.1.8은 로봇 B 카메라에서 실물 동작 확인 |
+| 비전 모듈 ESP32-S3 | 앞쪽 카메라 | Arduino(C++) 맞춤 영상 펌웨어 | [`firmware/vision/`](../firmware/vision/) | v0.1.10 저대역폭 fall 프로필 추가 |
 
 ## 0. 빌드 — 사람·AI 공통 도구 `firmware/build.py`
 
@@ -194,7 +194,7 @@ HTTP 머리글·I2C 명령표는 [protocol.md](protocol.md).
 
 | 값 | 기본 | 상수 |
 | --- | --- | --- |
-| 프로필 | balanced 640×480, 품질 10, 상한 약 15 fps / detail 800×600, 약 10 fps / PSRAM 없으면 320×240·버퍼 1개 | `--profile` |
+| 프로필 | balanced 640×480·15 fps, detail 800×600·10 fps, fall 480×320·15 fps (GC2145 소프트웨어 JPEG 품질 70). FPS는 촬영 상한. PSRAM 없으면 320×240·버퍼 1개 | `--profile` |
 | 프레임 버퍼 | PSRAM 2개, 최신 프레임 모드 | — |
 | 동시 스트림 | 2 | `CAM_MAX_STREAM_CLIENTS` |
 | 촬영 쉬기 | 10초 무요청(이때 fps 0.0 정상) | `CAM_IDLE_MS` |
