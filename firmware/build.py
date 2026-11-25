@@ -47,7 +47,7 @@ def main():
     parser.add_argument("robot", type=str.upper, choices=("A", "B"), help="로봇 ID")
     parser.add_argument("--only", nargs="+", choices=TARGETS, default=["python", "vision"],
                         help="빌드할 대상 (기본: python vision)")
-    parser.add_argument("--profile", choices=("balanced", "detail"), default="balanced", help="카메라 영상 프로필")
+    parser.add_argument("--profile", choices=("balanced", "detail", "fall"), default="balanced", help="카메라 영상 프로필")
     parser.add_argument("--arduino-cli", help="Vision/Arduino 빌드에 사용할 Arduino CLI 실행 파일 경로")
     parser.add_argument("--wifi-setup", action="store_true", help="본체 Wi-Fi 입력을 받아 secrets.py 생성")
     args = parser.parse_args()

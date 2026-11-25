@@ -93,6 +93,22 @@
   #reset-dialog .dlg-sub { display:block; margin-top:6px; font-size:14px; color:#c4cbd4; line-height:1.55; }  /* 밝은 회색: 어두운 배경에서 읽히게 */
   #reset-dialog button.primary { background:var(--btnon); border-color:var(--btnon); color:#fff; font-weight:700; }  /* Enter는 autofocus된 취소 */
   #reset-dialog .dlg-actions > button { padding:6px 14px; }
+  #drive-view[hidden], #review-view[hidden] { display:none; }
+  #views { display:flex; gap:4px; padding:8px 16px 0; }
+  #views [aria-pressed=true] { border-color:var(--btnon); color:white; }
+  #review-view { margin:14px 16px; }
+  #events { display:grid; gap:6px; margin:12px 0; }
+  #events button { display:flex; align-items:center; gap:12px; text-align:left; }
+  #events img { width:72px; height:48px; object-fit:contain; background:black; }
+  #photos { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr)); gap:12px; }
+  #photos figure { margin:0; }
+  #photos img { display:block; width:100%; }
+  #photos button { padding:0; width:100%; cursor:zoom-in; }
+  #photos:has(.expanded) { grid-template-columns:1fr; }
+  #photos .expanded button { cursor:zoom-out; }
+  #review-form label { display:block; margin:10px 0; }
+  #review-form textarea { display:block; width:min(100%,640px); }
+  #drive-controls { border:0; padding:0; margin:0; min-width:0; }
 </style>
 </head>
 <body>
@@ -104,12 +120,17 @@
   <label class="kbd-toggle" id="keyboard-toggle" title="켜면 W/A/S/D·Q/E/Z/C·방향키로 조종 (누르고 있는 동안만)"><input id="keyboard-enabled" type="checkbox" autocomplete="off">⌨ <span id="keyboard-state">방향 단축키 꺼짐</span></label>
   <button class="estop" id="estop" disabled>비상 정지 (Esc)</button>
 </header>
-<main>
+<nav id="views" aria-label="화면 선택">
+  <button id="drive-tab" aria-pressed="true">조종</button>
+  <button id="review-tab" aria-pressed="false">쓰러짐 로그</button>
+</nav>
+<main id="drive-view">
   <div class="top-row">  <!-- 왼쪽부터 카메라(영상 크기만큼) | 로봇 상태·초음파 | 조종. LiDAR는 아래 줄 -->
     <section>
       <div class="cam-head"><h2>카메라 (비전 모듈)</h2><button id="camera-reconnect" type="button" hidden>다시 연결</button></div>
       <div class="cam" id="cam">카메라 설정 확인 중</div>
       <p id="monitor-status" hidden></p>
+      <p id="fall-status" hidden></p>
     </section>
     <section id="robot-status">
       <h2>로봇 상태</h2>
@@ -147,6 +168,7 @@
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
+      <fieldset id="drive-controls" disabled aria-label="로봇 조종">
       <div class="start-row">
         <button id="reset">잠금 해제<br><small>사람이 로봇 상태 확인 후</small></button>
         <button id="stand">일어서기<br><small>기본 자세</small></button>
@@ -175,6 +197,7 @@
       <div class="row"><label for="angle" title="전진·후진하며 도는 버튼(Q/E/Z/C)에만 적용. 제자리 회전(A/D)은 아래 슬라이더">회전 (Q/E/Z/C)</label><input id="angle" type="range" min="1" max="30" value="15"><span class="val"><output id="anglev">15</output><span class="max"> / 30</span></span></div>
       <div class="row"><label for="spin" title="제자리 회전(A/D)에만 적용. 상한 60">제자리 회전 (A/D)</label><input id="spin" type="range" min="1" max="60" value="60"><span class="val"><output id="spinv">60</output><span class="max"> / 60</span></span></div>
       <div class="hint">화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
+      </fieldset>
     </section>
   </div>
     <section id="lidar-panel">
@@ -193,6 +216,26 @@
       <div class="hint" id="scan-status" role="status"></div>
     </section>
 </main>
+<section id="review-view" hidden>
+  <h2>쓰러짐 로그</h2>
+  <div id="review-list">
+    <label>영상 출처 <select id="archive"><option value="live">실제 카메라</option><option value="samples">시연 사진</option></select></label>
+    <button id="replay" hidden>테스트 사진 두 장으로 감지 실행</button>
+    <button id="refresh-events">목록 새로고침</button>
+    <div id="events"></div>
+    <button id="older" hidden>이전 사건 더 보기</button>
+  </div>
+  <form id="review-form" hidden>
+    <button type="button" id="back-events">목록으로</button>
+    <h3 id="event-title"></h3>
+    <div id="photos"></div>
+    <label>사람의 판정 <select id="verdict" required><option value="">미검토</option><option>쓰러짐 확인</option><option>오탐</option><option>판단 보류</option></select></label>
+    <label>검토 메모 <textarea id="review-note" rows="3" maxlength="1000"></textarea></label>
+    <button id="save-review">판정 저장</button>
+    <span id="review-time"></span>
+  </form>
+  <p id="review-info" role="status"></p>
+</section>
 <script>
 const $ = id => document.getElementById(id);
 const REASON = { none:"없음", boot:"부팅 직후", estop:"비상 정지", link_lost:"통신 끊김", low_battery:"배터리 부족", bad_cmd:"잘못된 명령" };
@@ -222,7 +265,7 @@ function sendMove() {
   });
 }
 function start(dir, input) {
-  if (!canMove || $("reset-dialog").open || holding?.input === input) return;
+  if (!canMove || $("drive-view").hidden || $("reset-dialog").open || holding?.input === input) return;
   stopMove(false);
   holding = { dir, input, epoch: motionEpoch };
   const button = document.querySelector(`[data-dir="${dir}"]`);
@@ -307,7 +350,7 @@ const KEYS = new Map([
 addEventListener("keydown", e => {
   if (!controlsEnabled) return;
   if (e.key === "Escape") { $("estop").click(); return; }
-  if (resetDialog.open) return;
+  if (resetDialog.open || $("drive-view").hidden) return;
   if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
   if (e.key === " ") { if (e.target !== keyboardEnabled) e.preventDefault(); stopMove(); return; }
   if (!keyboardEnabled.checked) return;
@@ -564,11 +607,18 @@ async function poll() {
     const s = await (await fetch("/api/state")).json();
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
     if (!cameraSource && (s.usb_camera || s.cam)) {
-      cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!s.monitor };
+      cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!(s.monitor || s.fall) };
       $("camera-reconnect").hidden = false;
       connectCamera();
     }
     if (!cameraSource) $("cam").textContent = "카메라 설정 없음";
+    $("fall-status").hidden = !s.fall;
+    $("fall-status").textContent = s.fall ? `${s.fall} · 수신 ${s.fall_fps.toFixed(1)} FPS` : "";
+    if (s.fall_hold > 0) $("fall-status").textContent += ` · 이동 정지 ${Math.ceil(s.fall_hold)}초`;
+    if (s.epoch !== undefined && (motionEpoch === undefined || s.epoch >= motionEpoch)) {
+      if (holding && holding.epoch !== s.epoch) stopMove(false);
+      motionEpoch = s.epoch;
+    }
     const monitor = s.monitor;
     if (monitor && (motionEpoch === undefined || monitor.epoch >= motionEpoch)) {
       if (holding && holding.epoch !== monitor.epoch) stopMove(false);
@@ -593,13 +643,15 @@ async function poll() {
       $("estop").hidden = true;
       $("keyboard-toggle").hidden = true;
       $("battery").hidden = true;
-      $("motion-controls").hidden = true;
+      $("drive-controls").disabled = true;
+      $("drive-state").textContent = "카메라 전용 · 본체 제어 꺼짐";
       $("lock").hidden = true;
       $("robot").textContent = "센서 전용";
       pill($("link"), "본체 제어 꺼짐", "");
       return;
     }
     controlsEnabled = true;
+    $("drive-controls").disabled = false;
     $("motion-controls").hidden = $("lock").hidden = $("battery").hidden = $("estop").hidden = $("keyboard-toggle").hidden = false;
     $("estop").disabled = false;
     const t = s.tel;
@@ -629,7 +681,8 @@ async function poll() {
     showLed(s, ledOk);
     if (!ledOk) $("led-status").innerHTML = "로봇 연결 후 사용<br>(로봇을 움직이지 않음, 잠김 중에도 가능)";
     $("s-fault").textContent = s.error || s.fault || "없음";
-    canMove = !!(t && !t.latched && s.fresh && !s.emergency);
+    canMove = !!(t && !t.latched && s.fresh && !s.emergency && !s.fall_hold);
+    $("stand").disabled = $("reset").disabled = s.fall_hold > 0;
     document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !canMove);
     if (holding && !canMove) stopMove();
   } catch (e) {
@@ -642,6 +695,123 @@ async function poll() {
     stopMove(false);
   }
 }
+const localTime = seconds => new Date(seconds * 1000).toLocaleString("ko-KR");
+const archiveUrl = () => $("archive").value === "samples" ? "/api/falls-samples" : "/api/falls";
+const photoUrl = (id, index) => archiveUrl() + "/" + id + "/photos/" + index;
+const eventSource = event => $("archive").value === "samples" ? "시연 사진" : "로봇 " + event.robot;
+let selectedEvent = null, lastEvent = null, listRequest = 0;
+
+function openEvent(event) {
+  selectedEvent = event;
+  $("review-info").textContent = "";
+  $("review-list").hidden = true;
+  $("review-form").hidden = false;
+  $("event-title").textContent = localTime(event.detected) + " · " + eventSource(event) + " · 쓰러짐 의심";
+  $("photos").replaceChildren();
+  event.photos.forEach((photo, index) => {
+    const figure = document.createElement("figure"), caption = document.createElement("figcaption");
+    const button = document.createElement("button"), image = new Image();
+    const name = index ? "감지 확인" : "첫 의심";
+    image.src = photoUrl(event.id, index);
+    image.alt = name + " · 쓰러짐 의심 대상 표시";
+    caption.textContent = name + " · " + new Date(photo.received * 1000).toLocaleTimeString("ko-KR",
+      { hour:"2-digit", minute:"2-digit", second:"2-digit", fractionalSecondDigits:3 });
+    button.type = "button";
+    button.setAttribute("aria-label", name + " 사진 확대 또는 축소");
+    button.onclick = () => figure.classList.toggle("expanded");
+    button.append(image); figure.append(caption, button); $("photos").append(figure);
+  });
+  $("verdict").value = event.verdict === "미검토" ? "" : event.verdict;
+  $("review-note").value = event.note;
+  $("review-time").textContent = event.reviewed ? "마지막 수정 " + localTime(event.reviewed) : "";
+}
+
+async function loadEvents(append = false) {
+  const request = ++listRequest;
+  $("older").disabled = true;
+  try {
+    const response = await fetch(archiveUrl() + (append ? "?before=" + lastEvent : ""));
+    if (!response.ok) throw new Error("사건 목록을 읽을 수 없습니다.");
+    const events = await response.json();
+    if (request !== listRequest || selectedEvent) return;
+    if (!append) $("events").replaceChildren();
+    for (const event of events) {
+      const button = document.createElement("button"), image = new Image();
+      image.src = photoUrl(event.id, 1); image.alt = ""; image.loading = "lazy";
+      button.append(image, localTime(event.detected) + " · " + eventSource(event) + " · " + event.verdict);
+      button.onclick = () => openEvent(event);
+      $("events").append(button);
+      lastEvent = event.id;
+    }
+    $("older").hidden = events.length < 25;
+    $("review-info").textContent = $("events").childElementCount ? "" : "기록된 쓰러짐 의심 사건이 없습니다.";
+  } catch (error) {
+    if (request === listRequest) $("review-info").textContent = error.message;
+  } finally {
+    if (request === listRequest) $("older").disabled = false;
+  }
+}
+
+function showList() {
+  selectedEvent = null;
+  $("review-list").hidden = false;
+  $("review-form").hidden = true;
+  loadEvents();
+}
+$("review-tab").onclick = () => {
+  stopMove();
+  $("drive-view").hidden = true; $("review-view").hidden = false;
+  $("drive-tab").setAttribute("aria-pressed", "false"); $("review-tab").setAttribute("aria-pressed", "true");
+  showList();
+};
+$("drive-tab").onclick = () => {
+  $("review-view").hidden = true; $("drive-view").hidden = false;
+  $("drive-tab").setAttribute("aria-pressed", "true"); $("review-tab").setAttribute("aria-pressed", "false");
+};
+$("older").onclick = () => loadEvents(true);
+$("archive").onchange = () => {
+  $("events").replaceChildren();
+  $("replay").hidden = $("archive").value !== "samples";
+  showList();
+};
+$("replay").onclick = async () => {
+  $("replay").disabled = true;
+  $("review-info").textContent = "시연 사진 두 장 분석 중";
+  try {
+    const result = await post("/api/falls-samples/replay");
+    if ($("archive").value === "samples") {
+      await loadEvents();
+      $("review-info").textContent = "시연 결과 · " + result.status;
+    }
+  } catch (error) { $("review-info").textContent = error.message; }
+  finally { $("replay").disabled = false; }
+};
+$("refresh-events").onclick = showList;
+$("back-events").onclick = showList;
+$("review-form").onsubmit = async e => {
+  e.preventDefault();
+  const event = selectedEvent;
+  $("save-review").disabled = true;
+  try {
+    await post(archiveUrl() + "/" + event.id + "/review", { verdict:$("verdict").value, note:$("review-note").value });
+    if (selectedEvent === event) {
+      $("review-time").textContent = "방금 저장";
+      $("review-info").textContent = "판정과 메모를 저장했습니다.";
+    }
+  } catch (error) {
+    if (selectedEvent === event) $("review-info").textContent = "저장 실패 · " + error.message;
+  } finally {
+    $("save-review").disabled = false;
+  }
+};
+function openSampleLink() {
+  if (location.hash !== "#samples") return;
+  $("archive").value = "samples";
+  $("replay").hidden = false;
+  $("review-tab").click();
+}
+addEventListener("hashchange", openSampleLink);
+openSampleLink();
 setInterval(poll, 250); poll(); pollScan();
 </script>
 </body>
