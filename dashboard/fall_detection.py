@@ -74,7 +74,16 @@ class FallDetection:
         options = mp.tasks.vision.PoseLandmarkerOptions(
             base_options=mp.tasks.BaseOptions(model_asset_buffer=model.read_bytes()), num_poses=4)
         self.model = mp.tasks.vision.PoseLandmarker.create_from_options(options)
+        person_model = DATA_DIR / "efficientdet_lite0.tflite"
+        if not person_model.is_file():
+            self.model.close()
+            raise ValueError("README 설치 절차로 EfficientDet Lite0 사람 모델을 내려받으세요.")
+        person_options = mp.tasks.vision.ObjectDetectorOptions(
+            base_options=mp.tasks.BaseOptions(model_asset_buffer=person_model.read_bytes()),
+            category_allowlist=["person"], score_threshold=0.55, max_results=4)
+        self.people = mp.tasks.vision.ObjectDetector.create_from_options(person_options)
         self.tracks = []
+        self.on_fall = None
         self.lock = Lock()
         self.latest = (0, "감지 불가", None)
         self.worker = Thread(target=self.run, daemon=True)
@@ -93,12 +102,42 @@ class FallDetection:
         image.save(output, format="JPEG", quality=88)
         return output.getvalue()
 
+    def person_pose(self, rgb, box):
+        height, width = rgb.shape[:2]
+        pad = round(max(box.width, box.height) * .12)
+        x = max(0, box.origin_x - pad)
+        y = max(0, box.origin_y - pad)
+        crop = rgb[y:min(height, box.origin_y + box.height + pad),
+                   x:min(width, box.origin_x + box.width + pad)]
+        h, w = crop.shape[:2]
+        if min(w, h) < 16:
+            return None
+        # A wide person may be easier to landmark when rotated upright.
+        for turns in ((0, 1, -1) if box.width > box.height else (0,)):
+            oriented = np.ascontiguousarray(np.rot90(crop, turns))
+            result = self.model.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=oriented))
+            for points in result.pose_landmarks:
+                for point in points:
+                    u, v = point.x, point.y
+                    if turns == 1:
+                        u, v = 1-v, u
+                    elif turns == -1:
+                        u, v = v, 1-u
+                    point.x, point.y = (x + u*w)/width, (y + v*h)/height
+                pose = assess(points, width, height)
+                if pose:
+                    person_box = (max(0, box.origin_x), max(0, box.origin_y),
+                                  min(width-1, box.origin_x+box.width), min(height-1, box.origin_y+box.height))
+                    if overlap(person_box, pose[0]) >= .25:
+                        return person_box, pose[1], pose[2]
+        return None
+
     def process(self, received, wall_time, jpeg):
         image = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         height, width = rgb.shape[:2]
-        result = self.model.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
-        poses = [pose for points in result.pose_landmarks if (pose := assess(points, width, height))]
+        people = self.people.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)).detections
+        poses = [pose for person in people if (pose := self.person_pose(rgb, person.bounding_box))]
         self.tracks = [t for t in self.tracks if received - t.seen <= 2 or received - t.last_event < 30]
         # Assign strongest overlaps first so two people cannot claim the same track.
         pairs = sorted(((overlap(p[0], t.box), i, j) for i, p in enumerate(poses)
@@ -129,20 +168,26 @@ class FallDetection:
             if not fallen:
                 track.first = None
                 continue
-            fallen_boxes.append(box)
             if track.reported or received - track.last_event < 30:
+                if track.reported:
+                    fallen_boxes.append(box)
                 continue
             marked = self.annotated(rgb, [box])
             photo = (wall_time, width, height, box, marked)
             if track.first is None:
                 track.first = photo
             else:
+                if self.on_fall:
+                    self.on_fall()
                 self.events.record(self.robot, track.first, photo)
                 track.reported, track.last_event, track.first = True, received, None
+                fallen_boxes.append(box)
         if fallen_boxes:
-            preview = marked if len(fallen_boxes) == 1 and marked else self.annotated(rgb, fallen_boxes)
+            preview = self.annotated(rgb, fallen_boxes)
             return "쓰러짐 의심", preview
-        return ("자세 확인 불가" if result.pose_landmarks and not poses else "감지 중"), jpeg
+        if not people:
+            return "사람 미검출", jpeg
+        return ("사람 확인" if poses else "사람 확인 · 자세 확인 불가"), jpeg
 
     def run(self):
         previous = 0
@@ -168,7 +213,11 @@ class FallDetection:
                 with self.lock:
                     self.latest = received, status, preview
         finally:
-            self.model.close()
+            self.close()
+
+    def close(self):
+        self.people.close()
+        self.model.close()
 
     def snapshot(self):
         with self.lock:

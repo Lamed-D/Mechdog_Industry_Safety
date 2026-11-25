@@ -219,6 +219,8 @@
 <section id="review-view" hidden>
   <h2>쓰러짐 로그</h2>
   <div id="review-list">
+    <label>영상 출처 <select id="archive"><option value="live">실제 카메라</option><option value="samples">시연 사진</option></select></label>
+    <button id="replay" hidden>테스트 사진 두 장으로 감지 실행</button>
     <button id="refresh-events">목록 새로고침</button>
     <div id="events"></div>
     <button id="older" hidden>이전 사건 더 보기</button>
@@ -611,7 +613,12 @@ async function poll() {
     }
     if (!cameraSource) $("cam").textContent = "카메라 설정 없음";
     $("fall-status").hidden = !s.fall;
-    $("fall-status").textContent = s.fall ? `쓰러짐 감지 · ${s.fall} · 수신 ${s.fall_fps.toFixed(1)} FPS` : "";
+    $("fall-status").textContent = s.fall ? `${s.fall} · 수신 ${s.fall_fps.toFixed(1)} FPS` : "";
+    if (s.fall_hold > 0) $("fall-status").textContent += ` · 이동 정지 ${Math.ceil(s.fall_hold)}초`;
+    if (s.epoch !== undefined && (motionEpoch === undefined || s.epoch >= motionEpoch)) {
+      if (holding && holding.epoch !== s.epoch) stopMove(false);
+      motionEpoch = s.epoch;
+    }
     const monitor = s.monitor;
     if (monitor && (motionEpoch === undefined || monitor.epoch >= motionEpoch)) {
       if (holding && holding.epoch !== monitor.epoch) stopMove(false);
@@ -674,7 +681,8 @@ async function poll() {
     showLed(s, ledOk);
     if (!ledOk) $("led-status").innerHTML = "로봇 연결 후 사용<br>(로봇을 움직이지 않음, 잠김 중에도 가능)";
     $("s-fault").textContent = s.error || s.fault || "없음";
-    canMove = !!(t && !t.latched && s.fresh && !s.emergency);
+    canMove = !!(t && !t.latched && s.fresh && !s.emergency && !s.fall_hold);
+    $("stand").disabled = $("reset").disabled = s.fall_hold > 0;
     document.querySelectorAll("[data-dir]").forEach(b => b.disabled = !canMove);
     if (holding && !canMove) stopMove();
   } catch (e) {
@@ -688,7 +696,9 @@ async function poll() {
   }
 }
 const localTime = seconds => new Date(seconds * 1000).toLocaleString("ko-KR");
-const photoUrl = (id, index) => "/api/falls/" + id + "/photos/" + index;
+const archiveUrl = () => $("archive").value === "samples" ? "/api/falls-samples" : "/api/falls";
+const photoUrl = (id, index) => archiveUrl() + "/" + id + "/photos/" + index;
+const eventSource = event => $("archive").value === "samples" ? "시연 사진" : "로봇 " + event.robot;
 let selectedEvent = null, lastEvent = null, listRequest = 0;
 
 function openEvent(event) {
@@ -696,7 +706,7 @@ function openEvent(event) {
   $("review-info").textContent = "";
   $("review-list").hidden = true;
   $("review-form").hidden = false;
-  $("event-title").textContent = localTime(event.detected) + " · 로봇 " + event.robot + " · 쓰러짐 의심";
+  $("event-title").textContent = localTime(event.detected) + " · " + eventSource(event) + " · 쓰러짐 의심";
   $("photos").replaceChildren();
   event.photos.forEach((photo, index) => {
     const figure = document.createElement("figure"), caption = document.createElement("figcaption");
@@ -720,7 +730,7 @@ async function loadEvents(append = false) {
   const request = ++listRequest;
   $("older").disabled = true;
   try {
-    const response = await fetch("/api/falls" + (append ? "?before=" + lastEvent : ""));
+    const response = await fetch(archiveUrl() + (append ? "?before=" + lastEvent : ""));
     if (!response.ok) throw new Error("사건 목록을 읽을 수 없습니다.");
     const events = await response.json();
     if (request !== listRequest || selectedEvent) return;
@@ -728,7 +738,7 @@ async function loadEvents(append = false) {
     for (const event of events) {
       const button = document.createElement("button"), image = new Image();
       image.src = photoUrl(event.id, 1); image.alt = ""; image.loading = "lazy";
-      button.append(image, localTime(event.detected) + " · 로봇 " + event.robot + " · " + event.verdict);
+      button.append(image, localTime(event.detected) + " · " + eventSource(event) + " · " + event.verdict);
       button.onclick = () => openEvent(event);
       $("events").append(button);
       lastEvent = event.id;
@@ -759,6 +769,23 @@ $("drive-tab").onclick = () => {
   $("drive-tab").setAttribute("aria-pressed", "true"); $("review-tab").setAttribute("aria-pressed", "false");
 };
 $("older").onclick = () => loadEvents(true);
+$("archive").onchange = () => {
+  $("events").replaceChildren();
+  $("replay").hidden = $("archive").value !== "samples";
+  showList();
+};
+$("replay").onclick = async () => {
+  $("replay").disabled = true;
+  $("review-info").textContent = "시연 사진 두 장 분석 중";
+  try {
+    const result = await post("/api/falls-samples/replay");
+    if ($("archive").value === "samples") {
+      await loadEvents();
+      $("review-info").textContent = "시연 결과 · " + result.status;
+    }
+  } catch (error) { $("review-info").textContent = error.message; }
+  finally { $("replay").disabled = false; }
+};
 $("refresh-events").onclick = showList;
 $("back-events").onclick = showList;
 $("review-form").onsubmit = async e => {
@@ -766,7 +793,7 @@ $("review-form").onsubmit = async e => {
   const event = selectedEvent;
   $("save-review").disabled = true;
   try {
-    await post("/api/falls/" + event.id + "/review", { verdict:$("verdict").value, note:$("review-note").value });
+    await post(archiveUrl() + "/" + event.id + "/review", { verdict:$("verdict").value, note:$("review-note").value });
     if (selectedEvent === event) {
       $("review-time").textContent = "방금 저장";
       $("review-info").textContent = "판정과 메모를 저장했습니다.";
@@ -777,6 +804,14 @@ $("review-form").onsubmit = async e => {
     $("save-review").disabled = false;
   }
 };
+function openSampleLink() {
+  if (location.hash !== "#samples") return;
+  $("archive").value = "samples";
+  $("replay").hidden = false;
+  $("review-tab").click();
+}
+addEventListener("hashchange", openSampleLink);
+openSampleLink();
 setInterval(poll, 250); poll(); pollScan();
 </script>
 </body>

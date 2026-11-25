@@ -12,8 +12,13 @@ VERDICTS = ("미검토", "쓰러짐 확인", "오탐", "판단 보류")
 
 
 class FallEvents:
-    def __init__(self):
-        self.path = DATA_DIR / "fall-events.sqlite3"
+    def __init__(self, path=None):
+        self.path = path or DATA_DIR / "fall-events.sqlite3"
+
+    def last_detection(self, robot):
+        if self.path.exists():
+            with closing(sqlite3.connect(self.path)) as db:
+                return db.execute("SELECT max(detected) FROM event WHERE robot=?", (robot,)).fetchone()[0]
 
     def prepare(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)

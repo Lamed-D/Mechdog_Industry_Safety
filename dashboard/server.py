@@ -32,7 +32,7 @@ from firmware.robot.python import config as settings  # noqa: E402
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 from dashboard.camera_monitor import CameraMonitor  # noqa: E402
-from dashboard.fall_events import FallEvents  # noqa: E402
+from dashboard.fall_events import DATA_DIR, FallEvents  # noqa: E402
 
 MAX_BODY = 256
 
@@ -147,6 +147,14 @@ class Console:
         self.monitor = monitor
         self.fall = fall
         self.events = events or FallEvents()
+        self.samples = FallEvents(DATA_DIR / "sample-events.sqlite3")
+        self.sample_lock = threading.Lock()
+        self.hold_until = 0
+        if fall and self.link:
+            fall.on_fall = self.stop_for_fall
+            last = self.events.last_detection(robot)
+            if last:
+                self.hold_until = time.monotonic() + max(0, min(30, last + 30 - time.time()))
         self.person_stop = self.obstacle_stop = False
         self.motion_epoch = 0
         self.manual_led = (0, 0, 0)
@@ -154,6 +162,31 @@ class Console:
         self.lidar = lidar or LidarFeed()
         self.error = None
         self.running = True
+
+    def stop_for_fall(self):
+        with self.lock:
+            self.hold_until = time.monotonic() + 30
+            self.motion_epoch += 1
+            self.link.pending_led = None
+            self.link.stop()
+
+    def replay_sample(self):
+        from dashboard.fall_detection import FallDetection
+        if not self.sample_lock.acquire(blocking=False):
+            raise ValueError("시연 사진 분석 중입니다.")
+        try:
+            frames = [(DATA_DIR / "samples/replay" / name).read_bytes() for name in ("first.jpg", "second.jpg")]
+            self.samples.prepare()
+            detector = FallDetection(None, self.samples, "공개 시연 사진")
+            try:
+                now, wall = time.monotonic(), time.time()
+                for index, frame in enumerate(frames):
+                    status, _ = detector.process(now + index / 3, wall + index / 3, frame)
+                return status
+            finally:
+                detector.close()
+        finally:
+            self.sample_lock.release()
 
     def monitor_stop(self):
         video, _ = self.monitor.snapshot()
@@ -225,6 +258,8 @@ class Console:
                 "cam": self.cam,
                 "fall": fall_status,
                 "fall_fps": fall_fps,
+                "fall_hold": max(0, self.hold_until - time.monotonic()),
+                "epoch": self.motion_epoch,
                 "usb_camera": self.usb_camera is not None,
                 "monitor": ({
                     **self.monitor.snapshot()[0],
@@ -249,8 +284,10 @@ class Console:
                 raise ValueError("sensor-only mode")
             if not self.running:
                 raise ValueError("console is closing")
+            if path in ("/api/move", "/api/stand", "/api/reset") and time.monotonic() < self.hold_until:
+                raise ValueError("쓰러짐 감지로 30초 정지 중입니다.")
             if path == "/api/move":
-                if self.monitor and body.get("epoch") != self.motion_epoch:
+                if (self.monitor or self.fall) and body.get("epoch") != self.motion_epoch:
                     raise ValueError("감지로 정지했습니다. 방향을 다시 누르세요")
                 self.link.move(body["step"], body["angle"])
             elif path == "/api/stop":
@@ -325,14 +362,15 @@ def make_handler(console):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if self.path == "/api/state":
                 return self._send(200, console.state())
-            page = re.fullmatch(r"/api/falls(?:\?before=([1-9][0-9]{0,17}))?", self.path)
-            photo = re.fullmatch(r"/api/falls/([1-9][0-9]{0,17})/photos/([01])", self.path)
+            archive = console.samples if self.path.startswith("/api/falls-samples") else console.events
+            page = re.fullmatch(r"/api/falls(?:-samples)?(?:\?before=([1-9][0-9]{0,17}))?", self.path)
+            photo = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/photos/([01])", self.path)
             try:
                 if page:
                     before = int(page[1]) if page[1] else 2**63 - 1
-                    return self._send(200, console.events.page(before))
+                    return self._send(200, archive.page(before))
                 if photo:
-                    return self._send(200, console.events.photo(int(photo[1]), int(photo[2])), "image/jpeg")
+                    return self._send(200, archive.photo(int(photo[1]), int(photo[2])), "image/jpeg")
             except KeyError:
                 return self._send(404, {"error": "사진 없음"})
             except sqlite3.Error:
@@ -364,19 +402,24 @@ def make_handler(console):
                 return self._reject_post(400, "invalid length")
             if length < 0:
                 return self._reject_post(400, "invalid length")
-            review = re.fullmatch(r"/api/falls/([1-9][0-9]{0,17})/review", self.path)
+            review = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/review", self.path)
             if length > (16384 if review else MAX_BODY):
                 return self._reject_post(413, "too large")
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("JSON object required")
+                if self.path == "/api/falls-samples/replay":
+                    return self._send(200, {"status": console.replay_sample()})
                 if review:
-                    console.events.review(int(review[1]), body.get("verdict"), body.get("note"))
+                    archive = console.samples if self.path.startswith("/api/falls-samples/") else console.events
+                    archive.review(int(review[1]), body.get("verdict"), body.get("note"))
                 else:
                     console.command(self.path, body)
-            except sqlite3.Error:
-                return self._send(503, {"error": "판정을 저장할 수 없습니다"})
+            except (FileNotFoundError, ImportError):
+                return self._send(503, {"error": "시연 사진 또는 감지 모델이 준비되지 않았습니다."})
+            except (OSError, RuntimeError, sqlite3.Error):
+                return self._send(503, {"error": "사진 분석 또는 저장에 실패했습니다."})
             except KeyError:
                 return self._send(404, {"error": "not found"})
             except (ValueError, TypeError) as error:
