@@ -28,13 +28,17 @@ sys.path.insert(0, ROOT)
 import socket  # noqa: E402
 from dashboard.robot_link import RobotLink, parse_telemetry  # noqa: E402
 from dashboard.udp_transport import UdpTransport  # noqa: E402
-from firmware.robot.python import config as settings  # noqa: E402
+from firmware.robot.python import config as settings, proto as wire  # noqa: E402
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 from dashboard.camera_monitor import CameraMonitor  # noqa: E402
 from dashboard.fall_events import DATA_DIR, FallEvents  # noqa: E402
 
 MAX_BODY = 256
+GREET_ACTION = "scrape_a_bow"  # 사람 인식 시 신호 (ai/mechdog-api.md 4.1)
+GREET_WAIT_S = 2.0       # 감지 뒤 로봇이 멈춰 대기 상태가 되기를 기다리는 최대 시간
+GREET_COOLDOWN_S = 10.0  # [가정] 인사가 끝난 뒤 다시 인사하지 않는 시간 (ai/scenario.md 3절)
+GREET_LOST_S = 2.0       # 동작 최대 시간이 지나고도 끝남을 못 보면 추적을 그만두는 여유
 
 
 class AutoTransport:
@@ -83,9 +87,10 @@ class AutoTransport:
 
 
 class ConsoleLink(RobotLink):
-    """일어서기(기본 자세) 요청 추가. 로봇 규약의 POSE default = set_default_pose().
-    잠금이 풀리고 신선한 상태일 때 한 번만 보냅니다. 잠김·비상정지면 보내지 않습니다."""
-    pending_pose = None
+    """일어서기(기본 자세)·동작 그룹 요청 추가. 로봇 규약의 POSE default = set_default_pose(),
+    ACTION <이름> = action_run(이름)(허용 목록은 로봇이 다시 확인).
+    잠금이 풀리고 신선한 대기 상태일 때 한 번만 보냅니다. 잠김·비상정지면 보내지 않습니다."""
+    pending = None  # (마감, 명령, 인자): 다음 대기 주기에 한 번만 보냄
 
     def _can_stand(self):
         t = self.latest
@@ -93,18 +98,26 @@ class ConsoleLink(RobotLink):
                 and t.battery_mv is not None and t.battery_mv >= settings.LOW_BATT_WARN_MV
                 and not t.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "lidar_backlog", "proto"}))
 
-    def request_stand(self):
+    def _request(self, name, arg):
         if not self._can_stand():
             raise ValueError("대기 상태·잠금 해제·배터리 상태를 확인하세요")
         self.stop()
-        self.pending_pose = self.clock() + settings.HOST_INTENT_MS / 1000
+        self.pending = (self.clock() + settings.HOST_INTENT_MS / 1000, name, arg)
+
+    def request_stand(self):
+        self._request("POSE", "default")
+
+    def request_action(self, name):
+        if name not in wire.ACTION_ALLOW:
+            raise ValueError("허용되지 않은 동작 그룹")
+        self._request("ACTION", name)
 
     def stop(self):
-        self.pending_pose = None
+        self.pending = None
         super().stop()
 
     def estop(self):
-        self.pending_pose = None
+        self.pending = None
         super().estop()
 
     def close(self):
@@ -112,7 +125,7 @@ class ConsoleLink(RobotLink):
         super().close()
 
     def move(self, step, angle):
-        self.pending_pose = None
+        self.pending = None
         if not self.fresh() or self.emergency or self.latest.latched:
             raise ValueError("로봇 연결과 잠금 상태를 확인하세요")
         super().move(step, angle)
@@ -120,24 +133,24 @@ class ConsoleLink(RobotLink):
     def observe(self, data):
         accepted = super().observe(data)
         if not accepted or not self._can_stand():
-            self.pending_pose = None
+            self.pending = None
         return accepted
 
     def step(self):
         if not self._can_stand():
-            self.pending_pose = None
+            self.pending = None
         super().step()
 
     def _idle_command(self):
-        deadline, self.pending_pose = self.pending_pose, None
-        if deadline is not None and self.clock() < deadline:
-            return self._command("POSE", "default")
+        pending, self.pending = self.pending, None
+        if pending is not None and self.clock() < pending[0]:
+            return self._command(*pending[1:])
         return super()._idle_command()
 
 
 class Console:
     def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None,
-                 fall=None, events=None):
+                 fall=None, events=None, *, greet=False):
         self.lock = threading.Lock()
         self.transport = transport
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
@@ -145,6 +158,12 @@ class Console:
         self.cam = cam
         self.usb_camera = usb_camera
         self.monitor = monitor
+        self.greet = greet
+        self.greet_until = None      # 인사를 보낼 마감(감지 직후 로봇이 대기 상태가 되길 기다림)
+        self.greet_sent = None       # 인사를 보낸 시각. 끝나면 None
+        self.greet_seen_action = False
+        self.greet_block_until = -float("inf")
+        self.greet_count = 0
         self.fall = fall
         self.events = events or FallEvents()
         self.samples = FallEvents(DATA_DIR / "sample-events.sqlite3")
@@ -166,6 +185,8 @@ class Console:
     def stop_for_fall(self):
         with self.lock:
             self.hold_until = time.monotonic() + 30
+            self.greet_until = self.greet_sent = None
+            self.greet_seen_action = False
             self.motion_epoch += 1
             self.link.pending_led = None
             self.link.stop()
@@ -199,14 +220,55 @@ class Console:
                 obstacle = True
             elif distance >= 400:
                 obstacle = False
-        tripped = (person and not self.person_stop) or (obstacle and not self.obstacle_stop)
+        new_person = person and not self.person_stop
+        tripped = new_person or (obstacle and not self.obstacle_stop)
         self.person_stop, self.obstacle_stop = person, obstacle
         if tripped:
             self.motion_epoch += 1
             self.link.pending_led = None
             self.applied_led = None
             self.link.stop()
+        if (new_person and self.greet and self.greet_sent is None and time.monotonic() >= self.hold_until
+                and self.link.clock() >= self.greet_block_until):
+            self.greet_until = self.link.clock() + GREET_WAIT_S
         return tripped
+
+    def _greet_done(self, now):
+        self.greet_sent = None
+        self.greet_seen_action = False
+        self.greet_block_until = now + GREET_COOLDOWN_S
+
+    def monitor_greet(self):
+        """사람이 새로 보이면 멈춘 뒤 인사(scrape_a_bow) → 끝나면 set_default_pose().
+        수동 입력·사람 사라짐·잠김이면 보내지 않고, 인사 뒤 GREET_COOLDOWN_S 동안 다시 인사하지 않습니다."""
+        link = self.link
+        now = link.clock()
+        t = link.latest if link.fresh() else None
+        if self.greet_sent is not None:
+            if t is None or link.emergency or t.latched:
+                self._greet_done(now)  # 래치면 로봇이 stop_action + move(0, 0). 자세 요청 없음
+            elif t.state == "action":
+                self.greet_seen_action = True
+            elif self.greet_seen_action and t.state == "idle":
+                if link.intent is None:  # 수동 이동이 이어지면 로봇이 MOVE 전에 스스로 기본 자세를 잡음
+                    try:
+                        link.request_stand()
+                    except ValueError:
+                        pass
+                self._greet_done(now)
+            elif now - self.greet_sent > settings.ACTION_DURATION_MS[GREET_ACTION] / 1000 + GREET_LOST_S:
+                self._greet_done(now)  # 명령 유실 등으로 동작을 못 봄
+            return
+        if self.greet_until is None:
+            return
+        if now > self.greet_until or not self.person_stop or link.intent is not None or link.emergency:
+            self.greet_until = None  # 시간 초과·사람 사라짐·수동 조종이 우선
+        elif link._can_stand():
+            link.request_action(GREET_ACTION)
+            self.greet_until = None
+            self.greet_sent = now
+            self.greet_seen_action = False
+            self.greet_count += 1
 
     def monitor_led(self):
         if not self.link.fresh() or not self.link.latest.has_sonar or self.link.emergency:
@@ -232,6 +294,8 @@ class Console:
                     self.link.estop()
                 try:
                     tripped = self.monitor and self.monitor_stop()
+                    if self.monitor and self.greet:
+                        self.monitor_greet()
                     self.link.step()
                     if self.monitor and not tripped:
                         self.monitor_led()
@@ -267,6 +331,10 @@ class Console:
                     "obstacle_stop": self.obstacle_stop,
                     "epoch": self.motion_epoch,
                     "override": bool((self.person_stop or self.obstacle_stop) and self.link.intent),
+                    "greet": ("off" if not self.greet else "greeting" if self.greet_sent is not None
+                              else "waiting" if self.greet_until is not None
+                              else "cooldown" if self.link.clock() < self.greet_block_until else "ready"),
+                    "greet_count": self.greet_count,
                 } if self.monitor else None),
                 "robot_ip": self.transport.peer[0] if self.transport.peer else None,
                 "tel": None if t is None else {
@@ -284,6 +352,8 @@ class Console:
                 raise ValueError("sensor-only mode")
             if not self.running:
                 raise ValueError("console is closing")
+            if path in ("/api/move", "/api/stop", "/api/estop"):
+                self.greet_until = None  # 사람 입력이 보내기 전 인사보다 우선
             if path in ("/api/move", "/api/stand", "/api/reset") and time.monotonic() < self.hold_until:
                 raise ValueError("쓰러짐 감지로 30초 정지 중입니다.")
             if path == "/api/move":
@@ -452,6 +522,7 @@ def main():
     p.add_argument("--allow-real", action="store_true", help="실제 로봇에 보내기 허용")
     p.add_argument("--sensors-only", action="store_true", help="카메라·라이다 표시, 본체 UDP 소켓 없음")
     p.add_argument("--monitor", action="store_true", help="Wi-Fi 영상 사람 감지와 초음파 정지 활성화")
+    p.add_argument("--greet", action="store_true", help="--monitor 에서 사람을 새로 보면 멈춘 뒤 인사(scrape_a_bow)")
     p.add_argument("--fall-detection", action="store_true", help="Wi-Fi 영상 쓰러짐 감지 및 검토 사진 저장")
     camera_source = p.add_mutually_exclusive_group()
     camera_source.add_argument("--cam", default="", help="카메라 영상 주소 예: http://192.168.5.1:81/stream")
@@ -465,6 +536,8 @@ def main():
     a = p.parse_args()
     if a.monitor and (a.sensors_only or a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
+    if a.greet and not a.monitor:
+        p.error("--greet에는 --monitor가 필요합니다")
     if a.fall_detection and (a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--fall-detection에는 Wi-Fi 카메라(--cam 또는 --hotspot)가 필요합니다")
     if a.monitor or a.fall_detection:
@@ -502,7 +575,7 @@ def main():
             fall = FallDetection(feed, events, a.robot)
         except (ImportError, OSError, ValueError, RuntimeError, sqlite3.Error) as error:
             p.error(f"쓰러짐 감지 초기화 실패: {error}")
-    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events)
+    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events, greet=a.greet)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
