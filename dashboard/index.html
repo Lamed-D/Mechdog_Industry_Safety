@@ -108,6 +108,7 @@
   #photos .expanded button { cursor:zoom-out; }
   #review-form label { display:block; margin:10px 0; }
   #review-form textarea { display:block; width:min(100%,640px); }
+  #drive-controls { border:0; padding:0; margin:0; min-width:0; }
 </style>
 </head>
 <body>
@@ -167,6 +168,7 @@
     </section>
     <section id="motion-controls">
       <h2>이동 — 누르고 있는 동안만 움직임</h2>
+      <fieldset id="drive-controls" disabled aria-label="로봇 조종">
       <div class="start-row">
         <button id="reset">잠금 해제<br><small>사람이 로봇 상태 확인 후</small></button>
         <button id="stand">일어서기<br><small>기본 자세</small></button>
@@ -195,6 +197,7 @@
       <div class="row"><label for="angle" title="전진·후진하며 도는 버튼(Q/E/Z/C)에만 적용. 제자리 회전(A/D)은 아래 슬라이더">회전 (Q/E/Z/C)</label><input id="angle" type="range" min="1" max="30" value="15"><span class="val"><output id="anglev">15</output><span class="max"> / 30</span></span></div>
       <div class="row"><label for="spin" title="제자리 회전(A/D)에만 적용. 상한 60">제자리 회전 (A/D)</label><input id="spin" type="range" min="1" max="60" value="60"><span class="val"><output id="spinv">60</output><span class="max"> / 60</span></span></div>
       <div class="hint">화면을 떠나거나 버튼에서 손을 떼면 바로 정지합니다.</div>
+      </fieldset>
     </section>
   </div>
     <section id="lidar-panel">
@@ -633,13 +636,15 @@ async function poll() {
       $("estop").hidden = true;
       $("keyboard-toggle").hidden = true;
       $("battery").hidden = true;
-      $("motion-controls").hidden = true;
+      $("drive-controls").disabled = true;
+      $("drive-state").textContent = "카메라 전용 · 본체 제어 꺼짐";
       $("lock").hidden = true;
       $("robot").textContent = "센서 전용";
       pill($("link"), "본체 제어 꺼짐", "");
       return;
     }
     controlsEnabled = true;
+    $("drive-controls").disabled = false;
     $("motion-controls").hidden = $("lock").hidden = $("battery").hidden = $("estop").hidden = $("keyboard-toggle").hidden = false;
     $("estop").disabled = false;
     const t = s.tel;
