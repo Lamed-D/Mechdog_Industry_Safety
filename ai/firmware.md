@@ -65,6 +65,8 @@ python firmware/build.py A --only arduino            # Arduino 판(예비) 컴�
 
 ### 2.2 업로드 순서 (사용자 가이드)
 
+협동 시나리오는 두 본체 모두 이 절의 최신 MicroPython 빌드를 올립니다. 부저 초기화 성공 시 본체 TEL에 `tone`과 실행 순번을 표시합니다. A와 B의 빌드 폴더와 카메라 ID를 맞춥니다.
+
 사용자가 그대로 따라 합니다. 에이전트는 이 절을 최신으로 유지하고, 업로드가 필요할 때 채팅으로 이 순서를 안내합니다.
 
 0. 빌드: `python firmware/build.py <ID> --only python` → `build/robot_<ID>/python/`의 파일을 올립니다.
@@ -119,6 +121,8 @@ python firmware/builder/build_main_arduino.py  # ID 확인 없이 → build/main
 - 보드 **ESP32 Dev Module**, ESP32 Arduino 코어 **3.3.12**. 합본·업로드 기능은 빌드 도구에 없습니다.
 
 ### 4.2 설정·업로드 (사용자 가이드)
+
+두 로봇 협동 탭은 초음파 거리와 부저 실행 확인을 제공하는 2.2절 MicroPython 본체를 사용합니다.
 
 사용자가 그대로 따라 합니다. 에이전트는 빌드(4.1)까지만 하고 이 순서를 안내합니다.
 

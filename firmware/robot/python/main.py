@@ -37,6 +37,10 @@ try:
     app = App(config, mechdog, Hiwonder.Battery_power, read_tilt, network, socket, machine, time,
               SSID, PASSWORD, vision=Vision(Hiwonder_IIC, config.VISION_RECOGNITION_ON_CAMERA),
               sonar=Sonar(Hiwonder_IIC, _iic1))
+    try:
+        app.robot.buzzer = Hiwonder.Buzzer()
+    except Exception:
+        pass
     app.start(Hiwonder.startMain)  # 감시 스레드 하나 + Wi-Fi
     app.run()  # 명령·텔레메트리·비전을 이 스레드에서 계속 (돌아오지 않음)
 except BaseException:

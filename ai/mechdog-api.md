@@ -81,7 +81,7 @@
 | --- | --- | --- | --- |
 | 스레드 | `Hiwonder.startMain(func)` | 예제·문자열 있음. 여러 루프 동시 실행 | 전역 조립 → 함수 → `startMain`, 매회 `sleep_ms` 양보 |
 | 배터리 | `Hiwonder.Battery_power()` | 예제·문자열 있음. mV | 실패는 NA |
-| 부저 | `Hiwonder.Buzzer()`, `playTone(freq, ms, wait)` | 있음 | 런타임 미사용 |
+| 부저 | `Hiwonder.Buzzer()`, `playTone(freq, ms, wait)` | [제조사 예제](https://docs.hiwonder.com/projects/MechDog/en/latest/docs/4.Python_Programming_Projects.html) | 협동 현장·호출·도착 신호, wait=False |
 | 버튼 | `Hiwonder.Button(1/2)`, `Clicked(callback)` | 있음 | 런타임 미사용 |
 | 조도 | `Hiwonder.LightSensor()`, `read()` | 문서 | J5(IO33)와 겹침 → 라이다와 함께 쓰지 않음([hardware.md](hardware.md)) |
 | 도트 매트릭스 | `Hiwonder.Digitaltube()`, `setBrightness(n)`, `showNum(n)` | 문서 | — |

@@ -127,6 +127,7 @@
 <nav id="views" aria-label="화면 선택">
   <button id="drive-tab" aria-pressed="true">조종</button>
   <button id="patrol-tab" aria-pressed="false">자율주행</button>
+  <button id="team-tab" aria-pressed="false">협동 시나리오</button>
   <button id="review-tab" aria-pressed="false">쓰러짐 로그</button>
 </nav>
 <main id="drive-view">
@@ -243,6 +244,25 @@
       <p id="patrol-status" role="status"></p>
       <p id="patrol-error" role="alert"></p>
     </section>
+  </div>
+</section>
+<section id="team-view" hidden>
+  <h2>두 로봇 쓰러짐 대응</h2>
+  <p id="team-message" role="status">서버 연결 확인 중</p>
+  <div id="team-panel" hidden>
+    <div id="team-robots" class="top-row"></div>
+    <fieldset id="team-course"><legend>한 방향 순환 코스</legend>
+      <p><label>주행 방식 <select id="team-mode"><option value="line">선 기반</option><option value="tag">선 없는 태그 접근</option></select></label>
+      <label>태그 탐색 방향 <select id="team-turn"><option value="left">왼쪽</option><option value="right">오른쪽</option></select></label></p>
+      <p><label>코스 순서 <input id="team-route" value="0,1,2" size="12"></label>
+      <label>도움 요청 구역 ID <input id="team-zones" value="2" size="8"></label></p>
+      <label>A 출발 ID <input type="number" id="team-a" min="0" max="586" value="0"></label>
+      <label>B 출발 ID <input type="number" id="team-b" min="0" max="586" value="1"></label>
+      <p id="team-print"></p>
+    </fieldset>
+    <p><button id="team-start">공동 순찰 시작</button> <button id="team-stop">전체 정지</button>
+    <button class="estop" id="team-estop">전체 비상 정지 (Esc)</button> <button id="team-finish">사건 종료</button></p>
+    <p id="team-error" role="alert"></p>
   </div>
 </section>
 <section id="review-view" hidden>
@@ -638,6 +658,7 @@ async function poll() {
   try {
     const s = await (await fetch("/api/state")).json();
     showPatrolState(s);
+    showTeam(s.team);
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
     if (!cameraSource && (s.usb_camera || s.cam)) {
       cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!(s.monitor || s.fall || s.patrol) };
@@ -680,8 +701,8 @@ async function poll() {
       $("drive-controls").disabled = true;
       $("drive-state").textContent = "카메라 전용 · 본체 제어 꺼짐";
       $("lock").hidden = true;
-      $("robot").textContent = "센서 전용";
-      pill($("link"), "본체 제어 꺼짐", "");
+      $("robot").textContent = s.team ? "로봇 A/B" : "센서 전용";
+      pill($("link"), s.team ? "협동 시나리오 · " + s.team.phase : "본체 제어 꺼짐", "");
       return;
     }
     controlsEnabled = true;
@@ -795,30 +816,31 @@ function showList() {
 let patrolOwner = null, previewBusy = false, patrolStarting = false, heartBusy = false;
 function leavePatrol() {
   patrolOwner = null;
+  if (teamOwner) stopTeam("stop");
   stopMove();
 }
-for (const view of ["drive", "patrol", "review"]) {
+for (const view of ["drive", "patrol", "team", "review"]) {
   $(view + "-tab").onclick = () => {
     if ($(view + "-view").hidden) leavePatrol();
-    for (const other of ["drive", "patrol", "review"]) {
+    for (const other of ["drive", "patrol", "team", "review"]) {
       $(other + "-view").hidden = other !== view;
       $(other + "-tab").setAttribute("aria-pressed", String(other === view));
     }
     if (view === "review") showList();
   };
 }
-function courseIds() {
-  const fields = $("patrol-route").value.split(",").map(s => s.trim());
+function courseIds(id = "patrol-route") {
+  const fields = $(id).value.split(",").map(s => s.trim());
   if (fields.length > 24 || fields.some(s => !/^\d{1,3}$/.test(s) || Number(s) >= 587)) {
     throw new Error("0~586의 태그 ID를 쉼표로 구분하세요 (최대 24개)");
   }
   return fields.map(Number);
 }
-function showTagLinks() {
-  const box = $("patrol-print");
+function showTagLinks(routeId, printId) {
+  const box = $(printId);
   box.replaceChildren();
   let ids;
-  try { ids = courseIds(); } catch { return; }
+  try { ids = courseIds(routeId); } catch { return; }
   for (const id of new Set(ids)) {
     const link = document.createElement("a");
     link.href = "/api/patrol/marker/" + id;
@@ -827,8 +849,11 @@ function showTagLinks() {
     box.append(link, " ");
   }
 }
-$("patrol-route").oninput = showTagLinks;
-showTagLinks();
+for (const prefix of ["patrol", "team"]) {
+  const routeId = prefix + "-route";
+  $(routeId).oninput = () => showTagLinks(routeId, prefix + "-print");
+  $(routeId).oninput();
+}
 $("patrol-mode").onchange = () => {
   const line = $("patrol-mode").value === "line";
   $("patrol-turn-row").hidden = $("patrol-calibrate").hidden = line;
@@ -925,6 +950,90 @@ $("review-form").onsubmit = async e => {
     $("save-review").disabled = false;
   }
 };
+let teamOwner = null, teamGeneration, teamStarting = false, teamHeartBusy = false;
+const teamRequest = (action, body) => post("/api/team/" + action, body);
+function teamError(e) { $("team-error").textContent = e.message; }
+function stopTeam(action) {
+  teamOwner = null;
+  teamRequest(action).catch(teamError);
+}
+for (const id of ["A", "B"]) {
+  const card = document.createElement("section");
+  card.innerHTML = '<h3>로봇 ' + id + '</h3><img alt="순찰 카메라" style="width:100%;max-width:480px" hidden>' +
+    '<p role="status"></p><button>잠금 해제</button> <button>보이는 태그 도착 기준 저장</button>';
+  card.id = "team-card-" + id;
+  const [unlock, save] = card.querySelectorAll("button");
+  unlock.onclick = () => {
+    if (confirm("로봇 " + id + " 주변을 확인했습니까?")) teamRequest("reset", {robot:id}).catch(teamError);
+  };
+  save.onclick = () => teamRequest("calibrate", {robot:id}).catch(teamError);
+  $("team-robots").append(card);
+  let busy = false;
+  setInterval(async () => {
+    if (busy || document.hidden || $("team-view").hidden || $("team-panel").hidden) return;
+    busy = true;
+    const img = card.querySelector("img");
+    try {
+      const res = await fetch("/api/team/frame/" + id, {signal:AbortSignal.timeout(1500)});
+      if (!res.ok) throw new Error();
+      const url = URL.createObjectURL(await res.blob());
+      if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+      img.src = url; img.hidden = false;
+    } catch { img.hidden = true; }
+    finally { busy = false; }
+  }, 350);
+}
+function showTeam(team) {
+  $("team-panel").hidden = !team;
+  if (!team) {
+    $("team-message").textContent = "A/B 본체 주소로 서버를 실행하세요. README의 두 로봇 협동 시나리오 절을 확인하세요.";
+    return;
+  }
+  if (teamGeneration === undefined && location.hash !== "#samples") $("team-tab").click();
+  teamGeneration = team.generation;
+  $("team-message").textContent = [team.phase, team.scene && "현장 로봇 " + team.scene,
+    team.destination != null && "현장 인근 태그 " + team.destination + " (마지막 확인 위치)"].filter(Boolean).join(" · ");
+  $("team-course").disabled = team.active;
+  $("team-start").disabled = teamStarting || team.active || !!team.scene ||
+    Object.values(team.robots).some(r => !r.fresh || r.locked);
+  for (const [id,r] of Object.entries(team.robots)) {
+    const card = $("team-card-" + id);
+    const tones = {alarm:"현장 경보", call:"도움 요청", arrive:"도착"};
+    card.querySelector("p").textContent = [r.fresh ? "연결" : "연결 대기", r.locked ? "잠김" : "잠금 해제",
+      r.role, "마지막 지점 " + (r.last ?? "—"), "목표 " + (r.target ?? "—"), r.blocked,
+      "본체 확인 신호음 " + (tones[r.tone] || "없음"), "도착 기준 " + (r.calibrated.join(", ") || "없음")].filter(Boolean).join(" · ");
+    const [unlock, save] = card.querySelectorAll("button");
+    unlock.disabled = team.active || !r.fresh || !r.locked;
+    save.disabled = team.active;
+  }
+}
+$("team-start").onclick = async () => {
+  if (teamStarting) return;
+  const owner = crypto.randomUUID();
+  teamStarting = true; teamOwner = owner;
+  $("team-error").textContent = "";
+  try {
+    await teamRequest("start", {owner, generation:teamGeneration, mode:$("team-mode").value,
+      turn:$("team-turn").value, course:courseIds("team-route"), zones:courseIds("team-zones"),
+      starts:[$("team-a").valueAsNumber,$("team-b").valueAsNumber]});
+    if (teamOwner !== owner) await teamRequest("stop");
+  } catch (e) { teamOwner = null; teamError(e); }
+  finally { teamStarting = false; }
+};
+for (const action of ["stop", "estop", "finish"]) $("team-" + action).onclick = () => stopTeam(action);
+addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("team-view").hidden && !$("team-panel").hidden) stopTeam("estop");
+});
+addEventListener("pagehide", () => { teamOwner = null; });
+setInterval(async () => {
+  if (!teamOwner || teamStarting || teamHeartBusy || document.hidden || $("team-view").hidden) return;
+  const owner = teamOwner;
+  teamHeartBusy = true;
+  try { await teamRequest("heartbeat", {owner}); }
+  catch { if (teamOwner === owner) teamOwner = null; }
+  finally { teamHeartBusy = false; }
+}, 220);
+
 function openSampleLink() {
   if (location.hash !== "#samples") return;
   $("archive").value = "samples";

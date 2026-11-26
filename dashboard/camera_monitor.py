@@ -7,9 +7,10 @@ from urllib.request import urlopen
 
 
 class CameraMonitor:
-    def __init__(self, url, cv, person_detection=True, expected_robot=None):
+    def __init__(self, url, cv, person_detection=True, expected_robot=None, require_id=False):
         self.url = url
         self.expected_robot = expected_robot
+        self.require_id = require_id
         self.cv = cv
         self.detector = None
         if person_detection:
@@ -38,7 +39,7 @@ class CameraMonitor:
             try:
                 with urlopen(self.url, timeout=2) as stream:
                     source_robot = stream.headers.get("X-Robot")
-                    if self.expected_robot and source_robot and source_robot != self.expected_robot:
+                    if self.expected_robot and (self.require_id or source_robot) and source_robot != self.expected_robot:
                         raise ValueError("camera robot ID mismatch")
                     boundary = stream.headers.get_param("boundary", "").encode("ascii")
                     if not boundary:
