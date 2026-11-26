@@ -20,6 +20,16 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 2. Vision을 빌드하려면 **Arduino IDE 2**를 설치합니다. IDE의 **File → Preferences → Additional boards manager URLs**에 `https://espressif.github.io/arduino-esp32/package_esp32_index.json`을 추가합니다. **Boards Manager**에서 **esp32 by Espressif Systems 3.3.12**를 선택해 설치합니다. [Arduino IDE 설치](https://support.arduino.cc/hc/en-us/articles/360019833020-Download-and-install-Arduino-IDE) · [Espressif 보드 패키지 설치](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html)
 3. 카메라를 USB로 설정하거나 USB LiDAR를 쓸 경우 `python -m pip install pyserial`을 실행합니다. 카메라를 데이터용 USB 케이블로 연결했는데 장치 관리자에 **USB-SERIAL CH340 (COM 번호)**가 없으면 케이블과 CH340 드라이버 설치 상태를 확인합니다.
 
+### 자율주행 탭에서 순찰 실험하기
+
+1. 노트북에 `python -m pip install "opencv-python-headless>=4.8"`을 설치합니다. 카메라만 연결한 상태에서는 `python -m dashboard.server --robot A --hotspot --sensors-only`로 시작합니다. 본체 주행 때는 `python -m dashboard.server --robot A --hotspot --allow-real`로 실행합니다. 대시보드 주소는 `http://127.0.0.1:8090`입니다.
+2. **자율주행** 탭에서 방문 순서를 입력하고 각 **태그 인쇄** 링크를 열어 흰 여백까지 인쇄합니다. 기본 순서 `1,0`은 A(ID 0)에서 출발해 B(ID 1)에 들른 뒤 A에 돌아와 정지합니다. 코너에는 경유 태그를 추가할 수 있습니다.
+3. **선 기반**은 밝은 바닥에 검은 선으로 폐곡선을 만들고 지점마다 파란 가로 띠를 붙입니다. 출발은 A의 띠를 막 지난 위치입니다. 영상 아래쪽에서 노란 점이 선을 따르는지, 띠에서 멈출 위치에 해당 태그 하나가 보이는지 확인합니다.
+4. **선 없음**은 각 지점의 원하는 정지 위치에서 해당 태그 하나를 화면 중앙에 놓고 **도착 기준 저장**을 누릅니다. 기준은 노트북에 로봇 ID별로 저장됩니다. 인쇄 크기·렌즈 설정을 바꾸면 다시 저장합니다. 각 구간에서 다음 태그가 보이고 선택한 탐색 방향으로 다음 지점을 찾을 수 있도록 배치합니다.
+5. 실물 주행은 연결 상태와 전방 초음파를 확인하고 **조종 → 잠금 해제 → 자율주행 → 한 바퀴 시작**을 누릅니다. 현재 목표와 방문 순서, 정지 사유가 탭에 표시됩니다. 운영자가 **정지** 또는 상단 **비상 정지(Esc)**로 개입할 수 있습니다. 중단 뒤 다시 시작하면 입력한 순서의 첫 지점부터 진행합니다.
+
+첫 현장 확인에서는 두 모드의 완주 여부, 각 지점 정지 오차와 수동 개입 횟수를 기록합니다. 선·목표 가림, 전방 장애물, 카메라 단절, 탭 이탈에서 실제로 정지하는지도 확인합니다.
+
 ### 인터넷을 유지하는 Wi-Fi 연결
 
 1. 노트북을 인터넷 Wi-Fi 또는 이더넷에 연결합니다. Windows의 **설정 → 네트워크 및 인터넷 → 모바일 핫스팟**에서 해당 인터넷 연결을 공유 원본으로 선택하고, 공유 방식은 **Wi-Fi**, 대역은 **2.4 GHz**로 설정한 뒤 켭니다. [Windows 모바일 핫스팟 설정](https://support.microsoft.com/en-us/windows/experience/connectivity-networking/use-your-windows-device-as-a-mobile-hotspot)

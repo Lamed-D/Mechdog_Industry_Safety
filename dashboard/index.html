@@ -97,6 +97,10 @@
   #views { display:flex; gap:4px; padding:8px 16px 0; }
   #views [aria-pressed=true] { border-color:var(--btnon); color:white; }
   #review-view { margin:14px 16px; }
+  #patrol-view { margin:14px 16px; }
+  #patrol-view h3 { margin:0 0 12px; }
+  #patrol-print a { color:#9dc9ff; margin-right:8px; }
+  #patrol-error { color:var(--warn); }
   #events { display:grid; gap:6px; margin:12px 0; }
   #events button { display:flex; align-items:center; gap:12px; text-align:left; }
   #events img { width:72px; height:48px; object-fit:contain; background:black; }
@@ -122,6 +126,7 @@
 </header>
 <nav id="views" aria-label="화면 선택">
   <button id="drive-tab" aria-pressed="true">조종</button>
+  <button id="patrol-tab" aria-pressed="false">자율주행</button>
   <button id="review-tab" aria-pressed="false">쓰러짐 로그</button>
 </nav>
 <main id="drive-view">
@@ -216,6 +221,30 @@
       <div class="hint" id="scan-status" role="status"></div>
     </section>
 </main>
+<section id="patrol-view" hidden>
+  <h2>자율순찰 실험</h2>
+  <div class="top-row">
+    <section>
+      <h3>인식 미리보기</h3>
+      <img id="patrol-frame" style="width:100%;max-width:640px" alt="최신 태그·선 인식 영상" hidden>
+      <p id="patrol-video">영상 대기 중</p>
+    </section>
+    <section>
+      <fieldset id="patrol-course">
+        <legend>코스 설정</legend>
+        <p><label>주행 방식 <select id="patrol-mode"><option value="line">선 기반</option><option value="tag">선 없음 · 태그 접근</option></select></label></p>
+        <p><label>방문할 태그 ID 순서 <input id="patrol-route" value="1,0" size="16"></label></p>
+        <p id="patrol-turn-row" hidden><label>다음 태그 탐색 방향 <select id="patrol-turn"><option value="left">왼쪽</option><option value="right">오른쪽</option></select></label></p>
+        <button id="patrol-calibrate" hidden>화면 속 태그의 도착 기준 저장</button>
+        <p id="patrol-sizes"></p>
+        <div id="patrol-print"></div>
+      </fieldset>
+      <p><button id="patrol-start" class="primary" disabled>한 바퀴 시작</button> <button id="patrol-stop" class="stop">정지</button></p>
+      <p id="patrol-status" role="status"></p>
+      <p id="patrol-error" role="alert"></p>
+    </section>
+  </div>
+</section>
 <section id="review-view" hidden>
   <h2>쓰러짐 로그</h2>
   <div id="review-list">
@@ -350,6 +379,9 @@ const KEYS = new Map([
 addEventListener("keydown", e => {
   if (!controlsEnabled) return;
   if (e.key === "Escape") { $("estop").click(); return; }
+  if (!$("patrol-view").hidden && e.code === "Space" && !e.target.matches("input, select, button")) {
+    e.preventDefault(); leavePatrol(); return;
+  }
   if (resetDialog.open || $("drive-view").hidden) return;
   if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
   if (e.key === " ") { if (e.target !== keyboardEnabled) e.preventDefault(); stopMove(); return; }
@@ -359,8 +391,8 @@ addEventListener("keydown", e => {
   if (dir && !e.repeat) { e.preventDefault(); start(dir, e.code || e.key); }
 });
 addEventListener("keyup", e => { if (holding?.input === (e.code || e.key)) stopMove(); });
-addEventListener("blur", () => stopMove());
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopMove(); });
+addEventListener("blur", leavePatrol);
+document.addEventListener("visibilitychange", () => { if (document.hidden) leavePatrol(); });
 
 function pill(el, text, kind) { el.textContent = text; el.className = "pill " + (kind || ""); }
 // 표시 범위(확대): 버튼 1/3/6/12 m, 캔버스 위 마우스 휠로 0.5~12 m. 표시만 바꾸며 수신·판단에는 영향 없음.
@@ -605,9 +637,10 @@ function showLed(s, ok) {
 async function poll() {
   try {
     const s = await (await fetch("/api/state")).json();
+    showPatrolState(s);
     $("robot").textContent = "로봇 " + s.robot + (s.robot_ip ? " · " + s.robot_ip : " · 찾는 중");
     if (!cameraSource && (s.usb_camera || s.cam)) {
-      cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!(s.monitor || s.fall) };
+      cameraSource = { usb: s.usb_camera, url: s.cam, monitored: !!(s.monitor || s.fall || s.patrol) };
       $("camera-reconnect").hidden = false;
       connectCamera();
     }
@@ -759,16 +792,103 @@ function showList() {
   $("review-form").hidden = true;
   loadEvents();
 }
-$("review-tab").onclick = () => {
+let patrolOwner = null, previewBusy = false, patrolStarting = false, heartBusy = false;
+function leavePatrol() {
+  patrolOwner = null;
   stopMove();
-  $("drive-view").hidden = true; $("review-view").hidden = false;
-  $("drive-tab").setAttribute("aria-pressed", "false"); $("review-tab").setAttribute("aria-pressed", "true");
-  showList();
+}
+for (const view of ["drive", "patrol", "review"]) {
+  $(view + "-tab").onclick = () => {
+    if ($(view + "-view").hidden) leavePatrol();
+    for (const other of ["drive", "patrol", "review"]) {
+      $(other + "-view").hidden = other !== view;
+      $(other + "-tab").setAttribute("aria-pressed", String(other === view));
+    }
+    if (view === "review") showList();
+  };
+}
+function courseIds() {
+  const fields = $("patrol-route").value.split(",").map(s => s.trim());
+  if (fields.length > 24 || fields.some(s => !/^\d{1,3}$/.test(s) || Number(s) >= 587)) {
+    throw new Error("0~586의 태그 ID를 쉼표로 구분하세요 (최대 24개)");
+  }
+  return fields.map(Number);
+}
+function showTagLinks() {
+  const box = $("patrol-print");
+  box.replaceChildren();
+  let ids;
+  try { ids = courseIds(); } catch { return; }
+  for (const id of new Set(ids)) {
+    const link = document.createElement("a");
+    link.href = "/api/patrol/marker/" + id;
+    link.target = "_blank"; link.rel = "noopener";
+    link.textContent = "태그 " + id + " 인쇄";
+    box.append(link, " ");
+  }
+}
+$("patrol-route").oninput = showTagLinks;
+showTagLinks();
+$("patrol-mode").onchange = () => {
+  const line = $("patrol-mode").value === "line";
+  $("patrol-turn-row").hidden = $("patrol-calibrate").hidden = line;
 };
-$("drive-tab").onclick = () => {
-  $("review-view").hidden = true; $("drive-view").hidden = false;
-  $("drive-tab").setAttribute("aria-pressed", "true"); $("review-tab").setAttribute("aria-pressed", "false");
+function showPatrolState(s) {
+  const p = s.patrol;
+  $("patrol-course").disabled = !p || p.active || patrolStarting;
+  $("patrol-start").disabled = !p || p.active || patrolStarting || !s.allow_real || !s.fresh ||
+    s.emergency || s.tel?.state !== "idle" || s.tel?.latched || !(s.tel?.sonar_mm > 300) || s.fall_hold > 0;
+  $("patrol-stop").disabled = !s.allow_real;
+  $("patrol-sizes").textContent = "도착 기준 저장됨 · " + (p?.calibrated.join(", ") || "없음");
+  $("patrol-status").textContent = p ? [p.reason, p.target != null ? "목표 " + p.target : "",
+    "방문 " + (p.visits.join(" → ") || "없음"),
+    !s.allow_real ? "카메라 전용 미리보기" : s.tel?.latched ? "조종 탭에서 잠금 해제" : ""].filter(Boolean).join(" · ")
+    : "Wi-Fi 카메라와 AprilTag 지원 OpenCV를 연결하세요.";
+}
+function patrolError(e) { $("patrol-error").textContent = e.message; }
+$("patrol-calibrate").onclick = () => post("/api/patrol/calibrate").then(() => {
+  $("patrol-error").textContent = "";
+}).catch(patrolError);
+$("patrol-start").onclick = async () => {
+  if (patrolStarting) return;
+  patrolStarting = true;
+  const owner = crypto.randomUUID();
+  patrolOwner = owner;
+  $("patrol-error").textContent = "";
+  try {
+    await post("/api/patrol/start", {mode: $("patrol-mode").value, route: courseIds(),
+      turn: $("patrol-turn").value, owner, epoch: motionEpoch});
+    if (patrolOwner !== owner) await post("/api/stop");
+  } catch (e) { patrolOwner = null; patrolError(e); }
+  finally { patrolStarting = false; }
 };
+$("patrol-stop").onclick = leavePatrol;
+addEventListener("pagehide", () => { patrolOwner = null; });
+setInterval(async () => {
+  if (!patrolOwner || patrolStarting || heartBusy || document.hidden || $("patrol-view").hidden) return;
+  heartBusy = true;
+  const owner = patrolOwner;
+  try { await post("/api/patrol/heartbeat", {owner}); }
+  catch { if (patrolOwner === owner) patrolOwner = null; }
+  finally { heartBusy = false; }
+}, 230);
+setInterval(async () => {
+  if (previewBusy || document.hidden || $("patrol-view").hidden) return;
+  previewBusy = true;
+  const img = $("patrol-frame");
+  try {
+    const response = await fetch("/api/patrol/frame");
+    if (!response.ok) throw new Error();
+    const old = img.src;
+    img.src = URL.createObjectURL(await response.blob());
+    if (old.startsWith("blob:")) URL.revokeObjectURL(old);
+    img.hidden = true;
+    await img.decode();
+    img.hidden = false;
+    $("patrol-video").textContent = "";
+  } catch { img.hidden = true; $("patrol-video").textContent = "최신 영상 대기 중"; }
+  finally { previewBusy = false; }
+}, 300);
 $("older").onclick = () => loadEvents(true);
 $("archive").onchange = () => {
   $("events").replaceChildren();

@@ -32,6 +32,7 @@ from firmware.robot.python import config as settings, proto as wire  # noqa: E40
 from dashboard.lidar.feed import LidarFeed  # noqa: E402
 from dashboard.usb_camera import UsbCamera  # noqa: E402
 from dashboard.camera_monitor import CameraMonitor  # noqa: E402
+from dashboard.patrol import Patrol, PatrolVision  # noqa: E402
 from dashboard.fall_events import DATA_DIR, FallEvents  # noqa: E402
 
 MAX_BODY = 256
@@ -150,7 +151,7 @@ class ConsoleLink(RobotLink):
 
 class Console:
     def __init__(self, robot, transport, cam, lidar=None, usb_camera=None, monitor=None,
-                 fall=None, events=None, *, greet=False):
+                 fall=None, events=None, *, greet=False, patrol=None, shared_feed=None, allow_real=False):
         self.lock = threading.Lock()
         self.transport = transport
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
@@ -159,6 +160,9 @@ class Console:
         self.usb_camera = usb_camera
         self.monitor = monitor
         self.greet = greet
+        self.patrol = patrol
+        self.shared_feed = shared_feed
+        self.allow_real = allow_real
         self.greet_until = None      # 인사를 보낼 마감(감지 직후 로봇이 대기 상태가 되길 기다림)
         self.greet_sent = None       # 인사를 보낸 시각. 끝나면 None
         self.greet_seen_action = False
@@ -184,6 +188,7 @@ class Console:
 
     def stop_for_fall(self):
         with self.lock:
+            self.end_patrol("쓰러짐 감지")
             self.hold_until = time.monotonic() + 30
             self.greet_until = self.greet_sent = None
             self.greet_seen_action = False
@@ -279,6 +284,24 @@ class Console:
             self.link.set_led(*desired)
             self.applied_led = desired
 
+    def end_patrol(self, reason):
+        if self.patrol and self.patrol.owner:
+            self.patrol.stop(self.link, reason)
+            self.motion_epoch += 1
+
+    def check_patrol(self):
+        link = self.link
+        if not self.allow_real or not link or not link.fresh() or link.emergency or link.latest.latched:
+            raise ValueError("실물 연결과 잠금 해제 상태를 확인하세요")
+        t = link.latest
+        if (t.state not in ("idle", "moving") or t.battery_mv is None or t.battery_mv < settings.LOW_BATT_WARN_MV
+                or t.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "lidar_backlog", "proto"})):
+            raise ValueError("본체 상태 또는 배터리 경고")
+        if not t.sonar_mm or t.sonar_mm <= 300:
+            raise ValueError("전방 장애물 또는 초음파 확인 불가")
+        if self.person_stop or self.obstacle_stop or time.monotonic() < self.hold_until:
+            raise ValueError("감지 경고로 정지")
+
     def loop(self):
         while True:
             with self.lock:
@@ -289,12 +312,19 @@ class Console:
                         try:
                             self.link.observe(data)
                         except ValueError:
+                            self.end_patrol("본체 상태 수신 오류")
                             self.link.stop()
                 except OSError:
                     self.link.estop()
                 try:
                     tripped = self.monitor and self.monitor_stop()
-                    if self.monitor and self.greet:
+                    if self.patrol and self.patrol.owner:
+                        try:
+                            self.check_patrol()
+                            self.patrol.tick(self.link)
+                        except Exception as error:
+                            self.end_patrol(str(error))
+                    elif self.monitor and self.greet:
                         self.monitor_greet()
                     self.link.step()
                     if self.monitor and not tripped:
@@ -310,9 +340,12 @@ class Console:
             fall_fps = self.fall.feed.snapshot()[0]["fps"] if self.fall else None
             if self.link is None:
                 return {"sensors_only": True, "robot": self.robot, "cam": self.cam,
+                        "patrol": self.patrol.state() if self.patrol else None,
                         "usb_camera": self.usb_camera is not None, "fall": fall_status, "fall_fps": fall_fps}
             t = self.link.latest
             return {
+                "patrol": self.patrol.state() if self.patrol else None,
+                "allow_real": self.allow_real,
                 "robot": self.link.robot,
                 "status": self.link.status(),
                 "fresh": self.link.fresh(),
@@ -348,12 +381,38 @@ class Console:
 
     def command(self, path, body):
         with self.lock:
+            if path.startswith("/api/patrol/"):
+                if not self.patrol or not self.running:
+                    raise ValueError("Wi-Fi 카메라와 AprilTag 지원 OpenCV가 필요합니다")
+                if path == "/api/patrol/calibrate":
+                    return self.patrol.calibrate()
+                if path == "/api/patrol/start":
+                    self.check_patrol()
+                    if body.get("epoch") != self.motion_epoch or not self.link._can_stand() or self.link.intent:
+                        raise ValueError("본체가 정지한 뒤 다시 시작하세요")
+                    self.patrol.start(body)
+                    self.motion_epoch += 1
+                    self.greet_until = None
+                    return
+                if path == "/api/patrol/heartbeat":
+                    if not self.patrol.owner or body.get("owner") != self.patrol.owner:
+                        raise ValueError("순찰 세션이 종료되었습니다")
+                    if time.monotonic() >= self.patrol.lease:
+                        self.end_patrol("조종 화면 연결 만료")
+                        raise ValueError("조종 화면 연결 만료")
+                    self.patrol.lease = time.monotonic() + .9
+                    return
+                raise KeyError(path)
             if self.link is None:
                 raise ValueError("sensor-only mode")
             if not self.running:
                 raise ValueError("console is closing")
             if path in ("/api/move", "/api/stop", "/api/estop"):
                 self.greet_until = None  # 사람 입력이 보내기 전 인사보다 우선
+            if path in ("/api/move", "/api/stop", "/api/estop", "/api/reset", "/api/stand"):
+                self.end_patrol("운영자 개입")
+                if path in ("/api/stop", "/api/estop"):
+                    self.motion_epoch += 1
             if path in ("/api/move", "/api/stand", "/api/reset") and time.monotonic() < self.hold_until:
                 raise ValueError("쓰러짐 감지로 30초 정지 중입니다.")
             if path == "/api/move":
@@ -432,6 +491,19 @@ def make_handler(console):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if self.path == "/api/state":
                 return self._send(200, console.state())
+            if self.path == "/api/patrol/frame" and console.patrol:
+                frame, jpeg = console.patrol.vision.snapshot()
+                if frame and time.monotonic() - frame[1] < 1:
+                    return self._send(200, jpeg, "image/jpeg")
+                return self._send(503, {"error": "최신 영상 없음"})
+            if self.path.startswith("/api/patrol/marker/") and console.patrol:
+                match = re.fullmatch(r"/api/patrol/marker/([0-9]{1,3})", self.path)
+                if not match or int(match[1]) >= 587:
+                    return self._send(400, {"error": "태그 번호 범위는 0~586입니다"})
+                vision = console.patrol.vision
+                marker = vision.cv.aruco.generateImageMarker(vision.dictionary, int(match[1]), 640)
+                marker = vision.cv.copyMakeBorder(marker, 80, 80, 80, 80, vision.cv.BORDER_CONSTANT, value=255)
+                return self._send(200, vision.cv.imencode(".png", marker)[1].tobytes(), "image/png")
             archive = console.samples if self.path.startswith("/api/falls-samples") else console.events
             page = re.fullmatch(r"/api/falls(?:-samples)?(?:\?before=([1-9][0-9]{0,17}))?", self.path)
             photo = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/photos/([01])", self.path)
@@ -459,6 +531,11 @@ def make_handler(console):
                 if jpeg is not None:
                     return self._send(200, jpeg, "image/jpeg")
                 return self._send(503, {"error": error})
+            if self.path == "/api/camera" and console.shared_feed:
+                _, jpeg = console.shared_feed.snapshot()
+                if jpeg:
+                    return self._send(200, jpeg, "image/jpeg")
+                return self._send(503, {"error": "최신 영상 없음"})
             self._send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -489,6 +566,8 @@ def make_handler(console):
             except (FileNotFoundError, ImportError):
                 return self._send(503, {"error": "시연 사진 또는 감지 모델이 준비되지 않았습니다."})
             except (OSError, RuntimeError, sqlite3.Error):
+                if self.path.startswith("/api/patrol/"):
+                    return self._send(503, {"error": "도착 기준을 저장할 수 없습니다"})
                 return self._send(503, {"error": "사진 분석 또는 저장에 실패했습니다."})
             except KeyError:
                 return self._send(404, {"error": "not found"})
@@ -540,11 +619,13 @@ def main():
         p.error("--greet에는 --monitor가 필요합니다")
     if a.fall_detection and (a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--fall-detection에는 Wi-Fi 카메라(--cam 또는 --hotspot)가 필요합니다")
-    if a.monitor or a.fall_detection:
+    cv2 = None
+    if a.monitor or a.fall_detection or a.cam or a.hotspot:
         try:
             import cv2
         except ImportError:
-            p.error("영상 감지에는 OpenCV 설치가 필요합니다. README를 확인하세요.")
+            if a.monitor or a.fall_detection:
+                p.error("영상 감지에는 OpenCV 설치가 필요합니다. README를 확인하세요.")
     a.robot_ip = a.robot_ip or ("auto" if a.hotspot else "127.0.0.1")
     a.broadcast = a.broadcast or ("192.168.137.255" if a.hotspot else "192.168.5.255")
     if a.relay_lidar and a.robot_ip == "auto":
@@ -565,7 +646,9 @@ def main():
         transport = UdpTransport(a.robot_ip, allow_real=a.allow_real)
     camera = UsbCamera(a.cam_usb) if a.cam_usb else None
     cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
-    feed = CameraMonitor(cam, cv2, a.monitor, a.robot) if a.monitor or a.fall_detection else None
+    patrol_supported = bool(cam and hasattr(getattr(cv2, "aruco", None), "ArucoDetector"))
+    feed = CameraMonitor(cam, cv2, a.monitor, a.robot) if patrol_supported or a.monitor or a.fall_detection else None
+    patrol = Patrol(PatrolVision(feed, cv2), DATA_DIR / f"patrol-{a.robot}.sqlite3") if patrol_supported else None
     events = FallEvents()
     fall = None
     if a.fall_detection:
@@ -575,7 +658,8 @@ def main():
             fall = FallDetection(feed, events, a.robot)
         except (ImportError, OSError, ValueError, RuntimeError, sqlite3.Error) as error:
             p.error(f"쓰러짐 감지 초기화 실패: {error}")
-    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events, greet=a.greet)
+    console = Console(a.robot, transport, cam, lidar, camera, feed if a.monitor else None, fall, events,
+                      greet=a.greet, patrol=patrol, shared_feed=feed, allow_real=a.allow_real)
     camera_worker = lidar_worker = None
     try:
         with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
@@ -589,6 +673,8 @@ def main():
                 camera_worker.start()
             if feed:
                 feed.start()
+            if patrol:
+                patrol.vision.start()
             if fall:
                 fall.worker.start()
             print("열기: http://127.0.0.1:%d  (로봇 %s @ %s)" % (server.server_port, a.robot, a.robot_ip))
