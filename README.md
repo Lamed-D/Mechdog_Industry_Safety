@@ -22,6 +22,10 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 
 ### 자율주행 탭에서 순찰 실험하기
 
+**먼저 [A4 인쇄용 태그 2장](ai/patrol-print/apriltag-stations-a4.pdf)을 다운로드하세요.** A4 세로·단면·실제 크기 100%로 출력합니다. A는 ID 0, B는 ID 1입니다. 개별 이미지도 받을 수 있습니다. [A PNG](ai/patrol-print/station-a-0.png) · [B PNG](ai/patrol-print/station-b-1.png)
+
+선 기반 코스는 **밝은 무광 바닥 + 검은색 진행선 + 파란색 가로 정지 띠**로 만듭니다. 선 없는 코스는 태그만 배치합니다. 테이프 고르는 법부터 카메라 각도, 정지 위치 보정, 첫 완주 확인까지 순서대로 보려면 [현장 설치·첫 주행 안내](ai/patrol-setup.md)를 따르세요.
+
 1. 노트북에 `python -m pip install "opencv-python-headless>=4.8"`을 설치합니다. 카메라만 연결한 상태에서는 `python -m dashboard.server --robot A --hotspot --sensors-only`로 시작합니다. 본체 주행 때는 `python -m dashboard.server --robot A --hotspot --allow-real`로 실행합니다. 대시보드 주소는 `http://127.0.0.1:8090`입니다.
 2. **자율주행** 탭에서 방문 순서를 입력하고 각 **태그 인쇄** 링크를 열어 흰 여백까지 인쇄합니다. 기본 순서 `1,0`은 A(ID 0)에서 출발해 B(ID 1)에 들른 뒤 A에 돌아와 정지합니다. 코너에는 경유 태그를 추가할 수 있습니다.
 3. **선 기반**은 밝은 바닥에 검은 선으로 폐곡선을 만들고 지점마다 파란 가로 띠를 붙입니다. 출발은 A의 띠를 막 지난 위치입니다. 영상 아래쪽에서 노란 점이 선을 따르는지, 띠에서 멈출 위치에 해당 태그 하나가 보이는지 확인합니다.
