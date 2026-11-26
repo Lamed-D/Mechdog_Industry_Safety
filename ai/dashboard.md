@@ -81,6 +81,8 @@ python -m venv .private\lidar-pc
 
 ### 순찰 시나리오 첫 시연
 
+두 로봇은 전용 실행 옵션 `--team A_IP B_IP --allow-real`로 시작합니다. 협동 탭은 `/api/state`의 `team`, 로봇별 `/api/team/frame/A`·`/api/team/frame/B`, 로컬 POST `/api/team/{start,heartbeat,stop,estop,finish,reset,calibrate}`를 사용합니다. 웹 세션이 1초간 갱신되지 않으면 전체 정지합니다. 동일 서버의 단일 조종 경로에는 본체 링크를 배정하지 않습니다. [사건 처리](scenario.md#8-두-로봇-협동-시나리오)
+
 자율주행 탭은 Wi-Fi MJPEG 수신기 하나를 조종 화면·감지기와 공유합니다. 노트북의 별도 스레드가 새 프레임의 선·띠·tag36h11을 분석하고 제어 루프가 기존 RobotLink로 이동합니다. 센서 전용 모드는 미리보기·도착 기준 저장·태그 인쇄를 지원합니다. 설치와 코스 배치는 README의 자율주행 절을 따릅니다.
 
 `/api/patrol/frame`은 인식 표시 JPEG, `/api/patrol/marker/<id>`는 인쇄용 PNG입니다. 시작·화면 연결 유지·도착 기준 저장은 로컬 JSON POST를 사용합니다. 시작 요청에는 주행 모드, 방문 ID 배열, 탐색 방향, 조종 화면 세션 ID와 현재 이동 세대 번호가 필요합니다. `/api/state`의 `patrol`은 현재 목표·방문 목록·저장된 기준·정지 사유를 제공합니다. 도착 기준은 영상 폭 대비 태그 평균 변 길이이며 노트북의 로봇별 SQLite 파일에 보관합니다.

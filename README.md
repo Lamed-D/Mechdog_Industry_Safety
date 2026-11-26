@@ -16,6 +16,8 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 
 ## Windows에서 처음 설치하기
 
+두 대를 함께 사용할 때는 [두 로봇 협동 시나리오](#두-로봇-협동-시나리오)의 준비·실행 순서를 따릅니다.
+
 1. Python 3.11 이상을 설치하고 설치 옵션에서 PATH 추가를 선택합니다. 새 PowerShell에서 `python --version`을 확인합니다. 로봇 본체에 파일을 올리려면 제조사의 **Hiwonder Python Editor**도 준비합니다. [Python 다운로드](https://www.python.org/downloads/windows/)
 2. Vision을 빌드하려면 **Arduino IDE 2**를 설치합니다. IDE의 **File → Preferences → Additional boards manager URLs**에 `https://espressif.github.io/arduino-esp32/package_esp32_index.json`을 추가합니다. **Boards Manager**에서 **esp32 by Espressif Systems 3.3.12**를 선택해 설치합니다. [Arduino IDE 설치](https://support.arduino.cc/hc/en-us/articles/360019833020-Download-and-install-Arduino-IDE) · [Espressif 보드 패키지 설치](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html)
 3. 카메라를 USB로 설정하거나 USB LiDAR를 쓸 경우 `python -m pip install pyserial`을 실행합니다. 카메라를 데이터용 USB 케이블로 연결했는데 장치 관리자에 **USB-SERIAL CH340 (COM 번호)**가 없으면 케이블과 CH340 드라이버 설치 상태를 확인합니다.
@@ -33,6 +35,21 @@ Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로
 5. 실물 주행은 연결 상태와 전방 초음파를 확인하고 **조종 → 잠금 해제 → 자율주행 → 한 바퀴 시작**을 누릅니다. 현재 목표와 방문 순서, 정지 사유가 탭에 표시됩니다. 운영자가 **정지** 또는 상단 **비상 정지(Esc)**로 개입할 수 있습니다. 중단 뒤 다시 시작하면 입력한 순서의 첫 지점부터 진행합니다.
 
 첫 현장 확인에서는 두 모드의 완주 여부, 각 지점 정지 오차와 수동 개입 횟수를 기록합니다. 선·목표 가림, 전방 장애물, 카메라 단절, 탭 이탈에서 실제로 정지하는지도 확인합니다.
+
+### 두 로봇 협동 시나리오
+
+1. 본체 A와 B의 최신 **MicroPython** 업로드 파일을 각각 `python firmware/build.py A --only python`, `python firmware/build.py B --only python`으로 만듭니다. 사용자가 각 ID에 맞는 파일을 올리고 마지막에 `main.py`를 올립니다. 각 카메라도 대응하는 A/B ID로 연결합니다. [본체 업로드 순서](ai/firmware.md#22-업로드-순서-사용자-가이드)
+2. 이 README의 쓰러짐 감지용 Python 환경과 사람·자세 모델 두 개를 준비합니다. 기존 단일 로봇 서버를 닫고, 아래 명령에서 두 IP를 실제 본체 주소로 바꿔 실행합니다. 카메라 자동 연결이 어려우면 끝에 `--team-cameras http://<A카메라IP>:81/stream http://<B카메라IP>:81/stream`을 붙입니다.
+
+   ```powershell
+   python -m dashboard.server --team <A본체IP> <B본체IP> --allow-real
+   ```
+
+3. **협동 시나리오** 탭에서 두 영상을 확인합니다. 예를 들어 순환 코스 `0,1,2`, 출발 A=`0`·B=`1`, 도움 요청 구역=`2`를 입력합니다. [태그 인쇄·코스 설치](ai/patrol-setup.md)를 따라 추가 지점도 준비하세요. 각 로봇을 진행 방향으로 놓고 각 화면에 자기 시작 태그 하나가 보이게 합니다. 선 없는 모드에서는 두 로봇 각각에 코스 전체 태그의 도착 기준을 저장합니다.
+4. 앞이 비었는지 확인하고 두 카드에서 각각 **잠금 해제 → 공동 순찰 시작**을 누릅니다. 먼저 쓰러짐을 확인한 로봇은 그 자리에 멈춰 낮은 경보음을 반복합니다. 다른 로봇은 지정 구역에서 서 있는 사람을 확인하면 높은 호출음을 내고 5초 기다립니다. 사람이 길을 비우면 현장 로봇의 마지막 확인 태그까지 안내하고 도착음을 냅니다. 마지막 태그와 실제 쓰러짐 위치 사이의 구간은 현장 부저와 영상으로 확인합니다.
+5. 운영 중에는 탭을 열어 둡니다. **전체 정지**는 이동과 추가 부저를 중단하고, **전체 비상 정지(Esc)**는 두 본체를 잠급니다. **사건 종료** 후 시작 태그에서 새 순찰을 시작할 수 있습니다. 실제로 사람이 뒤따르는지는 운영자가 확인합니다.
+
+첫 실물 검증은 선 기반·선 없는 코스 각각에서 A 감지/B 안내와 B 감지/A 안내를 수행합니다. 현장 정지 유지, 호출 후 대기, 목적 태그, 장애물 앞 정지, 통신·영상 단절 시 양쪽 정지와 재출발 방지를 기록합니다.
 
 ### 인터넷을 유지하는 Wi-Fi 연결
 

@@ -75,6 +75,8 @@ class Robot:
         self.uptime_ms = 0
         self._last_tick = now
         self.sonar_mm = None          # 초음파 거리(mm). app 이 채움, None = 모름(TEL 에 NA)
+        self.buzzer = None
+        self.tone_seq = 0
         self.led_request = None       # LED 명령으로 받은 (r, g, b). app 이 적용 후 비움
 
     # ---------- 공용 ----------
@@ -189,6 +191,14 @@ class Robot:
         if self.busy():
             self.events.add("busy")
             return
+        if name == "TONE" and self.buzzer is not None and not self.moving:
+            freq, duration = {"alarm": (900, 350), "call": (1800, 250), "arrive": (1200, 500)}[cmd.args[0]]
+            try:
+                self.buzzer.playTone(freq, duration, False)
+                self.tone_seq = cmd.seq
+            except Exception:
+                self.buzzer = None
+            return
         if name == "MOVE":
             self._move(cmd.args[0], cmd.args[1])
         elif name == "ACTION":
@@ -220,6 +230,7 @@ class Robot:
                 self.roles = RoleLease(self.clock)
             self._stop()
             self.last_cmd_seq = 0
+            self.tone_seq = 0
             self.boot_id = cmd.seq  # 래치는 그대로 둠
             self.urgent = True
         self.last_accept = self._now()
@@ -410,7 +421,8 @@ class Robot:
             self.latch_reason, battery, tilt[0], tilt[1], self.uptime_ms,
             self.boot_id if self.boot_id is not None else "-")
         # 마지막 필드: 초음파 거리 mm 또는 NA (ai/protocol.md TEL 표). 표시용, 안전 판단에 쓰지 않음
-        sonar = "|%s|$" % ("NA" if self.sonar_mm is None else str(self.sonar_mm))
+        sonar = "|%s|%s$" % ("NA" if self.sonar_mm is None else str(self.sonar_mm),
+                              "tone|%d|" % self.tone_seq if self.buzzer is not None else "")
         while ordered and len(head) + len(",".join(ordered)) + len(sonar) > MAX_TEL_LEN:
             ordered.pop()  # 길이 제한: 뒤쪽(덜 급한) 낱말부터 뺌
         line = head + (",".join(ordered) if ordered else "none") + sonar

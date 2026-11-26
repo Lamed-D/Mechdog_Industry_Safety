@@ -86,6 +86,7 @@ class FallDetection:
         self.on_fall = None
         self.lock = Lock()
         self.latest = (0, "감지 불가", None)
+        self.upright_at = 0
         self.worker = Thread(target=self.run, daemon=True)
 
     def annotated(self, rgb, boxes):
@@ -182,6 +183,9 @@ class FallDetection:
                 self.events.record(self.robot, track.first, photo)
                 track.reported, track.last_event, track.first = True, received, None
                 fallen_boxes.append(box)
+        # 같은 사람의 연속 두 자세를 확인한 프레임만 도움 요청에 사용합니다.
+        with self.lock:
+            self.upright_at = received if any(t.seen == received and t.upright_frames >= 2 for t in self.tracks) else 0
         if fallen_boxes:
             preview = self.annotated(rgb, fallen_boxes)
             return "쓰러짐 의심", preview
@@ -225,3 +229,10 @@ class FallDetection:
         if monotonic() - received > 1:
             return "감지 불가", None
         return status, jpeg
+
+    def scene_status(self):
+        with self.lock:
+            received, status, _ = self.latest
+            if monotonic() - received > 1:
+                return "감지 불가", False
+            return status, received == self.upright_at and received > 0

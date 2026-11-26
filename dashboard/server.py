@@ -154,6 +154,7 @@ class Console:
                  fall=None, events=None, *, greet=False, patrol=None, shared_feed=None, allow_real=False):
         self.lock = threading.Lock()
         self.transport = transport
+        self.team = None
         self.link = ConsoleLink(robot, transport.send, require_scan=False) if transport else None
         self.robot = robot
         self.cam = cam
@@ -490,17 +491,27 @@ def make_handler(console):
                 with open(page_path, "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if self.path == "/api/state":
-                return self._send(200, console.state())
+                state = console.state()
+                if console.team:
+                    state["team"] = console.team.state()
+                return self._send(200, state)
+            frame = re.fullmatch(r"/api/team/frame/([AB])", self.path)
+            if frame and console.team:
+                member = console.team.members[frame[1]]
+                frame_data, jpeg = member.nav.vision.snapshot()
+                if frame_data and time.monotonic() - frame_data[1] < 1:
+                    return self._send(200, jpeg, "image/jpeg")
+                return self._send(503, {"error": "최신 영상 대기"})
             if self.path == "/api/patrol/frame" and console.patrol:
                 frame, jpeg = console.patrol.vision.snapshot()
                 if frame and time.monotonic() - frame[1] < 1:
                     return self._send(200, jpeg, "image/jpeg")
                 return self._send(503, {"error": "최신 영상 없음"})
-            if self.path.startswith("/api/patrol/marker/") and console.patrol:
+            if self.path.startswith("/api/patrol/marker/") and (console.patrol or console.team):
                 match = re.fullmatch(r"/api/patrol/marker/([0-9]{1,3})", self.path)
                 if not match or int(match[1]) >= 587:
                     return self._send(400, {"error": "태그 번호 범위는 0~586입니다"})
-                vision = console.patrol.vision
+                vision = console.patrol.vision if console.patrol else console.team.members["A"].nav.vision
                 marker = vision.cv.aruco.generateImageMarker(vision.dictionary, int(match[1]), 640)
                 marker = vision.cv.copyMakeBorder(marker, 80, 80, 80, 80, vision.cv.BORDER_CONSTANT, value=255)
                 return self._send(200, vision.cv.imencode(".png", marker)[1].tobytes(), "image/png")
@@ -550,12 +561,18 @@ def make_handler(console):
             if length < 0:
                 return self._reject_post(400, "invalid length")
             review = re.fullmatch(r"/api/falls(?:-samples)?/([1-9][0-9]{0,17})/review", self.path)
-            if length > (16384 if review else MAX_BODY):
+            limit = 2048 if self.path == "/api/team/start" else MAX_BODY
+            if length > (16384 if review else limit):
                 return self._reject_post(413, "too large")
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("JSON object required")
+                if self.path.startswith("/api/team/"):
+                    if not console.team:
+                        raise ValueError("협동 모드로 서버를 실행하세요")
+                    console.team.command(self.path.rsplit("/", 1)[-1], body)
+                    return self._send(200, {"ok": True})
                 if self.path == "/api/falls-samples/replay":
                     return self._send(200, {"status": console.replay_sample()})
                 if review:
@@ -593,6 +610,8 @@ def hotspot_camera_url(robot):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--robot", choices=("A", "B"), default="A")
+    p.add_argument("--team", nargs=2, metavar=("A_IP", "B_IP"), help="협동 시나리오 전용 본체 주소")
+    p.add_argument("--team-cameras", nargs=2, metavar=("A_URL", "B_URL"), help="A/B Wi-Fi MJPEG 주소")
     p.add_argument("--robot-ip",
                    help="로봇 IP. 'auto' 면 같은 Wi-Fi에서 자동으로 찾음(--broadcast 사용)")
     p.add_argument("--broadcast", help="자동 찾기용 방송 주소")
@@ -613,6 +632,32 @@ def main():
     lidar_source.add_argument("--relay-lidar", action="store_true", help="--robot-ip와 같은 본체의 중계 사용")
     p.add_argument("--lidar-port", type=int, default=settings.LIDAR_TCP_PORT)
     a = p.parse_args()
+    if a.team:
+        if not a.allow_real or any((a.cam, a.cam_usb, a.robot_ip, a.sensors_only, a.lidar_usb, a.lidar_tcp,
+                                    a.relay_lidar, a.greet, a.monitor, a.fall_detection)):
+            p.error("협동 실행은 --team A_IP B_IP --allow-real 과 선택적인 --team-cameras를 사용합니다")
+        from dashboard.cooperative import Cooperative
+        events = FallEvents()
+        console = Console("A/B", None, "", events=events)
+        try:
+            import cv2
+            cameras = a.team_cameras or [hotspot_camera_url(robot) for robot in "AB"]
+            events.prepare()
+            console.team = Cooperative(a.team, cameras, cv2, events)
+        except (ImportError, OSError, ValueError, RuntimeError, AttributeError) as error:
+            p.error(str(error))
+        try:
+            with ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(console)) as server:
+                console.team.launch()
+                print(f"협동 시나리오: http://127.0.0.1:{a.port}")
+                server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            console.team.close()
+        return
+    if a.team_cameras:
+        p.error("--team-cameras에는 --team이 필요합니다")
     if a.monitor and (a.sensors_only or a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
     if a.greet and not a.monitor:

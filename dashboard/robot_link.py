@@ -32,6 +32,8 @@ class Telemetry:
     warnings: frozenset
     sonar_mm: int | None = None  # 초음파 거리. None = NA
     has_sonar: bool = False      # TEL 에 초음파 필드가 있음 = LED 명령 지원(MicroPython 판)
+    has_tone: bool = False
+    tone_seq: int = 0
 
 
 def parse_telemetry(data):
@@ -71,7 +73,9 @@ def parse_telemetry(data):
     has_sonar = len(fields) >= 15  # 선택 필드: 초음파 mm 또는 NA (예전 펌웨어·Arduino 판에는 없음)
     sonar = None if not has_sonar or fields[13] == "NA" else integer(fields[13])
     return Telemetry(robot, integer(tseq), integer(seq), state, latched == "1", reason,
-                     volts, tuple(tilt), integer(uptime), boot, warnings, sonar, has_sonar)
+                     volts, tuple(tilt), integer(uptime), boot, warnings, sonar, has_sonar,
+                     len(fields) >= 17 and fields[14] == "tone",
+                     integer(fields[15]) if len(fields) >= 17 and fields[14] == "tone" else 0)
 
 
 class RobotLink:
