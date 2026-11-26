@@ -1,5 +1,9 @@
 # Mechdog Industry Safety
 
+> 🧪 **이 브랜치(`feat/patrol-sonar-arrival-test`)는 임시 시험용입니다. `main`에는 없습니다.**
+> 자율주행 순찰을 **초음파 거리로 도착**하게 바꿔 보는 실험입니다. 기존 방식과 다른 점과 실행 방법은 [dashboard/PATROL_SONAR_TEST.md](dashboard/PATROL_SONAR_TEST.md)를 보세요.
+> 실행 옵션 `--patrol-arrive-mm`을 붙일 때만 새 방식으로 동작합니다. 실물 주행 검증 전입니다.
+
 Hiwonder MechDog 사족보행 로봇으로 산업 현장 안전을 돕는 프로젝트입니다.
 
 ## 구성

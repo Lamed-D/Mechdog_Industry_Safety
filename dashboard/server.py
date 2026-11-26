@@ -295,10 +295,25 @@ class Console:
         if not self.allow_real or not link or not link.fresh() or link.emergency or link.latest.latched:
             raise ValueError("실물 연결과 잠금 해제 상태를 확인하세요")
         t = link.latest
-        if (t.state not in ("idle", "moving") or t.battery_mv is None or t.battery_mv < settings.LOW_BATT_WARN_MV
-                or t.warnings.intersection({"batt_unknown", "batt_low", "lidar_uart", "lidar_backlog", "proto"})):
-            raise ValueError("본체 상태 또는 배터리 경고")
-        if not t.sonar_mm or t.sonar_mm <= 300:
+        # 임시 시험(--patrol-arrive-mm): 주행 중 300 mm 이하 판단은 patrol.tick이 맡음(전진 없이 도착 또는 중단)
+        arriving = self.patrol and self.patrol.arrive_mm  # 시작 전에도 앞에 태그 판이 있어도 시작 허용
+        # 임시 시험: 초음파 값이 없어도 시작·순찰을 막지 않음(사용자 결정). 배터리 순간 하락 허용은 순찰 중에만
+        waiting = arriving and self.patrol.owner
+        if t.state not in ("idle", "moving"):
+            raise ValueError(f"본체 상태가 {t.state}")
+        bad = t.warnings.intersection({"lidar_uart", "lidar_backlog", "proto"})
+        if bad:
+            raise ValueError("본체 경고 " + ", ".join(sorted(bad)))
+        if (t.battery_mv is None or t.battery_mv < settings.LOW_BATT_WARN_MV
+                or t.warnings.intersection({"batt_unknown", "batt_low"})):
+            # 임시 시험 순찰 중에는 걸을 때 순간 전압 하락을 3초까지 봐줌
+            now = time.monotonic()
+            self.batt_low_since = getattr(self, "batt_low_since", None) or now
+            if not waiting or now - self.batt_low_since > 3:
+                raise ValueError(f"배터리 낮음 ({t.battery_mv if t.battery_mv is not None else '읽기 실패'} mV)")
+        else:
+            self.batt_low_since = None
+        if (not t.sonar_mm and not arriving) or (t.sonar_mm and t.sonar_mm <= 300 and not arriving):
             raise ValueError("전방 장애물 또는 초음파 확인 불가")
         if self.person_stop or self.obstacle_stop or time.monotonic() < self.hold_until:
             raise ValueError("감지 경고로 정지")
@@ -507,6 +522,11 @@ def make_handler(console):
                 if frame and time.monotonic() - frame[1] < 1:
                     return self._send(200, jpeg, "image/jpeg")
                 return self._send(503, {"error": "최신 영상 없음"})
+            arrival = re.fullmatch(r"/api/patrol/arrival/([0-9]{1,9})", self.path)
+            if arrival and console.patrol:
+                # 임시 시험: 발견·도착·중단 기록 순간의 인식 화면(메모리에만 보관, 파일 저장 없음)
+                jpeg = console.patrol.photo(int(arrival[1]))
+                return self._send(200, jpeg, "image/jpeg") if jpeg else self._send(404, {"error": "기록 사진 없음"})
             if self.path.startswith("/api/patrol/marker/") and (console.patrol or console.team):
                 match = re.fullmatch(r"/api/patrol/marker/([0-9]{1,3})", self.path)
                 if not match or int(match[1]) >= 587:
@@ -625,6 +645,8 @@ def main():
     camera_source = p.add_mutually_exclusive_group()
     camera_source.add_argument("--cam", default="", help="카메라 영상 주소 예: http://192.168.5.1:81/stream")
     camera_source.add_argument("--cam-usb", metavar="COM_PORT", help="USB JPEG 펌웨어가 설치된 ESP32-S3")
+    p.add_argument("--patrol-arrive-mm", type=int, metavar="MM",
+                   help="임시 시험: 태그 접근 모드에서 태그를 향해 보폭 50 직진, 전방 초음파 거리(mm, 300~1500) 이하면 도착")
     p.add_argument("--port", type=int, default=8090)
     lidar_source = p.add_mutually_exclusive_group()
     lidar_source.add_argument("--lidar-usb", metavar="COM_PORT", help="확인된 A1M8 어댑터")
@@ -658,6 +680,8 @@ def main():
         return
     if a.team_cameras:
         p.error("--team-cameras에는 --team이 필요합니다")
+    if a.patrol_arrive_mm is not None and not 300 <= a.patrol_arrive_mm <= 1500:
+        p.error("--patrol-arrive-mm은 300~1500 사이로 지정하세요")
     if a.monitor and (a.sensors_only or a.cam_usb or not (a.cam or a.hotspot)):
         p.error("--monitor는 Wi-Fi 카메라와 본체 연결 모드가 필요합니다")
     if a.greet and not a.monitor:
@@ -693,7 +717,8 @@ def main():
     cam = hotspot_camera_url(a.robot) if a.hotspot and not (a.cam or camera) else a.cam
     patrol_supported = bool(cam and hasattr(getattr(cv2, "aruco", None), "ArucoDetector"))
     feed = CameraMonitor(cam, cv2, a.monitor, a.robot) if patrol_supported or a.monitor or a.fall_detection else None
-    patrol = Patrol(PatrolVision(feed, cv2), DATA_DIR / f"patrol-{a.robot}.sqlite3") if patrol_supported else None
+    patrol = Patrol(PatrolVision(feed, cv2), DATA_DIR / f"patrol-{a.robot}.sqlite3",
+                    a.patrol_arrive_mm) if patrol_supported else None
     events = FallEvents()
     fall = None
     if a.fall_detection:

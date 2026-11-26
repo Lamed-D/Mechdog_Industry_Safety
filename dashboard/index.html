@@ -96,6 +96,19 @@
   #drive-view[hidden], #review-view[hidden] { display:none; }
   #views { display:flex; gap:4px; padding:8px 16px 0; }
   #views [aria-pressed=true] { border-color:var(--btnon); color:white; }
+  #print-help { max-width:min(560px, calc(100vw - 32px)); background:var(--panel); color:var(--text); border:1px solid #444; border-radius:8px; padding:16px 20px; }
+  #print-help::backdrop { background:rgba(0,0,0,.6); }
+  #print-help .x { position:absolute; top:8px; right:10px; font-size:18px; padding:2px 10px; }
+  #print-help ol { padding-left:20px; line-height:1.6; }
+  #print-help em { font-style:normal; font-weight:bold; font-size:1.1em; color:#f2c94c; }  /* 실제 인쇄 때 중요한 값 */
+  #patrol-nav { border:2px solid var(--btnon); border-radius:10px; padding:10px 16px; margin:0 0 12px; background:rgba(56,139,253,.08); }
+  #patrol-nav div { margin:2px 0; }
+  #nav-done { color:#3fb950; font-size:1em; }
+  #nav-now { font-size:1.5em; font-weight:bold; }
+  #nav-next { font-size:1.15em; color:#f2c94c; }
+  #patrol-reset.unlocked:disabled { opacity:1; border-color:#3fb950; color:#3fb950; font-weight:bold; }
+  .patrol-big { font-size:1.3em; font-weight:bold; margin:4px 0; }
+  .mode-pick[aria-pressed=true] { border-color:var(--btnon); background:var(--btnon); color:white; font-weight:bold; }
   #review-view { margin:14px 16px; }
   #patrol-view { margin:14px 16px; }
   #patrol-view h3 { margin:0 0 12px; }
@@ -224,28 +237,61 @@
 </main>
 <section id="patrol-view" hidden>
   <h2>자율순찰 실험</h2>
+  <div id="patrol-nav" hidden>
+    <div id="nav-done"></div>
+    <div id="nav-now"></div>
+    <div id="nav-next"></div>
+  </div>
   <div class="top-row">
     <section>
-      <h3>인식 미리보기</h3>
+      <h3>카메라 인식 화면</h3>
       <img id="patrol-frame" style="width:100%;max-width:640px" alt="최신 태그·선 인식 영상" hidden>
       <p id="patrol-video">영상 대기 중</p>
+      <p id="patrol-visible" class="patrol-big"></p>
+      <p id="patrol-sonar" class="patrol-big"></p>
     </section>
     <section>
       <fieldset id="patrol-course">
         <legend>코스 설정</legend>
-        <p><label>주행 방식 <select id="patrol-mode"><option value="line">선 기반</option><option value="tag">선 없음 · 태그 접근</option></select></label></p>
-        <p><label>방문할 태그 ID 순서 <input id="patrol-route" value="1,0" size="16"></label></p>
-        <p id="patrol-turn-row" hidden><label>다음 태그 탐색 방향 <select id="patrol-turn"><option value="left">왼쪽</option><option value="right">오른쪽</option></select></label></p>
-        <button id="patrol-calibrate" hidden>화면 속 태그의 도착 기준 저장</button>
+        <p>주행 방식 <button type="button" class="mode-pick" data-mode="line" aria-pressed="false">선 기반</button>
+          <button type="button" class="mode-pick" data-mode="tag" aria-pressed="true">선 없음</button>
+          <select id="patrol-mode" hidden><option value="line">선 기반</option><option value="tag" selected>선 없음</option></select><br>
+          <small id="patrol-mode-help"></small></p>
+        <p><label>방문 순서 <input id="patrol-route" value="1,0" size="16"></label>
+          <b id="patrol-route-view" style="font-size:1.4em;margin-left:8px"></b></p>
+        <p id="patrol-turn-row" hidden>다음 태그를 찾을 때 도는 방향
+          <button type="button" class="mode-pick turn-pick" data-turn="left" aria-pressed="true">왼쪽</button>
+          <button type="button" class="mode-pick turn-pick" data-turn="right" aria-pressed="false">오른쪽</button>
+          <select id="patrol-turn" hidden><option value="left">왼쪽</option><option value="right">오른쪽</option></select></p>
+        <p id="patrol-calibrate-row" hidden><button id="patrol-calibrate">지금 보이는 태그 크기를 '여기서 멈춤'으로 기억</button><br>
+          <small>선 없음 방식은 태그가 이만큼 크게 보이면 도착했다고 판단합니다. 로봇을 멈추고 싶은 자리에 직접 두고, 화면에 태그 하나만 보이게 한 뒤 누르세요. 방문 순서의 태그마다 한 번씩 필요합니다.</small></p>
         <p id="patrol-sizes"></p>
-        <div id="patrol-print"></div>
+        <div><span id="patrol-print"></span> <button type="button" id="print-help-open">인쇄 방법</button></div>
       </fieldset>
-      <p><button id="patrol-start" class="primary" disabled>한 바퀴 시작</button> <button id="patrol-stop" class="stop">정지</button></p>
+      <p><button id="patrol-reset">잠금 해제</button> <button id="patrol-restart" disabled title="처음부터 다시 시작 (기록도 비움)" aria-label="처음부터 다시 시작">↻</button> <button id="patrol-start" class="primary" disabled>순찰 시작</button> <button id="patrol-stop" class="stop">정지</button></p>
+      <p id="patrol-why" role="status"></p>
       <p id="patrol-status" role="status"></p>
       <p id="patrol-error" role="alert"></p>
     </section>
+    <section id="patrol-arrival" hidden>
+      <h3>도착 확인 (임시 시험)</h3>
+      <p id="patrol-arrival-text" role="status"></p>
+      <ol id="patrol-log" reversed style="padding-left:20px;max-height:70vh;overflow-y:auto"></ol>
+    </section>
   </div>
 </section>
+<dialog id="print-help" aria-labelledby="print-help-title">
+  <button type="button" class="x" aria-label="닫기">✕</button>
+  <h3 id="print-help-title" style="margin-top:0">태그 인쇄 방법</h3>
+  <ol>
+    <li>0번·1번 태그는 저장소의 <code>ai/patrol-print/apriltag-stations-a4.pdf</code>를 엽니다. 1쪽이 0번, 2쪽이 1번입니다.</li>
+    <li>흰 A4 용지에 <em>세로 · 단면 · 실제 크기 100%</em>로 출력합니다. 흑백이면 충분합니다. 인쇄 창에서 <em>'용지에 맞춤'과 '축소'를 끕니다.</em></li>
+    <li>종이 아래 확인선을 자로 잽니다. <em>확인선 50 mm</em>, <em>검은 정사각형 한 변 140 mm</em>여야 합니다. 다르면 인쇄 배율을 확인합니다.</li>
+    <li><em>흰 여백을 자르지 말고</em> 평평한 판이나 벽에 붙입니다. 테이프는 종이 가장자리에만 붙이고, 빛이 반사되는 비닐은 피합니다.</li>
+    <li>0·1번 외의 태그는 <b>태그 N</b> 링크의 그림을 출력하되, <em>검은 정사각형 한 변이 140 mm</em>가 되게 크기를 맞춥니다.</li>
+    <li>태그 높이는 사람 눈높이가 아니라 <em>서 있는 로봇의 카메라 높이</em>에 맞춥니다.</li>
+  </ol>
+</dialog>
 <section id="team-view" hidden>
   <h2>두 로봇 쓰러짐 대응</h2>
   <p id="team-message" role="status">서버 연결 확인 중</p>
@@ -350,12 +396,14 @@ $("estop").onclick = () => {
     .catch(e => say("비상 정지 요청 실패: " + e.message));
 };
 const resetDialog = $("reset-dialog");
+document.body.append(resetDialog);  // 조종 탭이 숨겨져도(자율주행 탭) 확인창이 보이도록 탭 밖으로 옮김
 // 확인창을 잠금 해제 버튼 바로 왼쪽에 띄움: 확인창의 [잠금 해제]가 원래 버튼 왼편 같은 높이에 오도록.
 // 커서 바로 밑이 아니라 옆이라 두 번 클릭으로 실수로 확인되지 않음. 왼쪽 공간이 부족하면(좁은 화면) 버튼 아래에 띄움.
+let resetAnchor = "reset";  // 확인창을 띄운 버튼(조종 탭 또는 자율주행 탭)
 function placeResetDialog() {
   const d = resetDialog, ok = d.querySelector('button[value="reset"]');
   d.style.margin = "0"; d.style.inset = "auto"; d.style.left = "0px"; d.style.top = "0px";
-  const b = $("reset").getBoundingClientRect(), dr = d.getBoundingClientRect(), okr = ok.getBoundingClientRect();
+  const b = $(resetAnchor).getBoundingClientRect(), dr = d.getBoundingClientRect(), okr = ok.getBoundingClientRect();
   const okMid = okr.top + okr.height / 2 - dr.top, gap = 8;
   let left = b.left - gap - dr.width, top = b.top + b.height / 2 - okMid;  // 창 오른쪽 끝 = 버튼 왼쪽 - 8px
   if (left < gap) { left = b.left; top = b.bottom + gap; }
@@ -364,16 +412,20 @@ function placeResetDialog() {
   top = Math.max(minTop, Math.min(top, innerHeight - dr.height - gap));
   d.style.left = left + "px"; d.style.top = top + "px";
 }
-$("reset").onclick = () => {
+function openResetDialog(anchor) {
   if (holding) stopMove();
+  resetAnchor = anchor;
   resetDialog.returnValue = "";
   resetDialog.showModal();
   placeResetDialog();
-};
+}
+$("reset").onclick = () => openResetDialog("reset");
+$("patrol-reset").onclick = () => openResetDialog("patrol-reset");
 addEventListener("resize", () => { if (resetDialog.open) placeResetDialog(); });
 resetDialog.addEventListener("close", () => {
   if (resetDialog.returnValue !== "reset") return;
-  post("/api/reset").then(() => say("잠금 해제 요청 보냄")).catch(e => say("해제 불가: " + e.message));
+  const shown = resetAnchor === "patrol-reset" ? (m => { $("patrol-error").textContent = m; }) : say;
+  post("/api/reset").then(() => shown("잠금 해제 요청 보냄")).catch(e => shown("해제 불가: " + e.message));
 });
 $("stand").onclick = () => { stopMove(false);
   post("/api/stand").then(() => say("일어서기 보냄")).catch(e => say("일어서기 불가: " + e.message)); };
@@ -845,7 +897,7 @@ function showTagLinks(routeId, printId) {
     const link = document.createElement("a");
     link.href = "/api/patrol/marker/" + id;
     link.target = "_blank"; link.rel = "noopener";
-    link.textContent = "태그 " + id + " 인쇄";
+    link.textContent = "태그 " + id;
     box.append(link, " ");
   }
 }
@@ -854,39 +906,187 @@ for (const prefix of ["patrol", "team"]) {
   $(routeId).oninput = () => showTagLinks(routeId, prefix + "-print");
   $(routeId).oninput();
 }
+// 자율주행 방문 순서: 입력칸 옆에 화살표로 표시
+{
+  const showRoute = () => {
+    let ids; try { ids = courseIds(); } catch { ids = null; }
+    $("patrol-route-view").textContent = ids ? ids.join(" → ") : "";
+  };
+  $("patrol-route").addEventListener("input", showRoute);
+  showRoute();
+}
+let patrolArriveMm = null;  // 초음파 도착 시험 모드면 도착 기준 저장이 필요 없으므로 버튼을 숨김
+const MODE_HELP = {line: "바닥의 검은 선을 따라 걷고 파란 띠에서 멈춥니다.",
+  tag: "태그를 보고 그쪽으로 걸어가 멈춥니다."};
+for (const b of document.querySelectorAll(".mode-pick[data-mode]")) {
+  b.onclick = () => { $("patrol-mode").value = b.dataset.mode; $("patrol-mode").onchange(); };
+}
+$("print-help-open").onclick = () => $("print-help").showModal();
+$("print-help").querySelector(".x").onclick = () => $("print-help").close();
+$("print-help").addEventListener("click", e => { if (e.target === $("print-help")) $("print-help").close(); });  // 바깥 클릭으로도 닫기
+for (const b of document.querySelectorAll(".turn-pick")) {
+  b.onclick = () => {
+    $("patrol-turn").value = b.dataset.turn;
+    for (const o of document.querySelectorAll(".turn-pick")) o.setAttribute("aria-pressed", String(o === b));
+  };
+}
 $("patrol-mode").onchange = () => {
   const line = $("patrol-mode").value === "line";
-  $("patrol-turn-row").hidden = $("patrol-calibrate").hidden = line;
+  for (const b of document.querySelectorAll(".mode-pick[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === $("patrol-mode").value));
+  $("patrol-mode-help").textContent = MODE_HELP[$("patrol-mode").value];
+  $("patrol-turn-row").hidden = line;
+  $("patrol-calibrate-row").hidden = line || !!patrolArriveMm;
 };
+$("patrol-mode").onchange();  // 기본: 선 없음
 function showPatrolState(s) {
   const p = s.patrol;
+  if (patrolArriveMm !== (p?.arrive_mm || null)) { patrolArriveMm = p?.arrive_mm || null; $("patrol-mode").onchange(); }
   $("patrol-course").disabled = !p || p.active || patrolStarting;
+  const seen = p?.visible;
+  $("patrol-visible").textContent = "태그: " + (!seen ? "영상 없음" : seen.length ? seen.join(", ") : "없음");
+  $("patrol-visible").style.color = seen?.length ? "var(--ok, #3fb950)" : "";
+  $("patrol-sonar").textContent ="초음파: " + (s.fresh && s.tel?.sonar_mm ? Math.round(s.tel.sonar_mm / 10) + " cm" : "-");
+  // 시작 버튼이 꺼진 이유를 버튼 아래에 그대로 보여 줌(조건은 버튼 비활성 조건과 같음)
+  const why = !p ? ["카메라 영상이 연결되지 않음"] : p.active ? [] : [
+    !s.allow_real && "카메라만 연결된 모드로 실행됨 → 실행 명령에 --allow-real 을 넣고 --sensors-only 는 빼야 합니다",
+    s.allow_real && !s.fresh && "로봇 본체와 연결되지 않음 → 로봇 전원·핫스팟 연결을 확인하세요",
+    s.emergency && "비상 정지가 걸려 있음 → 잠금 해제를 누르세요",
+    s.fresh && s.tel?.latched && "로봇이 잠겨 있음 → 왼쪽 잠금 해제 버튼을 누르세요",
+    s.fresh && !s.tel?.latched && s.tel?.state !== "idle" && "로봇이 아직 움직이거나 동작 중 → 멈출 때까지 기다리세요",
+    s.fresh && !p.arrive_mm && !s.tel?.sonar_mm && "초음파 값을 읽지 못함",
+    s.fresh && !p.arrive_mm && s.tel?.sonar_mm <= 300 && "앞 30 cm 안에 물체가 있음",
+    s.fall_hold > 0 && "쓰러짐 감지 직후라 잠시 이동이 막혀 있음"].filter(Boolean);
   $("patrol-start").disabled = !p || p.active || patrolStarting || !s.allow_real || !s.fresh ||
-    s.emergency || s.tel?.state !== "idle" || s.tel?.latched || !(s.tel?.sonar_mm > 300) || s.fall_hold > 0;
+    s.emergency || s.tel?.state !== "idle" || s.tel?.latched || (!p.arrive_mm && !(s.tel?.sonar_mm > 300)) || s.fall_hold > 0;
+  $("patrol-restart").disabled = $("patrol-start").disabled;
+  $("patrol-restart").hidden = !p?.arrive_mm;  // 이어서 가기는 초음파 도착 모드에만 있음
+  $("patrol-why").textContent = why.length ? "⛔ 아직 시작할 수 없음: " + why.join(" · ")
+    : p?.active ? "" : "✅ 시작할 수 있습니다. 로봇 앞을 비우고 순찰 시작을 누르세요.";
+  // 숨기지 않고 상태를 글자로: 잠김이면 누를 수 있는 "잠금 해제", 풀렸으면 "잠금 해제 완료"(누를 필요 없음)
+  const unlocked = s.fresh && !s.tel?.latched && !s.emergency;
+  $("patrol-reset").hidden = !s.allow_real;
+  $("patrol-reset").textContent = unlocked ? "잠금 해제 완료" : "잠금 해제";
+  $("patrol-reset").classList.toggle("unlocked", !!unlocked);
+  $("patrol-reset").disabled = unlocked || !s.fresh || s.fall_hold > 0;
   $("patrol-stop").disabled = !s.allow_real;
-  $("patrol-sizes").textContent = "도착 기준 저장됨 · " + (p?.calibrated.join(", ") || "없음");
-  $("patrol-status").textContent = p ? [p.reason, p.target != null ? "목표 " + p.target : "",
-    "방문 " + (p.visits.join(" → ") || "없음"),
-    !s.allow_real ? "카메라 전용 미리보기" : s.tel?.latched ? "조종 탭에서 잠금 해제" : ""].filter(Boolean).join(" · ")
-    : "Wi-Fi 카메라와 AprilTag 지원 OpenCV를 연결하세요.";
+  showArrival(p);
+  showNav(p, s);
+  $("patrol-sizes").textContent = p?.arrive_mm
+    ? "멈추는 기준 (임시 시험): 태그를 향해 걷다가 앞 초음파 거리가 " + Math.round(p.arrive_mm / 10) +
+      " cm 이하가 되면 멈추고, 완전히 선 뒤 태그 번호를 확인합니다."
+    : p?.calibrated.length
+      ? "'여기서 멈춤' 크기를 기억해 둔 태그: " + p.calibrated.join(", ") + "번 (선 없음 방식은 방문 순서의 모든 태그가 여기 있어야 시작됩니다)"
+      : "'여기서 멈춤' 크기를 기억해 둔 태그가 아직 없습니다. 선 없음 방식은 먼저 태그마다 기억시켜야 합니다.";
+  $("patrol-status").textContent = p ? ["상태: " + p.reason, p.target != null ? "지금 찾아가는 태그: " + p.target + "번" : "",
+    "도착한 태그: " + (p.visits.join(" → ") || "아직 없음"),
+    !s.allow_real ? "카메라만 연결된 미리보기 모드(로봇은 움직이지 않음)" : ""].filter(Boolean).join(" · ")
+    : "카메라 영상이 없거나 태그 인식용 OpenCV가 없어 이 기능을 쓸 수 없습니다.";
+}
+// ❌ 기록에 붙일 해결법(멈춘 이유 문구의 일부로 찾음)
+const PATROL_FIX = [
+  ["배터리", "배터리를 충전하세요. 걸을 때 전압이 7.0 V 밑으로 3초 넘게 떨어지면 멈춥니다."],
+  ["초음파", "초음파 센서 선과 방향을 확인하세요. 태그 판에 비스듬히 닿으면 값이 끊길 수 있습니다."],
+  ["놓침", "태그가 카메라 정면 시야에 계속 들어오게 높이·각도를 맞추고, 반사·역광을 줄이세요."],
+  ["식별 불가", "태그 하나만 시야에 들어오게 하고, 흰 여백까지 보이게 하세요."],
+  ["여러 개", "같은 번호 태그가 두 장 보입니다. 하나만 남기세요."],
+  ["멈춘 뒤 확인 실패", "멈춘 위치에서 태그가 잘리거나 안 보입니다. 도착 거리(--patrol-arrive-mm)를 늘리거나 태그 높이를 카메라에 맞추세요."],
+  ["화면 연결", "순찰 중에는 자율주행 탭을 열어 두세요. 다른 탭·창으로 가면 멈춥니다."],
+  ["카메라 영상", "카메라 IP와 핫스팟 연결을 확인하세요."],
+  ["본체 상태", "로봇이 동작 중이거나 잠겼습니다. 멈춘 뒤 잠금 해제하고 다시 시작하세요."],
+  ["실물 연결", "로봇 연결과 잠금 해제 상태를 확인하세요."],
+  ["운영자", "정지·비상 정지로 멈췄습니다. 다시 시작하면 멈춘 태그부터 이어서 갑니다."],
+  ["쓰러짐", "쓰러짐 감지로 멈췄습니다. 쓰러짐 로그 탭에서 확인하고, 이동 차단이 풀린 뒤 다시 시작하세요."],
+  ["감지 경고", "사람·장애물 감지로 멈췄습니다. 앞을 비운 뒤 다시 시작하세요."],
+];
+function arrivalLine(a) {
+  const fix = a.ok === false && PATROL_FIX.find(([key]) => a.text.includes(key));
+  return [(a.ok === true ? "✅ " : a.ok === false ? "❌ " : a.ok === "start" ? "▶ " : "🔎 ") + a.text,
+    fix ? "해결: " + fix[1] : "",
+    "보인 태그: " + (a.seen.length ? a.seen.join(", ") + "번" : "없음"),
+    "초음파: " + (a.sonar_mm ? Math.round(a.sonar_mm / 10) + " cm" : "없음"),
+    a.size ? "태그 크기 " + Math.round(a.size * 100) + "% · " +
+      (Math.abs(a.offset) < .05 ? "정중앙" : (a.offset < 0 ? "왼쪽 " : "오른쪽 ") + Math.round(Math.abs(a.offset) * 100) + "%") : ""
+  ].filter(Boolean).join(" · ");
+}
+// 네비 안내: 방금 끝낸 것 / 지금 하는 것 / 다음에 할 것 (갑자기 도는 등 다음 동작을 미리 알림)
+// 숫자 뒤 조사: 끝자리 읽는 소리에 받침이 있으면(영·일·삼·육·칠·팔, 십·백) 앞 것, 없으면 뒤 것
+const josa = (n, withFinal, without) => n + ([0, 1, 3, 6, 7, 8].includes(Math.abs(n) % 10) ? withFinal : without);
+function showNav(p, s) {
+  const box = $("patrol-nav");
+  box.hidden = !p || !(p.active || p.visits.length || p.log?.length);
+  if (box.hidden) return;
+  const dir = p.turn === "right" ? "오른쪽" : "왼쪽", t = p.target, last = p.visits[p.visits.length - 1];
+  const sonar = s.tel?.sonar_mm ? Math.round(s.tel.sonar_mm / 10) + " cm" : "측정 안 됨";
+  const stopAt = p.arrive_mm ? Math.round(p.arrive_mm / 10) + " cm" : "기억한 크기";
+  const after = p.next != null ? `${dir}으로 제자리 회전하며 태그 ${josa(p.next, "을", "를")} 찾습니다` : "순찰을 마칩니다";
+  let now = "", next = "";
+  if (!p.active) {
+    now = p.target == null ? "🏁 순찰 완료" : "⏹ 순찰 멈춤 · " + p.reason;
+    next = p.target == null ? "다시 하려면 ↻ 또는 순찰 시작" : `순찰 시작을 누르면 태그 ${t}부터 이어서 갑니다`;
+  } else if (p.phase === "search") {
+    now = `🔄 ${dir}으로 제자리 회전하며 태그 ${t} 찾는 중`;
+    next = `태그 ${josa(t, "이", "가")} 보이면 회전을 멈추고 그쪽으로 직진합니다`;
+  } else if (p.phase === "follow" && p.mode === "tag") {
+    now = `⬆ 태그 ${t} 쪽으로 직진 중 · 앞 거리 ${sonar}`;
+    next = `${stopAt} 안으로 들어오면 멈추고 태그 번호를 확인합니다`;
+  } else if (p.phase === "confirm") {
+    now = `⏸ 멈춤 · 태그 ${t} 번호 확인 중`;
+    next = "확인되면 " + after;
+  } else {
+    now = p.mode === "line" ? "⬆ 바닥 선을 따라 걷는 중" : "순찰 중";
+    next = p.mode === "line" ? "파란 띠에서 멈추고 태그 번호를 확인합니다" : "";
+  }
+  $("nav-done").textContent = last != null ? `✅ 방금: 태그 ${last} 도착 확인` : "";
+  $("nav-now").textContent = now;
+  $("nav-next").textContent = next ? "➡ 다음: " + next : "";
+}
+function showArrival(p) {
+  const log = p?.log || [], list = $("patrol-log");
+  $("patrol-arrival").hidden = !p?.arrive_mm && !log.length;
+  $("patrol-arrival-text").textContent = log.length ? "" : "아직 기록 없음";
+  const keep = new Set(log.map(a => String(a.n)));
+  for (const li of [...list.children]) {
+    if (keep.has(li.dataset.n)) continue;
+    const img = li.querySelector("img");
+    if (img?.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+    li.remove();
+  }
+  for (const a of log) {
+    if (list.querySelector(`li[data-n="${a.n}"]`)) continue;
+    const li = document.createElement("li"), text = document.createElement("div"), img = document.createElement("img");
+    li.dataset.n = a.n;
+    text.textContent = arrivalLine(a);
+    img.style.cssText = "width:100%;max-width:320px;margin:4px 0 12px";
+    img.alt = "기록 순간의 인식 화면";
+    img.hidden = true;  // 사진을 받은 뒤에만 보임(인라인 display를 주지 않아야 hidden이 적용됨)
+    li.append(text, img);
+    list.prepend(li);  // 최신 기록이 맨 위
+    fetch("/api/patrol/arrival/" + a.n).then(r => r.ok ? r.blob() : Promise.reject()).then(blob => {
+      img.src = URL.createObjectURL(blob);
+      img.hidden = false;
+    }).catch(() => {});
+  }
 }
 function patrolError(e) { $("patrol-error").textContent = e.message; }
 $("patrol-calibrate").onclick = () => post("/api/patrol/calibrate").then(() => {
   $("patrol-error").textContent = "";
 }).catch(patrolError);
-$("patrol-start").onclick = async () => {
+async function startPatrol(fresh) {
   if (patrolStarting) return;
   patrolStarting = true;
   const owner = crypto.randomUUID();
   patrolOwner = owner;
   $("patrol-error").textContent = "";
   try {
+    // fresh: 진행·기록을 비우고 방문 순서 첫 태그부터(초음파 도착 모드의 '이어서 가기'를 하지 않음)
     await post("/api/patrol/start", {mode: $("patrol-mode").value, route: courseIds(),
-      turn: $("patrol-turn").value, owner, epoch: motionEpoch});
+      turn: $("patrol-turn").value, owner, epoch: motionEpoch, fresh});
     if (patrolOwner !== owner) await post("/api/stop");
   } catch (e) { patrolOwner = null; patrolError(e); }
   finally { patrolStarting = false; }
-};
+}
+$("patrol-start").onclick = () => startPatrol(false);
+$("patrol-restart").onclick = () => startPatrol(true);
 $("patrol-stop").onclick = leavePatrol;
 addEventListener("pagehide", () => { patrolOwner = null; });
 setInterval(async () => {
